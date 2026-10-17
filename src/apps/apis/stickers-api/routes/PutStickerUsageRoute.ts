@@ -6,23 +6,23 @@ import {
   Body,
   JsonController,
   Param,
-  Post,
+  Put,
   Req,
   Res,
 } from 'routing-controllers';
 
-import { PostUsedStickerBody } from '../bodies/PostUsedStickerBody';
+import { PutStickerUsageBody } from '../bodies/PutStickerUsageBody';
 import { StickerRouteSupport } from './StickerRouteSupport';
 
 @JsonController('/stickers/packs')
-export class PostUsedStickerRoute extends StickerRouteSupport {
+export class PutStickerUsageRoute extends StickerRouteSupport {
   private readonly recorder = this.get<StickerUseRecorder>(StickerUseRecorder);
 
-  @Post('/:packId/stickers/:stickerId/used')
+  @Put('/:packId/stickers/:stickerId/usage')
   public async recordStickerUse(
     @Param('packId') packId: string,
     @Param('stickerId') stickerId: string,
-    @Body() body: PostUsedStickerBody,
+    @Body() body: PutStickerUsageBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {

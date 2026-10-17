@@ -299,7 +299,6 @@ package "nodes" {
       -nodes: NodeRepository
       -eventPublisher: DomainEventPublisher
       +addNetwork(message: NodeNetworkAdderMessage): Promise<void>
-      +addPublicNetwork(message: NodePublicNetworkAdderMessage): Promise<void>
     }
 
     class NodeNetworkRemover {
@@ -310,11 +309,6 @@ package "nodes" {
     }
 
     class NodeNetworkAdderMessage {
-      +network: Network
-      +authenticatedIdentityId?: IdentityId
-    }
-
-    class NodePublicNetworkAdderMessage {
       +network: Network
       +authenticatedIdentityId?: IdentityId
     }
@@ -422,7 +416,6 @@ package "nodes" {
 
     NodeNetworkAdder --> NodeRepository
     NodeNetworkAdder --> NodeNetworkAdderMessage
-    NodeNetworkAdder --> NodePublicNetworkAdderMessage
     NodeNetworkRemover --> NodeRepository
     NodeNetworkRemover --> NodeNetworkDataCleaner
     NodeNetworkRemover --> NodeNetworkRemoverMessage

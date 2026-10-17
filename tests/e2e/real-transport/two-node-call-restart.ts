@@ -91,6 +91,7 @@ async function send(
   identity: IdentityFixture,
   endpoint: string,
   body: Record<string, unknown>,
+  method: 'PATCH' | 'POST' = 'POST',
 ): Promise<Outcome> {
   try {
     const response = await fetch(`${node.baseUrl}${endpoint}`, {
@@ -98,9 +99,9 @@ async function send(
       headers: {
         Connection: 'close',
         'content-type': 'application/json',
-        ...signHeaders(identity, 'POST', endpoint, body),
+        ...signHeaders(identity, method, endpoint, body),
       },
-      method: 'POST',
+      method,
       signal: AbortSignal.timeout(5_000),
     });
 
@@ -275,15 +276,19 @@ async function main(): Promise<void> {
       join(nodeB, identityB, callId),
     );
 
-    const heartbeatPath = `/calls/${callId}/participants/me/heartbeat`;
-    const settled = await send(nodeB, identityB, heartbeatPath, {
-      mediaConnections: [],
-    });
+    const heartbeatPath = `/calls/${callId}/participants/me`;
+    const settled = await send(
+      nodeB,
+      identityB,
+      heartbeatPath,
+      { mediaConnections: [] },
+      'PATCH',
+    );
 
     assert.equal(settled.status, 204, settled.body);
 
     await retryAcrossRestart(nodeB, 'Heartbeat', () =>
-      send(nodeB, identityB, heartbeatPath, { mediaConnections: [] }),
+      send(nodeB, identityB, heartbeatPath, { mediaConnections: [] }, 'PATCH'),
     );
   } finally {
     await Promise.allSettled([stopNode(nodeA), stopNode(nodeB)]);

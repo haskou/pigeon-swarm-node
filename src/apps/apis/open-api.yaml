@@ -61,22 +61,20 @@ paths:
     $ref: './calls-api/swagger.yaml#/paths/~1calls'
   /calls/{callId}:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}'
-  /calls/ice-servers:
-    $ref: './calls-api/swagger.yaml#/paths/~1calls~1ice-servers'
-  /calls/history:
-    $ref: './calls-api/swagger.yaml#/paths/~1calls~1history'
+  /call-ice-servers:
+    $ref: './calls-api/swagger.yaml#/paths/~1call-ice-servers'
+  /past-calls:
+    $ref: './calls-api/swagger.yaml#/paths/~1past-calls'
   /calls/{callId}/participants:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants'
   /calls/{callId}/participants/me:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me'
-  /calls/{callId}/participants/me/heartbeat:
-    $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1participants~1me~1heartbeat'
   /calls/{callId}/signals:
     $ref: './calls-api/swagger.yaml#/paths/~1calls~1{callId}~1signals'
   /communities:
     $ref: './communities-api/swagger.yaml#/paths/~1communities'
-  /communities/discover:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1discover'
+  /discoverable-communities:
+    $ref: './communities-api/swagger.yaml#/paths/~1discoverable-communities'
   /community-membership-requests:
     $ref: './communities-api/swagger.yaml#/paths/~1community-membership-requests'
   /community-membership-requests/{requestId}:
@@ -105,8 +103,8 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members'
   /communities/{communityId}/members/me:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1me'
-  /communities/{communityId}/members/{identityId}/kick:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1{identityId}~1kick'
+  /communities/{communityId}/members/{identityId}:
+    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1{identityId}'
   /communities/{communityId}/members/{identityId}/roles:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1members~1{identityId}~1roles'
   /communities/{communityId}/bans:
@@ -121,10 +119,6 @@ paths:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels'
   /communities/{communityId}/messages:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1messages'
-  /communities/{communityId}/channels/text:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1text'
-  /communities/{communityId}/channels/voice:
-    $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1voice'
   /communities/{communityId}/channels/{channelId}:
     $ref: './communities-api/swagger.yaml#/paths/~1communities~1{communityId}~1channels~1{channelId}'
   /communities/{communityId}/channels/{channelId}/permissions:
@@ -159,8 +153,8 @@ paths:
     $ref: './identities-api/swagger.yaml#/paths/~1identities~1{identityId}'
   /ipfs/contents/{cid}:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1contents~1{cid}'
-  /ipfs/public:
-    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1public'
+  /ipfs/contents:
+    $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1contents'
   /ipfs/replication-status:
     $ref: './ipfs-api/swagger.yaml#/paths/~1ipfs~1replication-status'
   /ipfs/replications/{cid}:
@@ -197,8 +191,6 @@ paths:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks'
   /node/networks/{networkId}:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1{networkId}'
-  /node/networks/public:
-    $ref: './nodes-api/swagger.yaml#/paths/~1node~1networks~1public'
   /node/owner:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1owner'
   /node/registration:
@@ -231,8 +223,6 @@ paths:
     $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}~1votes'
   /polls/{pollId}/votes/me:
     $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}~1votes~1me'
-  /polls/{pollId}/close:
-    $ref: './polls-api/swagger.yaml#/paths/~1polls~1{pollId}~1close'
   /push/vapid-public-key:
     $ref: './push-api/swagger.yaml#/paths/~1push~1vapid-public-key'
   /push/subscriptions:
@@ -253,5 +243,5 @@ paths:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}'
   /stickers/packs/{packId}/stickers/{stickerId}/favorite:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1favorite'
-  /stickers/packs/{packId}/stickers/{stickerId}/used:
-    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1used'
+  /stickers/packs/{packId}/stickers/{stickerId}/usage:
+    $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1usage'

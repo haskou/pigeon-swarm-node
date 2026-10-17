@@ -41,6 +41,7 @@ const singularSegments: Record<string, true> = {
   owner: true,
   pin: true,
   'private-authorization': true,
+  publication: true,
   push: true,
   realtime: true,
   registration: true,
@@ -49,6 +50,7 @@ const singularSegments: Record<string, true> = {
   revocation: true,
   saved: true,
   thread: true,
+  usage: true,
   'vapid-public-key': true,
 };
 
@@ -78,26 +80,28 @@ const verbs: Record<string, true> = {
   used: true,
 };
 
-// Documented exceptions (docs/api.md, "Path conventions").
+// Documented exceptions (docs/api.md, "Path conventions"): RPC-style
+// operations with no resource to write.
 const exceptions: Record<string, string> = {
-  'DELETE /communities/{communityId}/members/{identityId}/kick': 'verb',
-  'GET /calls/history': 'static segment beside {callId}',
-  'GET /calls/ice-servers': 'static segment beside {callId}',
-  'GET /communities/discover': 'verb beside {communityId}',
-  'POST /calls/{callId}/participants/me/heartbeat': 'verb',
-  'POST /communities/{communityId}/channels/text':
-    'static segment beside {channelId}',
-  'POST /communities/{communityId}/channels/voice':
-    'static segment beside {channelId}',
-  'POST /mailboxes/{mailboxId}/ack': 'verb',
-  'POST /node/networks/public': 'static segment beside {networkId}',
-  'POST /polls/{pollId}/close': 'verb',
-  'POST /push/test': 'verb',
-  'POST /stickers/packs/{packId}/stickers/{stickerId}/used': 'verb',
-  'GET /node/blocks/publication': 'singleton beside the blocks collection',
-  'PUT /node/blocks/publication': 'singleton beside the blocks collection',
-  'POST /ipfs/public': 'adjective',
+  'POST /mailboxes/{mailboxId}/ack': 'RPC: advances a reader cursor',
+  'POST /push/test': 'RPC: sends a test notification',
 };
+
+// Verb-style operations that issue #606 replaced with resource and method
+// semantics. None of them may be served again.
+const removedOperations = [
+  'DELETE /communities/{communityId}/members/{identityId}/kick',
+  'GET /calls/history',
+  'GET /calls/ice-servers',
+  'GET /communities/discover',
+  'POST /calls/{callId}/participants/me/heartbeat',
+  'POST /communities/{communityId}/channels/text',
+  'POST /communities/{communityId}/channels/voice',
+  'POST /ipfs/public',
+  'POST /node/networks/public',
+  'POST /polls/{pollId}/close',
+  'POST /stickers/packs/{packId}/stickers/{stickerId}/used',
+];
 
 function readYaml(file: string): OpenAPIDocument {
   return YAML.parse(readFileSync(file, 'utf8')) as OpenAPIDocument;
@@ -125,6 +129,45 @@ function handlerOperations(): string[] {
 
       return `${action.type.toUpperCase()} ${path.replace(/:(\w+)/g, '{$1}')}`;
     });
+}
+
+type RegisteredHandler = { method: string; order: number; path: string };
+
+function registeredHandlers(): RegisteredHandler[] {
+  const storage = getMetadataArgsStorage();
+
+  return storage.actions.flatMap((action) => {
+    const order = applicationRoutes.indexOf(action.target as never);
+
+    if (order < 0) return [];
+
+    const controller = storage.controllers.find(
+      (candidate) => candidate.target === action.target,
+    );
+
+    return [
+      {
+        method: action.type,
+        order,
+        path: `${controller?.route ?? ''}${(action.route as string) ?? ''}`,
+      },
+    ];
+  });
+}
+
+// True when `literal` names one concrete path that `pattern` also matches.
+function shadows(pattern: string, literal: string): boolean {
+  const patternSegments = pattern.split('/');
+  const literalSegments = literal.split('/');
+
+  return (
+    pattern !== literal &&
+    patternSegments.length === literalSegments.length &&
+    patternSegments.every(
+      (segment, index) =>
+        segment.startsWith(':') || segment === literalSegments[index],
+    )
+  );
 }
 
 function apiSwaggerFiles(): string[] {
@@ -241,6 +284,33 @@ describe('API path conventions', () => {
     expect(sorted(aggregatedOperations())).toEqual(
       sorted(apiSwaggerOperations()),
     );
+  });
+
+  it('should not serve the verb-style operations it replaced', () => {
+    const served = new Set([...handlerOperations(), ...apiSwaggerOperations()]);
+
+    expect(
+      removedOperations.filter((operation) => served.has(operation)),
+    ).toEqual([]);
+  });
+
+  it('should register a literal path before the parameter path that also matches it', () => {
+    const handlers = registeredHandlers();
+    const misordered = handlers.flatMap((pattern) =>
+      handlers
+        .filter(
+          (literal) =>
+            literal.method === pattern.method &&
+            shadows(pattern.path, literal.path) &&
+            literal.order > pattern.order,
+        )
+        .map(
+          (literal) =>
+            `${literal.method.toUpperCase()} ${literal.path} is registered after ${pattern.path}`,
+        ),
+    );
+
+    expect(misordered).toEqual([]);
   });
 
   it('should only list exceptions that exist', () => {

@@ -6,23 +6,23 @@ import {
   Body,
   JsonController,
   Param,
-  Post,
+  Patch,
   Req,
   Res,
 } from 'routing-controllers';
 
-import { PostPollCloseBody } from '../bodies/PostPollCloseBody';
+import { PatchPollBody } from '../bodies/PatchPollBody';
 import { PollViewModel } from '../view-model/PollViewModel';
 import { PollRouteSupport } from './PollRouteSupport';
 
 @JsonController('/polls')
-export class PostPollCloseRoute extends PollRouteSupport {
+export class PatchPollRoute extends PollRouteSupport {
   private readonly closer = this.get<PollCloser>(PollCloser);
 
-  @Post('/:pollId/close')
+  @Patch('/:pollId')
   public async closePoll(
     @Param('pollId') pollId: string,
-    @Body() body: PostPollCloseBody,
+    @Body() body: PatchPollBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {

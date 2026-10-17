@@ -4,7 +4,6 @@ import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { NodeNetworkAdderMessage } from '../../../../../../src/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
-import { NodePublicNetworkAdderMessage } from '../../../../../../src/contexts/nodes/application/add-network/messages/NodePublicNetworkAdderMessage';
 import NodeNetworkAdder from '../../../../../../src/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { Node } from '../../../../../../src/contexts/nodes/domain/Node';
 import NodeRepository from '../../../../../../src/contexts/nodes/domain/repositories/NodeRepository';
@@ -82,23 +81,44 @@ describe('NodeNetworkAdder', () => {
     });
   });
 
-  describe('addPublicNetwork', () => {
-    it('should add a generated public network to the latest node and publish its events', async () => {
-      const message = new NodePublicNetworkAdderMessage(
+  describe('addNetwork without an id', () => {
+    it('should add a network with a generated id to the latest node and publish its events', async () => {
+      const message = new NodeNetworkAdderMessage(
+        undefined,
+        'public',
+        undefined,
         IdentityIdMother.canonical().valueOf(),
       );
       const events = [mock<DomainEvent>()];
 
       node.pullDomainEvents.mockReturnValue(events);
 
-      const result = await adder.addPublicNetwork(message);
+      const result = await adder.addNetwork(message);
 
       expect(result).toBe(node);
+      expect(message.network.isPublic()).toBe(true);
       expect(node.addNetwork).toHaveBeenCalledWith(
         message.network,
         message.authenticatedIdentityId,
       );
       expect(eventPublisher.publish).toHaveBeenCalledWith(events);
+    });
+
+    it('should generate a different id for every message', () => {
+      const first = new NodeNetworkAdderMessage(
+        undefined,
+        'public',
+        undefined,
+        undefined,
+      );
+      const second = new NodeNetworkAdderMessage(
+        undefined,
+        'public',
+        undefined,
+        undefined,
+      );
+
+      expect(first.network.getId().isEqual(second.network.getId())).toBe(false);
     });
   });
 });

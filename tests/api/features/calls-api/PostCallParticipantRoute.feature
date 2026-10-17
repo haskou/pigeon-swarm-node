@@ -29,7 +29,7 @@ Feature: Join call participant
     When I POST a participant join to the current call
     Then response code is equal to 200
     And the other identity signs the current call heartbeat request
-    When I POST a participant heartbeat to the current call
+    When I PATCH the participant of the current call
     Then response code is equal to 204
 
   Scenario: Reject a heartbeat reporting a media connection to a participant that already left
@@ -44,7 +44,7 @@ Feature: Join call participant
     When I POST a participant join to the current call
     Then response code is equal to 200
     And the other identity signs a heartbeat reporting a media connection to a departed participant
-    When I POST a participant heartbeat to the current call
+    When I PATCH the participant of the current call
     Then response code is equal to 409
     And response body should contain "InvalidCallParticipantMediaConnectionError"
 

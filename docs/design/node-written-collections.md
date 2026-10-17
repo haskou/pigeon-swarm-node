@@ -494,7 +494,7 @@ fetch, and other responsible nodes with room still hold the replica.
 
 ### UI/API contract changes
 
-- The upload endpoint (`POST /ipfs/public`) no longer announces replication.
+- The upload endpoint (`POST /ipfs/contents`) no longer announces replication.
   Replication registration is a second request,
   `PUT /ipfs/replications/{cid}` (or equivalent) with `{networkId, context,
   sizeBytes, mutation}` after the client has the CID. For public uploads of an
@@ -666,7 +666,7 @@ about the author's own actions. No node-chosen `updatedAt`/`receivedAt`.
 - A node can no longer write a participant's `left` for a crashed client. A
   graceful exit signs `left`; a crash is handled by the lease expiring locally
   (the node hides the call from its users) plus the maximum call duration
-  cutoff (owner decision below). `GET /calls` and `/calls/history` keep the
+  cutoff (owner decision below). `GET /calls` and `/past-calls` keep the
   same shape.
 - Missed-call push and notifications are derived from admitted call_start
   records only.

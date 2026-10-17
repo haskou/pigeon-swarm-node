@@ -9,7 +9,7 @@ import CallRelayRecordRegistry from '../CallRelayRecordRegistry';
 import FederatedCallRelayCredentials from '../FederatedCallRelayCredentials';
 import { CallRouteSupport } from './CallRouteSupport';
 
-@JsonController('/calls')
+@JsonController('/call-ice-servers')
 export class GetCallIceServersRoute extends CallRouteSupport {
   private readonly callRelayRecordRegistry = this.get<CallRelayRecordRegistry>(
     CallRelayRecordRegistry,
@@ -21,7 +21,7 @@ export class GetCallIceServersRoute extends CallRouteSupport {
   private readonly federatedCredentials =
     this.get<FederatedCallRelayCredentials>(FederatedCallRelayCredentials);
 
-  @Get('/ice-servers')
+  @Get()
   public async getIceServers(
     @Req() request: Request,
     @Res() response: Response,

@@ -64,7 +64,10 @@ try {
         /^\/calls\/[^/]+\/?$/.test(pathname)
       )
         observation.gets.push({ time: Date.now(), status: response.status() });
-      if (pathname.endsWith('/participants/me/heartbeat'))
+      if (
+        response.request().method() === 'PATCH' &&
+        /^\/calls\/[^/]+\/participants\/me\/?$/.test(pathname)
+      )
         observation.heartbeats.push({
           time: Date.now(),
           status: response.status(),

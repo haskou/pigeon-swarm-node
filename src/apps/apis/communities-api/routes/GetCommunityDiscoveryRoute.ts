@@ -7,13 +7,13 @@ import { Get, JsonController, QueryParam, Req, Res } from 'routing-controllers';
 import { CommunityDiscoveryViewModel } from '../view-model/CommunityDiscoveryViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
-@JsonController('/communities')
+@JsonController('/discoverable-communities')
 export class GetCommunityDiscoveryRoute extends CommunityRouteSupport {
   private readonly discoverer = this.get<CommunitiesDiscoverer>(
     CommunitiesDiscoverer,
   );
 
-  @Get('/discover')
+  @Get()
   public async discoverCommunities(
     @QueryParam('query') query: string | undefined,
     @QueryParam('networkId') networkId: string | undefined,

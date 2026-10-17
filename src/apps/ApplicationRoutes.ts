@@ -1,10 +1,10 @@
 import { DeleteCallParticipantRoute } from '@app/apps/apis/calls-api/routes/DeleteCallParticipantRoute';
 import { DeleteCallRoute } from '@app/apps/apis/calls-api/routes/DeleteCallRoute';
-import { GetCallHistoryRoute } from '@app/apps/apis/calls-api/routes/GetCallHistoryRoute';
 import { GetCallIceServersRoute } from '@app/apps/apis/calls-api/routes/GetCallIceServersRoute';
 import { GetCallRoute } from '@app/apps/apis/calls-api/routes/GetCallRoute';
 import { GetCallsRoute } from '@app/apps/apis/calls-api/routes/GetCallsRoute';
-import { PostCallParticipantHeartbeatRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantHeartbeatRoute';
+import { GetPastCallsRoute } from '@app/apps/apis/calls-api/routes/GetPastCallsRoute';
+import { PatchCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PatchCallParticipantRoute';
 import { PostCallParticipantRoute } from '@app/apps/apis/calls-api/routes/PostCallParticipantRoute';
 import { PostCallRoute } from '@app/apps/apis/calls-api/routes/PostCallRoute';
 import { PostCallSignalRoute } from '@app/apps/apis/calls-api/routes/PostCallSignalRoute';
@@ -44,6 +44,7 @@ import { PostCommunityBanRoute } from '@app/apps/apis/communities-api/routes/Pos
 import { PostCommunityChannelMessagePinRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessagePinRoute';
 import { PostCommunityChannelMessageReactionRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageReactionRoute';
 import { PostCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelMessageRoute';
+import { PostCommunityChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityChannelRoute';
 import { PostCommunityInvitationAdmissionRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInvitationAdmissionRoute';
 import { PostCommunityInvitationClaimRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInvitationClaimRoute';
 import { PostCommunityInvitationRevocationRoute } from '@app/apps/apis/communities-api/routes/PostCommunityInvitationRevocationRoute';
@@ -51,8 +52,6 @@ import { PostCommunityInvitationRoute } from '@app/apps/apis/communities-api/rou
 import { PostCommunityJoinRequestRoute } from '@app/apps/apis/communities-api/routes/PostCommunityJoinRequestRoute';
 import { PostCommunityRoleRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoleRoute';
 import { PostCommunityRoute } from '@app/apps/apis/communities-api/routes/PostCommunityRoute';
-import { PostCommunityTextChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityTextChannelRoute';
-import { PostCommunityVoiceChannelRoute } from '@app/apps/apis/communities-api/routes/PostCommunityVoiceChannelRoute';
 import { PostMLSRecordRoute } from '@app/apps/apis/communities-api/routes/PostMLSRecordRoute';
 import { PutCommunityChannelDraftRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelDraftRoute';
 import { PutCommunityChannelMessageRoute } from '@app/apps/apis/communities-api/routes/PutCommunityChannelMessageRoute';
@@ -103,7 +102,6 @@ import { GetPeersRoute } from '@app/apps/apis/nodes-api/routes/GetPeersRoute';
 import { GetPublishedNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/GetPublishedNodeBlocksRoute';
 import { PostNodeBlockSourceApprovalRoute } from '@app/apps/apis/nodes-api/routes/PostNodeBlockSourceApprovalRoute';
 import { PostNodeNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodeNetworkRoute';
-import { PostNodePublicNetworkRoute } from '@app/apps/apis/nodes-api/routes/PostNodePublicNetworkRoute';
 import { PostNodeRegistrationCodeRoute } from '@app/apps/apis/nodes-api/routes/PostNodeRegistrationCodeRoute';
 import { PutNodeBlockExceptionsRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlockExceptionsRoute';
 import { PutNodeBlockPublicationRoute } from '@app/apps/apis/nodes-api/routes/PutNodeBlockPublicationRoute';
@@ -121,7 +119,7 @@ import { PatchNotificationRoute } from '@app/apps/apis/notifications-api/routes/
 import { PostNotificationRoute } from '@app/apps/apis/notifications-api/routes/PostNotificationRoute';
 import { DeletePollVoteRoute } from '@app/apps/apis/polls-api/routes/DeletePollVoteRoute';
 import { GetPollRoute } from '@app/apps/apis/polls-api/routes/GetPollRoute';
-import { PostPollCloseRoute } from '@app/apps/apis/polls-api/routes/PostPollCloseRoute';
+import { PatchPollRoute } from '@app/apps/apis/polls-api/routes/PatchPollRoute';
 import { PostPollRoute } from '@app/apps/apis/polls-api/routes/PostPollRoute';
 import { PostPollVoteRoute } from '@app/apps/apis/polls-api/routes/PostPollVoteRoute';
 import { GetPresenceRoute } from '@app/apps/apis/presence-api/routes/GetPresenceRoute';
@@ -148,9 +146,9 @@ import { PatchStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PatchS
 import { PatchStickerRoute } from '@app/apps/apis/stickers-api/routes/PatchStickerRoute';
 import { PostStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PostStickerPackRoute';
 import { PostStickerRoute } from '@app/apps/apis/stickers-api/routes/PostStickerRoute';
-import { PostUsedStickerRoute } from '@app/apps/apis/stickers-api/routes/PostUsedStickerRoute';
 import { PutFavoriteStickerRoute } from '@app/apps/apis/stickers-api/routes/PutFavoriteStickerRoute';
 import { PutSavedStickerPackRoute } from '@app/apps/apis/stickers-api/routes/PutSavedStickerPackRoute';
+import { PutStickerUsageRoute } from '@app/apps/apis/stickers-api/routes/PutStickerUsageRoute';
 import HealthRoute from '@app/shared/infrastructure/ui/routes/HealthRoute';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 
@@ -159,12 +157,12 @@ import { ApplicationServiceClass } from './ApplicationServiceClass';
 export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   HealthRoute,
   GetCallsRoute,
-  GetCallHistoryRoute,
+  GetPastCallsRoute,
   GetCallIceServersRoute,
   GetCallRoute,
   PostCallRoute,
   PostCallParticipantRoute,
-  PostCallParticipantHeartbeatRoute,
+  PatchCallParticipantRoute,
   DeleteCallParticipantRoute,
   DeleteCallRoute,
   PostCallSignalRoute,
@@ -207,7 +205,6 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetNodeNetworksRoute,
   DeleteNodeNetworkRoute,
   PostNodeNetworkRoute,
-  PostNodePublicNetworkRoute,
   PutNodeOwnerRoute,
   PutNodeRegistrationRoute,
   PostNodeRegistrationCodeRoute,
@@ -243,7 +240,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetPollRoute,
   PostPollVoteRoute,
   DeletePollVoteRoute,
-  PostPollCloseRoute,
+  PatchPollRoute,
   GetPushVapidPublicKeyRoute,
   PutPushSubscriptionRoute,
   DeletePushSubscriptionRoute,
@@ -260,7 +257,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   DeleteStickerRoute,
   PutFavoriteStickerRoute,
   DeleteFavoriteStickerRoute,
-  PostUsedStickerRoute,
+  PutStickerUsageRoute,
   GetCommunitiesRoute,
   GetCommunityDiscoveryRoute,
   GetCommunityMembershipRequestsRoute,
@@ -291,8 +288,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PutCommunityMemberRolesRoute,
   GetCommunityChannelsRoute,
   GetCommunityMessagesRoute,
-  PostCommunityTextChannelRoute,
-  PostCommunityVoiceChannelRoute,
+  PostCommunityChannelRoute,
   PatchCommunityChannelRoute,
   PatchCommunityChannelPermissionsRoute,
   DeleteCommunityChannelRoute,

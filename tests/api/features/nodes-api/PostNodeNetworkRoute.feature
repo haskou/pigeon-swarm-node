@@ -25,7 +25,13 @@ Feature: Post node network
 
   Scenario: Add a generated public network before the node is owned
     Given the local node has no owner and no networks
-    When I POST to "/node/networks/public"
+    And I set json body
+      """
+      {
+        "name": "public"
+      }
+      """
+    When I POST to "/node/networks"
     Then response code is equal to 200
     And response data should match partially
       """
@@ -67,7 +73,7 @@ Feature: Post node network
     Then response code is equal to 200
 
     Given I sign the current node public network request
-    When I POST to "/node/networks/public"
+    When I POST to "/node/networks"
     Then response code is equal to 200
 
   Scenario: Reject unsigned network deletion before the node is owned

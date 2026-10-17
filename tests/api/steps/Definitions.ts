@@ -654,10 +654,10 @@ export default class Definitions {
       ],
       [
         'POST',
-        /^\/communities\/[^/]+\/channels\/(text|voice)$/,
-        (match) => ({
+        /^\/communities\/[^/]+\/channels$/,
+        () => ({
           action: 'channel_created',
-          details: { name: body.name, type: match[1] },
+          details: { name: body.name, type: body.type },
           target: channel(derivedChannelId),
         }),
       ],
@@ -744,7 +744,7 @@ export default class Definitions {
       ],
       [
         'DELETE',
-        /^\/communities\/[^/]+\/members\/([^/]+)\/kick$/,
+        /^\/communities\/[^/]+\/members\/(?!me$)([^/]+)$/,
         (match) => ({
           action: 'member_kicked',
           details: {},
@@ -929,8 +929,8 @@ export default class Definitions {
       ],
       [
         'POST',
-        /^\/communities\/[^/]+\/channels\/(text|voice)$/,
-        (match) => ({
+        /^\/communities\/[^/]+\/channels$/,
+        () => ({
           action: 'channel_created',
           args: {
             channelId: CommunityChannelId.derive(
@@ -939,7 +939,7 @@ export default class Definitions {
               createdAt,
             ).valueOf(),
             name: body.name,
-            type: match[1],
+            type: body.type,
           },
         }),
       ],
@@ -1032,7 +1032,7 @@ export default class Definitions {
       ],
       [
         'DELETE',
-        /^\/communities\/[^/]+\/members\/([^/]+)\/kick$/,
+        /^\/communities\/[^/]+\/members\/(?!me$)([^/]+)$/,
         (match) => ({
           action: 'member_kicked',
           args: { identityId: decoded(match) },
@@ -1297,7 +1297,7 @@ export default class Definitions {
       return;
     }
 
-    if (participant) {
+    if (participant && method !== 'PATCH') {
       const at = Date.now();
       const callId = participant[1];
       const recordId = participantPayload({
@@ -1329,7 +1329,7 @@ export default class Definitions {
       return;
     }
 
-    if (method === 'DELETE' && end && end[1] !== 'ice-servers') {
+    if (method === 'DELETE' && end) {
       const at = Date.now();
       const signed = signCallEnd({ at, callId: end[1], signer });
 
@@ -3377,7 +3377,7 @@ export default class Definitions {
       'DELETE',
       `/communities/${this.communityId}/members/${encodeURIComponent(
         this.otherIdentityId.valueOf(),
-      )}/kick`,
+      )}`,
     );
   }
 
@@ -3482,7 +3482,7 @@ export default class Definitions {
     this.body = undefined;
     await this.signCurrentRequest(
       'GET',
-      '/communities/discover',
+      '/discoverable-communities',
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -3699,6 +3699,7 @@ export default class Definitions {
   public iSetACommunityTextChannelBody(): void {
     this.body = JSON.stringify({
       name: 'general',
+      type: 'text',
     });
   }
 
@@ -3706,6 +3707,7 @@ export default class Definitions {
   public iSetACommunityVoiceChannelBody(): void {
     this.body = JSON.stringify({
       name: 'voice',
+      type: 'voice',
     });
   }
 
@@ -3717,7 +3719,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'POST',
-      `/communities/${this.communityId}/channels/text`,
+      `/communities/${this.communityId}/channels`,
     );
   }
 
@@ -3729,7 +3731,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'POST',
-      `/communities/${this.communityId}/channels/voice`,
+      `/communities/${this.communityId}/channels`,
     );
   }
 
@@ -3743,7 +3745,7 @@ export default class Definitions {
 
     await this.signCurrentRequest(
       'POST',
-      `/communities/${this.communityId}/channels/text`,
+      `/communities/${this.communityId}/channels`,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -4478,7 +4480,7 @@ export default class Definitions {
   @given('I sign the current call history request')
   public async iSignTheCurrentCallHistoryRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/calls/history');
+    await this.signCurrentRequest('GET', '/past-calls');
   }
 
   @given('I sign the current call request')
@@ -4530,7 +4532,7 @@ export default class Definitions {
   @given('I sign the current call ICE servers request')
   public async iSignTheCurrentCallIceServersRequest(): Promise<void> {
     this.body = undefined;
-    await this.signCurrentRequest('GET', '/calls/ice-servers');
+    await this.signCurrentRequest('GET', '/call-ice-servers');
   }
 
   @given('the other identity signs the current call join request')
@@ -4559,8 +4561,8 @@ export default class Definitions {
 
     this.body = JSON.stringify({ mediaConnections: [] });
     await this.signCurrentRequest(
-      'POST',
-      `/calls/${this.callId}/participants/me/heartbeat`,
+      'PATCH',
+      `/calls/${this.callId}/participants/me`,
     );
   }
 
@@ -4586,8 +4588,8 @@ export default class Definitions {
       ],
     });
     await this.signCurrentRequest(
-      'POST',
-      `/calls/${this.callId}/participants/me/heartbeat`,
+      'PATCH',
+      `/calls/${this.callId}/participants/me`,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -4614,8 +4616,8 @@ export default class Definitions {
       ],
     });
     await this.signCurrentRequest(
-      'POST',
-      `/calls/${this.callId}/participants/me/heartbeat`,
+      'PATCH',
+      `/calls/${this.callId}/participants/me`,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -5079,7 +5081,7 @@ export default class Definitions {
   @given('I sign the current public IPFS content request')
   public async iSignTheCurrentPublicIPFSContentRequest(): Promise<void> {
     await this.ensureAuthenticatedIdentityIsPublished();
-    await this.signCurrentRequest('POST', '/ipfs/public');
+    await this.signCurrentRequest('POST', '/ipfs/contents');
   }
 
   @given('I sign the current network IPFS content request')
@@ -5663,8 +5665,8 @@ export default class Definitions {
 
   @given('I sign the current node public network request')
   public async iSignTheCurrentNodePublicNetworkRequest(): Promise<void> {
-    this.body = this.body ?? '{}';
-    await this.signCurrentRequest('POST', '/node/networks/public');
+    this.body = JSON.stringify({ name: 'public' });
+    await this.signCurrentRequest('POST', '/node/networks');
   }
 
   @given(
@@ -6108,8 +6110,8 @@ export default class Definitions {
   public async iSignTheCurrentUsedStickerRequest(): Promise<void> {
     await this.withStickerLibraryMutation('recent', false);
     await this.signCurrentRequest(
-      'POST',
-      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/used`,
+      'PUT',
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/usage`,
     );
   }
 
@@ -6201,10 +6203,10 @@ export default class Definitions {
     );
   }
 
-  @when('I POST the current sticker as used')
-  public async iPOSTTheCurrentStickerAsUsed(): Promise<void> {
-    this.response = await this.restClient.post(
-      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/used`,
+  @when('I PUT the current sticker usage')
+  public async iPUTTheCurrentStickerUsage(): Promise<void> {
+    this.response = await this.restClient.put(
+      `/stickers/packs/${this.stickerPackId}/stickers/${this.stickerId}/usage`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -6423,7 +6425,7 @@ export default class Definitions {
     await this.iSignTheCurrentCommunityTextChannelRequest();
 
     this.response = await this.restClient.post(
-      `/communities/${this.communityId}/channels/text`,
+      `/communities/${this.communityId}/channels`,
       JSON.parse(this.body || '{}'),
       { headers: this.headers },
     );
@@ -7214,7 +7216,7 @@ export default class Definitions {
     this.response = await this.restClient.delete(
       `/communities/${this.communityId}/members/${encodeURIComponent(
         this.otherIdentityId.valueOf(),
-      )}/kick`,
+      )}`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7280,7 +7282,7 @@ export default class Definitions {
   @when('I GET discoverable communities')
   public async iGETDiscoverableCommunities(): Promise<void> {
     this.response = await this.restClient.get(
-      `/communities/discover?query=API&networkId=${this.currentNetworkId}`,
+      `/discoverable-communities?query=API&networkId=${this.currentNetworkId}`,
       this.headers,
     );
   }
@@ -7313,7 +7315,7 @@ export default class Definitions {
 
   @when('I GET current call history')
   public async iGETCurrentCallHistory(): Promise<void> {
-    this.response = await this.restClient.get('/calls/history', this.headers);
+    this.response = await this.restClient.get('/past-calls', this.headers);
   }
 
   @when('I GET the current call')
@@ -7331,7 +7333,7 @@ export default class Definitions {
   @when('I GET call ICE servers')
   public async iGETCallIceServers(): Promise<void> {
     this.response = await this.restClient.get(
-      '/calls/ice-servers',
+      '/call-ice-servers',
       this.headers,
     );
   }
@@ -7384,14 +7386,14 @@ export default class Definitions {
     );
   }
 
-  @when('I POST a participant heartbeat to the current call')
-  public async iPOSTAParticipantHeartbeatToTheCurrentCall(): Promise<void> {
+  @when('I PATCH the participant of the current call')
+  public async iPATCHTheParticipantOfTheCurrentCall(): Promise<void> {
     if (!this.callId) {
       throw new Error('Call must be created first.');
     }
 
-    this.response = await this.restClient.post(
-      `/calls/${this.callId}/participants/me/heartbeat`,
+    this.response = await this.restClient.patch(
+      `/calls/${this.callId}/participants/me`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7480,7 +7482,7 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.post(
-      `/communities/${this.communityId}/channels/text`,
+      `/communities/${this.communityId}/channels`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
@@ -7493,7 +7495,7 @@ export default class Definitions {
     }
 
     this.response = await this.restClient.post(
-      `/communities/${this.communityId}/channels/voice`,
+      `/communities/${this.communityId}/channels`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
     );
