@@ -24,6 +24,7 @@ const CLIENT_ADDRESS = '203.0.113.7';
 const SIGNATURE_BYTES = 64;
 const SLOTS_PER_SIGNER = 1_000;
 const STRANGER_SIGNERS = 10;
+const STRANGER_SLOTS_PER_SOURCE = 250;
 
 const signatureOf = (index: number): Signature => {
   const bytes = Buffer.alloc(SIGNATURE_BYTES);
@@ -218,7 +219,7 @@ describe('SignedHttpRequestAuthenticator', () => {
         guard.acceptFromStranger(
           stranger,
           signatureOf(index),
-          `198.51.100.${signer}`,
+          `198.51.${signer}.${Math.floor(index / STRANGER_SLOTS_PER_SOURCE)}`,
         ),
       ),
     );

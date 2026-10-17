@@ -81,11 +81,14 @@ Implemented:
   checks passed: an identity request then, a device or recovery proof only once
   the device is authorized or the key is the recovery authority of the
   identity. A request refused before that point leaves no record behind. A
-  check that runs after authentication keeps the slot: a node owner route that
-  refuses a key with `403` code `403010`, and a `PUT /node/blocks` body that
-  does not hash to `X-Body-Hash`. Both signatures were valid and fresh, so
-  keeping them refuses a resend of the same signed headers, and the slot counts
-  against the signing key only
+  check that runs after authentication keeps the slot. That holds for every
+  route's own checks on an authenticated state-changing request, such as a
+  node owner route that refuses a key with `403` code `403010`
+  (`POST /node/networks` included), or a `PUT /node/blocks` body that does not
+  hash to `X-Body-Hash`. The signature was valid and fresh, so keeping it
+  refuses a resend of the same signed headers. The slot counts against the
+  signing key and, for a stranger (below), against its client address and the
+  stranger share too
 - the guard is bounded and fails closed: each signing key holds at most 1,000
   live entries and the whole guard holds 100,000. The node serves a key when it
   holds its identity or the identity owns the node (read from the local node
@@ -94,10 +97,22 @@ Implemented:
   stranger: an identity creating itself here, an identity held elsewhere, and
   any identity but the owner while the node has not opened its replicated
   state. Strangers share 10,000 entries, of which one client address holds at
-  most 1,000 (IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address
-  is the socket address unless `API_TRUST_PROXY` names a reverse proxy, so a
-  proxy the node is not told about puts every stranger on one address). The
-  address is kept in memory for the 60 second window only
+  most 250 (IPv6 counts per /64, IPv4-mapped addresses as IPv4; the address is
+  the socket address unless `API_TRUST_PROXY` names a reverse proxy, so a proxy
+  the node is not told about puts every stranger on one address). The address
+  is kept in memory only, with its entry. An entry expires after 60 seconds and
+  is dropped when the guard next records a signed state-changing request
+- the per-address cap of 250 is a trade-off. Filling the stranger share takes
+  40 addresses instead of one. One address still has room for its identity
+  creations (`IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE`, 30 by default)
+  and for the other strangers behind a carrier NAT or a shared proxy, which
+  rarely sign 250 state-changing requests within 60 seconds. Above that, the
+  clients behind that address get `401020` until its entries expire. While the
+  replicated state is not open every identity but the owner is a stranger, so a
+  busy shared address meets the cap sooner during that window. An attacker
+  holding 40 IPv4 addresses, or an IPv6 prefix of /58 or shorter (40 /64s or
+  more), can still fill the share. The identities and devices this node serves
+  and its owner keep their slots then
 - a full share refuses new signatures with `401` code `401020` instead of
   evicting live entries, until entries of that share expire (at most 60
   seconds). A stranger refused this way, such as a client creating its
@@ -111,11 +126,12 @@ Implemented:
   proxy) must not lock each other out. Many served identities together can
   still fill the 100,000 entries (100 identities at 1,000 requests a minute
   each); the owner answers that by blocking them
-- a signed identity `GET` takes no slot, and neither does the transitions read
-  of a key that was never authorized (see _Identity device authorization_):
-  replaying either inside the window only returns again what that key may
-  read, at most the public recovery lineage, so the guard is kept for state
-  changes and for device and recovery proofs
+- no identity-signed `GET`, `HEAD` or `OPTIONS` request takes a slot, and
+  neither does the transitions read of a key that was never authorized (see
+  _Identity device authorization_). Replaying either inside the window only
+  returns again what that key may read, at most the public recovery lineage.
+  The guard is kept for state changes and for device and recovery proofs, which
+  take a slot on every method
 - `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
   (PEM armour and whitespace are ignored). An alias encoding of the signing key,
   such as another DER prefix byte or base64 padding bits that decode to the

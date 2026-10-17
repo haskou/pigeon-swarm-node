@@ -12,6 +12,7 @@ import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 const SIGNATURE_BYTES = 64;
 const SLOTS_PER_SIGNER = 1_000;
 const STRANGER_SIGNERS = 10;
+const STRANGER_SLOTS_PER_SOURCE = 250;
 const SIGNERS_AT_CAPACITY = 100;
 
 const signersOf = (count: number): Promise<IdentityId[]> =>
@@ -121,7 +122,7 @@ describe('SignedRequestReplayGuard', () => {
         guard.acceptFromStranger(
           stranger,
           signatureOf(index),
-          `198.51.100.${signer}`,
+          `198.51.${signer}.${Math.floor(index / STRANGER_SLOTS_PER_SOURCE)}`,
         ),
       ),
     );
@@ -134,15 +135,14 @@ describe('SignedRequestReplayGuard', () => {
 
   it('refuses a client address past its part of the stranger share without touching other addresses', () => {
     const guard = new SignedRequestReplayGuard();
-    const half = SLOTS_PER_SIGNER / 2;
 
     const accepted = [strangers[0], strangers[1]].flatMap((stranger) =>
-      Array.from({ length: half }).filter((_, index) =>
+      Array.from({ length: STRANGER_SLOTS_PER_SOURCE }).filter((_, index) =>
         guard.acceptFromStranger(stranger, signatureOf(index), '192.0.2.1'),
       ),
     );
 
-    expect(accepted).toHaveLength(SLOTS_PER_SIGNER);
+    expect(accepted).toHaveLength(STRANGER_SLOTS_PER_SOURCE);
     expect(
       guard.acceptFromStranger(strangers[2], signatureOf(0), '192.0.2.1'),
     ).toBe(false);
@@ -154,7 +154,7 @@ describe('SignedRequestReplayGuard', () => {
   it('counts the stranger slots of a whole IPv6 /64 as one client address', () => {
     const guard = new SignedRequestReplayGuard();
 
-    Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+    Array.from({ length: STRANGER_SLOTS_PER_SOURCE }).forEach((_, index) =>
       guard.acceptFromStranger(
         strangers[0],
         signatureOf(index),
@@ -167,13 +167,39 @@ describe('SignedRequestReplayGuard', () => {
     ).toBe(false);
   });
 
+  it('counts the stranger slots of an IPv4-mapped address against its IPv4 address', () => {
+    const guard = new SignedRequestReplayGuard();
+
+    Array.from({ length: STRANGER_SLOTS_PER_SOURCE }).forEach((_, index) =>
+      guard.acceptFromStranger(
+        strangers[0],
+        signatureOf(index),
+        '::ffff:192.0.2.1',
+      ),
+    );
+
+    expect(
+      guard.acceptFromStranger(strangers[1], signatureOf(0), '192.0.2.1'),
+    ).toBe(false);
+    expect(
+      guard.acceptFromStranger(
+        strangers[1],
+        signatureOf(1),
+        '::ffff:192.0.2.2',
+      ),
+    ).toBe(true);
+  });
+
   it('frees the stranger slots of a client address as its entries expire', () => {
     const now = jest.spyOn(Date, 'now').mockReturnValue(0);
     const guard = new SignedRequestReplayGuard();
 
-    Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+    Array.from({ length: STRANGER_SLOTS_PER_SOURCE }).forEach((_, index) =>
       guard.acceptFromStranger(strangers[0], signatureOf(index), '192.0.2.1'),
     );
+    expect(
+      guard.acceptFromStranger(strangers[1], signatureOf(0), '192.0.2.1'),
+    ).toBe(false);
     now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
 
     expect(
