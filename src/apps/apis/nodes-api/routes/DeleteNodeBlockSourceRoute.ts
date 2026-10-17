@@ -24,9 +24,8 @@ export class DeleteNodeBlockSourceRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-    await this.remover.remove(
-      new NodeBlockSourceRemoverMessage(ownerIdentityId),
+    await this.writeAsNodeOwner(request, () =>
+      this.remover.remove(new NodeBlockSourceRemoverMessage(ownerIdentityId)),
     );
 
     return response

@@ -18,8 +18,9 @@ export class DeleteNodeRegistrationCodeRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-    await this.revoker.revoke(new NodeRegistrationCodeRevokerMessage(codeId));
+    await this.writeAsNodeOwner(request, () =>
+      this.revoker.revoke(new NodeRegistrationCodeRevokerMessage(codeId)),
+    );
 
     return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
   }

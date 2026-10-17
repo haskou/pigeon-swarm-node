@@ -32,7 +32,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PrivateAuthorizationProvisionResource'
         '403':
-          description: Signed request identity is not the current node owner (code 403010).
+          description: Signed request identity is not the current node owner (code 403010). A write still in flight when the node changes hands is refused the same way.
           content:
             application/json:
               schema:

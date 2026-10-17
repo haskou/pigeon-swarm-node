@@ -9,12 +9,15 @@ package "nodes" {
       -networks: Map<NetworkId, Network>
       -owner?: IdentityId
       -registrationMode: NodeRegistrationMode
-      +addNetwork(network: Network): void
+      +addNetwork(network: Network, authenticatedIdentityId?: IdentityId): void
+      +removeNetwork(networkId: NetworkId, authenticatedIdentityId: IdentityId): void
+      +updateRelayConfiguration(relayConfiguration: NodeRelayConfiguration, authenticatedIdentityId?: IdentityId): void
       +assignOwner(owner: IdentityId, authenticatedIdentityId: IdentityId): void
       +hasOwner(): boolean
       +clearNonCanonicalOwner(): boolean
       +isOwnedBy(identityId: IdentityId): boolean
-      +changeRegistrationMode(mode: NodeRegistrationMode): void
+      +assertManagedBy(authenticatedIdentityId: IdentityId): void
+      +changeRegistrationMode(mode: NodeRegistrationMode, authenticatedIdentityId: IdentityId): void
       +isOpenForRegistration(): boolean
       +isClosedForRegistration(): boolean
       +toPrimitives(): object
@@ -135,6 +138,7 @@ package "nodes" {
       +loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>
       +updateLocalNode(change: (node: Node) => void): Promise<Node>
       +updateStoppedLocalNode(change: (node: Node) => void): Promise<Node>
+      +holdLocalNode<T>(action: (node: Node) => Promise<T>): Promise<T>
     }
 
     class NodeLoaderService {
@@ -306,17 +310,36 @@ package "nodes" {
     }
 
     class NodeNetworkAdderMessage {
-      -network: Network
+      +network: Network
+      +authenticatedIdentityId?: IdentityId
     }
 
     class NodePublicNetworkAdderMessage {
-      -network: Network
+      +network: Network
+      +authenticatedIdentityId?: IdentityId
     }
 
     class NodeNetworkRemoverMessage {
       +networkId: NetworkId
-      +constructor(networkId: string)
+      +authenticatedIdentityId: IdentityId
+      +constructor(networkId: string, authenticatedIdentityId: string)
     }
+
+    class NodeOwnerWriteHolderMessage {
+      +authenticatedIdentityId: IdentityId
+      +constructor(authenticatedIdentityId: string)
+    }
+
+    class NodeOwnerWriteHolder {
+      -nodes: NodeRepository
+      +hold<T>(message: NodeOwnerWriteHolderMessage, write: () => Promise<T>): Promise<T>
+    }
+
+    note right of NodeOwnerWriteHolder
+      Checks the owner of the latest node and runs
+      an owner-only write stored elsewhere before
+      any handover can land.
+    end note
 
     interface NodeNetworkDataCleaner {
       +clean(networkId: NetworkId): Promise<void>
@@ -407,6 +430,8 @@ package "nodes" {
     NodeOwnerAssigner --> NodeRepository
     NodeOwnerAssigner --> NodeBlockPolicy
     NodeOwnerAssigner --> NodeOwnerAssignerMessage
+    NodeOwnerWriteHolder --> NodeRepository
+    NodeOwnerWriteHolder --> NodeOwnerWriteHolderMessage
     NodeHeartbeatSender --> NodeLoaderService
     NodeHeartbeatSender ..> NodeHeartbeatWasSent
     NodePeerRegistrar --> NodePeerRepository
@@ -432,6 +457,7 @@ package "nodes" {
       +find(): Promise<NodeBlocks>
     }
 
+    NodeBlockListStorer --> NodeRepository
     NodeBlockListStorer --> NodeBlockListRepository
     NodeBlockListStorer --> NodeBlockPolicy
     NodeBlockListFinder --> NodeBlockListRepository
@@ -515,6 +541,7 @@ package "nodes" {
       +loadLocalNodeRegistrationMode(): Promise<NodeRegistrationMode>
       +updateLocalNode(change: (node: Node) => void): Promise<Node>
       +updateStoppedLocalNode(change: (node: Node) => void): Promise<Node>
+      +holdLocalNode<T>(action: (node: Node) => Promise<T>): Promise<T>
     }
 
     class LocalNodeRegistrationCodeRepository {

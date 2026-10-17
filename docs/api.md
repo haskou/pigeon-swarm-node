@@ -1587,6 +1587,15 @@ Implemented:
   Ed25519 key (an alias DER prefix, a re-encoded base64, a small-order or an
   off-curve point) with `409`, code `InvalidNodeOwnerIdentityIdError`, so the
   node is never handed to an id no identity can sign for
+- a handover and an owner-only write never interleave: every owner-only write
+  (registration mode and codes, relay configuration and networks of a claimed
+  node, block sources, exceptions and publication, diagnostics, private
+  authorization scopes) checks the signer still owns the node as it lands, so
+  a write of the former owner that is still in flight when the handover lands
+  is refused with `403`, code `403010`, and changes nothing; on an unclaimed
+  node, a relay or network change that is overtaken by the first claim is
+  refused the same way; a block list is checked against the owner as it is
+  stored, so one overtaken by a handover is refused with `409`
 
 ### Put local node registration mode
 
@@ -1940,8 +1949,8 @@ owner; `413` with code `413010` when the body is larger than
 `NODE_BLOCK_LIST_MAX_BYTES`; `408` with code `408010` when the body is not
 received within `NODE_BLOCK_LIST_BODY_TIMEOUT_MS`; `429` with code `429060` while another block list
 upload is in progress; `400` when the body is not JSON or not a block list
-document; `409` when the document is not signed by the current owner, its
-signature does not verify, or its version is not higher than the stored one.
+document; `409` when the document is not signed by the owner of the node as it
+is stored (a handover that lands first refuses it), its signature does not verify, or its version is not higher than the stored one.
 
 ```http
 GET /node/blocks

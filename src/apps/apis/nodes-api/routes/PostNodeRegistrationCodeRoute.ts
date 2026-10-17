@@ -24,11 +24,11 @@ export class PostNodeRegistrationCodeRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
     try {
-      const issued = await this.issuer.issue(
-        new NodeRegistrationCodeIssuerMessage(body.expiresAt, body.maxUses),
+      const issued = await this.writeAsNodeOwner(request, () =>
+        this.issuer.issue(
+          new NodeRegistrationCodeIssuerMessage(body.expiresAt, body.maxUses),
+        ),
       );
 
       response.setHeader('Cache-Control', 'no-store');

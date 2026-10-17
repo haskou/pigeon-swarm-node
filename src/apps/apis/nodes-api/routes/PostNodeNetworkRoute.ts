@@ -6,10 +6,10 @@ import { Body, JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { PostNodeNetworkBody } from '../bodies/PostNodeNetworkBody';
 import { NetworksViewModel } from '../view-model/NetworksViewModel';
-import { NodeNetworkRouteSupport } from './NodeNetworkRouteSupport';
+import { NodeOwnerRouteSupport } from './NodeOwnerRouteSupport';
 
 @JsonController('/node/networks')
-export class PostNodeNetworkRoute extends NodeNetworkRouteSupport {
+export class PostNodeNetworkRoute extends NodeOwnerRouteSupport {
   private readonly adder: NodeNetworkAdder =
     this.get<NodeNetworkAdder>(NodeNetworkAdder);
 
@@ -19,9 +19,15 @@ export class PostNodeNetworkRoute extends NodeNetworkRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNetworksWhenClaimed(request);
-    const node = await this.adder.addNetwork(
-      new NodeNetworkAdderMessage(body.id, body.name, body.key),
+    const node = await this.setUpNodeAsOwnerWhenClaimed(request, (identityId) =>
+      this.adder.addNetwork(
+        new NodeNetworkAdderMessage(
+          body.id,
+          body.name,
+          body.key,
+          identityId?.valueOf(),
+        ),
+      ),
     );
 
     return response

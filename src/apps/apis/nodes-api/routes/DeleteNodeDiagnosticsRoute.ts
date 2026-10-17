@@ -16,8 +16,7 @@ export class DeleteNodeDiagnosticsRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-    await this.closer.close();
+    await this.writeAsNodeOwner(request, () => this.closer.close());
 
     return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
   }

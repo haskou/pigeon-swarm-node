@@ -5,10 +5,10 @@ import { Request, Response } from 'express';
 import { JsonController, Post, Req, Res } from 'routing-controllers';
 
 import { NetworksViewModel } from '../view-model/NetworksViewModel';
-import { NodeNetworkRouteSupport } from './NodeNetworkRouteSupport';
+import { NodeOwnerRouteSupport } from './NodeOwnerRouteSupport';
 
 @JsonController('/node/networks/public')
-export class PostNodePublicNetworkRoute extends NodeNetworkRouteSupport {
+export class PostNodePublicNetworkRoute extends NodeOwnerRouteSupport {
   private readonly adder: NodeNetworkAdder =
     this.get<NodeNetworkAdder>(NodeNetworkAdder);
 
@@ -17,9 +17,10 @@ export class PostNodePublicNetworkRoute extends NodeNetworkRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNetworksWhenClaimed(request);
-    const node = await this.adder.addPublicNetwork(
-      new NodePublicNetworkAdderMessage(),
+    const node = await this.setUpNodeAsOwnerWhenClaimed(request, (identityId) =>
+      this.adder.addPublicNetwork(
+        new NodePublicNetworkAdderMessage(identityId?.valueOf()),
+      ),
     );
 
     return response

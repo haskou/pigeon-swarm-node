@@ -15,7 +15,7 @@ export default class NodeNetworkAdder {
     message: NodeNetworkAdderMessage | NodePublicNetworkAdderMessage,
   ): Promise<Node> {
     const node = await this.nodes.updateLocalNode((latest) =>
-      latest.addNetwork(message.network),
+      latest.addNetwork(message.network, message.authenticatedIdentityId),
     );
 
     await this.eventPublisher.publish(node.pullDomainEvents());

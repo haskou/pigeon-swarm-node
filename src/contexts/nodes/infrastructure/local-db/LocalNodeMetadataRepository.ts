@@ -285,4 +285,16 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       return this.changeMetadata(storedMetadata, change);
     });
   }
+
+  public async holdLocalNode<T>(
+    action: (node: Node) => Promise<T>,
+  ): Promise<T> {
+    return this.exclusively(async () =>
+      action(
+        this.nodeFromMetadata(
+          (await this.findMetadata()) ?? (await this.createMetadata()),
+        ),
+      ),
+    );
+  }
 }

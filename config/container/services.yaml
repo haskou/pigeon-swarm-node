@@ -1878,6 +1878,10 @@ services:
       /contexts/nodes/application/find-registration-codes/NodeRegistrationCodesFinder
     arguments:
       - '@contexts/nodes/domain/repositories/NodeRegistrationCodeRepository'
+  contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder:
+    class: /contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder
+    arguments:
+      - '@contexts/nodes/domain/repositories/NodeRepository'
   contexts/nodes/application/issue-registration-code/NodeRegistrationCodeIssuer:
     class: >-
       /contexts/nodes/application/issue-registration-code/NodeRegistrationCodeIssuer
@@ -1947,7 +1951,7 @@ services:
   contexts/nodes/application/store-block-list/NodeBlockListStorer:
     class: /contexts/nodes/application/store-block-list/NodeBlockListStorer
     arguments:
-      - '@contexts/nodes/domain/services/NodeLoaderService'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
       - '@contexts/nodes/domain/repositories/NodeBlockListRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
   contexts/nodes/application/update-block-exceptions/NodeBlockExceptionsUpdater:

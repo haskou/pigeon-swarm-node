@@ -13,7 +13,7 @@ export default class NodeNetworkRemover {
 
   public async remove(message: NodeNetworkRemoverMessage): Promise<void> {
     const node = await this.nodes.updateLocalNode(async (latest) => {
-      latest.removeNetwork(message.networkId);
+      latest.removeNetwork(message.networkId, message.authenticatedIdentityId);
       await this.cleaner.clean(message.networkId);
     });
 

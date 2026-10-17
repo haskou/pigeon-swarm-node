@@ -21,16 +21,17 @@ export class PostPrivateAuthorizationScopeRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const identityId = await this.authenticateNodeOwner(request);
-    const result = await this.provisioner.provision(
-      new PrivateAuthorizationScopeProvisionMessage(
-        identityId.valueOf(),
-        body.identityAuthorizationEpoch,
-        body.identityAuthorizationRevision,
-        body.ownerDeviceKey,
-        body.signedGenesisJson,
-        body.protectedMlsState,
-        body.projection,
+    const result = await this.writeAsNodeOwner(request, (identityId) =>
+      this.provisioner.provision(
+        new PrivateAuthorizationScopeProvisionMessage(
+          identityId.valueOf(),
+          body.identityAuthorizationEpoch,
+          body.identityAuthorizationRevision,
+          body.ownerDeviceKey,
+          body.signedGenesisJson,
+          body.protectedMlsState,
+          body.projection,
+        ),
       ),
     );
     const status = result.isAccepted()

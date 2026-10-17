@@ -37,12 +37,12 @@ import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/Node
 import NodeOwnerSettingsResetter from '@app/contexts/nodes/application/reset-owner-settings/NodeOwnerSettingsResetter';
 import { NodeBlockEntries } from '@app/contexts/nodes/domain/NodeBlockEntries';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
-import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
 import NodeBlockExceptionsRepository from '@app/contexts/nodes/domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockListRepository from '@app/contexts/nodes/domain/repositories/NodeBlockListRepository';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import NodeLoaderService from '@app/contexts/nodes/domain/services/NodeLoaderService';
+import { SignedNodeBlockList } from '@app/contexts/nodes/domain/SignedNodeBlockList';
 import { NodeBlockSourceOrigin } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceOrigin';
 import { NodeBlockSourceVersionFloor } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceVersionFloor';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
@@ -6334,6 +6334,11 @@ export default class Definitions {
     networkName: string,
   ): Promise<void> {
     const { privateKey } = generateKeyPairSync('ed25519');
+    const { owner } = (
+      await Kernel.di
+        .getService<NodeLoaderService>(NodeLoaderService)
+        .loadNode()
+    ).toPrimitives();
 
     await Kernel.di
       .getService<NodeNetworkAdder>(NodeNetworkAdder)
@@ -6342,6 +6347,7 @@ export default class Definitions {
           networkId,
           networkName,
           privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
+          owner,
         ),
       );
     await Kernel.di.getService<NodeLoaderService>(NodeLoaderService).loadNode();

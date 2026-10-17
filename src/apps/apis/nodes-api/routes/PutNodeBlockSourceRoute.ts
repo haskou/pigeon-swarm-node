@@ -34,8 +34,6 @@ export class PutNodeBlockSourceRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
     const message = new NodeBlockSourceAdopterMessage(
       ownerIdentityId,
       body.origin,
@@ -46,7 +44,9 @@ export class PutNodeBlockSourceRoute extends NodeOwnerRouteSupport {
       throw new NonCanonicalIdentityIdError();
     }
 
-    const source = await this.adopter.adopt(message);
+    const source = await this.writeAsNodeOwner(request, () =>
+      this.adopter.adopt(message),
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

@@ -5,10 +5,10 @@ import { Request, Response } from 'express';
 import { Delete, JsonController, Param, Req, Res } from 'routing-controllers';
 
 import { NetworksViewModel } from '../view-model/NetworksViewModel';
-import { NodeNetworkRouteSupport } from './NodeNetworkRouteSupport';
+import { NodeOwnerRouteSupport } from './NodeOwnerRouteSupport';
 
 @JsonController('/node/networks')
-export class DeleteNodeNetworkRoute extends NodeNetworkRouteSupport {
+export class DeleteNodeNetworkRoute extends NodeOwnerRouteSupport {
   private readonly remover = this.get<NodeNetworkRemover>(NodeNetworkRemover);
 
   @Delete('/:networkId')
@@ -17,8 +17,11 @@ export class DeleteNodeNetworkRoute extends NodeNetworkRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNetworks(request);
-    await this.remover.remove(new NodeNetworkRemoverMessage(networkId));
+    await this.changeNodeAsOwner(request, (identityId) =>
+      this.remover.remove(
+        new NodeNetworkRemoverMessage(networkId, identityId.valueOf()),
+      ),
+    );
 
     const node = await this.nodeLoader.loadNode();
 

@@ -20,10 +20,10 @@ export class PutNodeDiagnosticsRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.assertOwnerCanManageNode(request);
-
-    const session = await this.opener.open(
-      new DiagnosticsSessionOpenMessage(body.minutes, body.consent),
+    const session = await this.writeAsNodeOwner(request, () =>
+      this.opener.open(
+        new DiagnosticsSessionOpenMessage(body.minutes, body.consent),
+      ),
     );
 
     return response
