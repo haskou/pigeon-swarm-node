@@ -684,7 +684,7 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
     );
   });
 
-  it('should name the provider multiaddr when a provider dial is skipped', async () => {
+  it('should log only the error class when a provider dial is skipped', async () => {
     const directory = createDirectory(localDatabase);
     const privateConnection = mock<IPFSConnection>();
     const network = privateNetwork(
@@ -716,10 +716,21 @@ describe('PrivateNetworkRelayRecordDirectory', () => {
 
     await directory.discover(network, mock());
 
+    const loggedLines = [
+      ...logger.debug.mock.calls,
+      ...logger.info.mock.calls,
+      ...logger.warn.mock.calls,
+      ...logger.error.mock.calls,
+    ].map((args) => args.map(String).join(' '));
+
     expect(logger.debug).toHaveBeenCalledWith(
-      'Private IPFS relay record provider dial skipped:' +
-        ` error=InvalidPeerIdError multiaddr=${selfProviderMultiaddr}`,
+      'Private IPFS relay record provider dial skipped: error=InvalidPeerIdError',
     );
+    expect(
+      loggedLines.filter(
+        (line) => line.includes('127.0.0.1') || line.includes('not-a-peer-id'),
+      ),
+    ).toEqual([]);
   });
 
   it('should keep one active circuit relay while it remains connected', async () => {
