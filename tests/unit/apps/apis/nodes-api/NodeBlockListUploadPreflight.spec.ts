@@ -8,6 +8,7 @@ import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequ
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { Node } from '@app/contexts/nodes/domain/Node';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Kernel } from '@haskou/ddd-kernel';
@@ -150,7 +151,11 @@ describe('NodeBlockListUploadPreflight', () => {
       [NodeLoader, nodeLoader],
       [
         SignedHttpRequestAuthenticator,
-        new SignedHttpRequestAuthenticator(blockPolicy, identityRepository),
+        new SignedHttpRequestAuthenticator(
+          blockPolicy,
+          identityRepository,
+          mock<NodeRepository>(),
+        ),
       ],
     ]);
     new Kernel({

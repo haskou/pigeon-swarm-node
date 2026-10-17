@@ -116,14 +116,71 @@ describe('SignedRequestReplayGuard', () => {
   it('keeps room for known signers while strangers fill their share', () => {
     const guard = new SignedRequestReplayGuard();
 
-    strangers.forEach((stranger) =>
+    strangers.forEach((stranger, signer) =>
       Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
-        guard.acceptFromStranger(stranger, signatureOf(index)),
+        guard.acceptFromStranger(
+          stranger,
+          signatureOf(index),
+          `198.51.100.${signer}`,
+        ),
       ),
     );
 
-    expect(guard.acceptFromStranger(attacker, signatureOf(0))).toBe(false);
+    expect(
+      guard.acceptFromStranger(attacker, signatureOf(0), '192.0.2.1'),
+    ).toBe(false);
     expect(guard.accept(identity, signatureOf(0))).toBe(true);
+  });
+
+  it('refuses a client address past its part of the stranger share without touching other addresses', () => {
+    const guard = new SignedRequestReplayGuard();
+    const half = SLOTS_PER_SIGNER / 2;
+
+    const accepted = [strangers[0], strangers[1]].flatMap((stranger) =>
+      Array.from({ length: half }).filter((_, index) =>
+        guard.acceptFromStranger(stranger, signatureOf(index), '192.0.2.1'),
+      ),
+    );
+
+    expect(accepted).toHaveLength(SLOTS_PER_SIGNER);
+    expect(
+      guard.acceptFromStranger(strangers[2], signatureOf(0), '192.0.2.1'),
+    ).toBe(false);
+    expect(
+      guard.acceptFromStranger(strangers[2], signatureOf(0), '192.0.2.2'),
+    ).toBe(true);
+  });
+
+  it('counts the stranger slots of a whole IPv6 /64 as one client address', () => {
+    const guard = new SignedRequestReplayGuard();
+
+    Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+      guard.acceptFromStranger(
+        strangers[0],
+        signatureOf(index),
+        '2001:db8:0:1::1',
+      ),
+    );
+
+    expect(
+      guard.acceptFromStranger(strangers[1], signatureOf(0), '2001:db8:0:1::2'),
+    ).toBe(false);
+  });
+
+  it('frees the stranger slots of a client address as its entries expire', () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const guard = new SignedRequestReplayGuard();
+
+    Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+      guard.acceptFromStranger(strangers[0], signatureOf(index), '192.0.2.1'),
+    );
+    now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
+
+    expect(
+      guard.acceptFromStranger(strangers[1], signatureOf(0), '192.0.2.1'),
+    ).toBe(true);
+
+    now.mockRestore();
   });
 
   it('refuses a stranger replaying a signature a known signer recorded', () => {
@@ -131,7 +188,9 @@ describe('SignedRequestReplayGuard', () => {
 
     guard.accept(identity, signatureOf(0));
 
-    expect(guard.acceptFromStranger(identity, signatureOf(0))).toBe(false);
+    expect(
+      guard.acceptFromStranger(identity, signatureOf(0), '192.0.2.1'),
+    ).toBe(false);
   });
 
   it('keeps live entries and fails closed at capacity instead of evicting them', () => {
