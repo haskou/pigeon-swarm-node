@@ -19,12 +19,76 @@ import { generateKeyPairSync, randomBytes, createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { inspect } from 'node:util';
 
 new Kernel({ logger: { debug() {}, info() {}, warn() {}, error() {} } });
 let network: IPFSNetwork | undefined;
 const records = new CallRelayRecordRegistry();
 const signer = new CallRelayRecordSigner();
 const discovery = new CallRelayRecordDiscovery(records, signer);
+
+const secrets = new Set<string>();
+
+function redact(text: string): string {
+  const values = [
+    ...secrets,
+    process.env.CALLS_TURN_SHARED_SECRET,
+    process.env.TURN_TEST_NETWORK_KEY,
+  ].filter((value): value is string => !!value && value.length >= 8);
+  let redacted = text;
+  for (const value of values)
+    redacted = redacted.split(value).join('[redacted]');
+
+  return redacted
+    .replace(
+      /-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g,
+      '[redacted-key]',
+    )
+    .replace(
+      /\/(?:ip4|ip6|dns4|dns6|dns|tcp|udp|ws|wss|certhash|p2p)\/[^\s'"`,)\]]*/g,
+      '[redacted-address]',
+    )
+    .replace(/\b(?:turns?|stuns?):[^\s'"`,)\]]+/gi, '[redacted-url]')
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '[redacted-ip]')
+    .replace(/\b12D3Koo[1-9A-HJ-NP-Za-km-z]+/g, '[redacted-peer]')
+    .replace(/\b[0-9a-f]{32,}\b/gi, '[redacted-hex]')
+    .replace(/[A-Za-z0-9+/]{27}=/g, '[redacted-credential]');
+}
+
+function describeValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value instanceof Error)
+    return value.stack ?? `${value.name}: ${value.message}`;
+  return inspect(value, { depth: 3, breakLength: 120 });
+}
+
+function causesOf(error: Error): Array<[unknown, string]> {
+  const causes: Array<[unknown, string]> = [];
+  if ('cause' in error && error.cause !== undefined)
+    causes.push([error.cause, 'caused by']);
+  if ('errors' in error && Array.isArray(error.errors))
+    causes.push(...error.errors.map((item: unknown): [unknown, string] => [item, 'aggregated']));
+  return causes;
+}
+
+function describeFailure(error: unknown): string {
+  const lines: string[] = [];
+  const seen = new Set<unknown>();
+  const pending: Array<[unknown, string]> = [[error, 'error']];
+  for (
+    let entry = pending.shift();
+    entry && lines.length < 16;
+    entry = pending.shift()
+  ) {
+    const [value, label] = entry;
+
+    if (seen.has(value)) continue;
+    seen.add(value);
+    lines.push(`${label}: ${describeValue(value)}`);
+    if (value instanceof Error) pending.push(...causesOf(value));
+  }
+  return lines.join('\n').slice(0, 8000);
+}
 
 async function waitFor<T>(
   read: () => T | undefined,
@@ -191,10 +255,13 @@ async function main(): Promise<void> {
   const root = await mkdtemp(path.join(tmpdir(), 'pigeon-federated-turn-'));
   const container = `pigeon-federated-turn-${randomBytes(6).toString('hex')}`;
   const ownerSecret = randomBytes(32).toString('hex');
+  secrets.add(ownerSecret);
   const requesterSecret = randomBytes(32).toString('hex');
+  secrets.add(requesterSecret);
   const key = generateKeyPairSync('ed25519')
     .privateKey.export({ format: 'pem', type: 'pkcs8' })
     .toString();
+  secrets.add(key);
   const url = 'turn:127.0.0.1:3478?transport=udp';
   let child: ChildProcess | undefined;
   let containerCreated = false;
@@ -363,6 +430,7 @@ async function main(): Promise<void> {
       'PASS two processes: private relay reservation, signed gossip, encrypted credential stream, independent secrets and real coturn packet delivery',
     );
     const rotatedSecret = randomBytes(32).toString('hex');
+    secrets.add(rotatedSecret);
     docker(['rm', '-f', container]);
     containerCreated = false;
     startCoturn(rotatedSecret);
@@ -445,11 +513,9 @@ async function main(): Promise<void> {
 }
 
 void (process.env.TURN_TEST_OWNER === 'true' ? owner() : main()).catch(
-  (error) => {
+  (error: unknown) => {
     console.error(
-      error instanceof Error
-        ? error.message
-        : 'Federated TURN regression failed',
+      `Federated TURN regression failed:\n${redact(describeFailure(error))}`,
     );
     process.exit(1);
   },
