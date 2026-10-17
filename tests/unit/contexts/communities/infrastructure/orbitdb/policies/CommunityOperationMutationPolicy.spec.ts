@@ -1,3 +1,4 @@
+import { InvalidCommunityOperationError } from '@app/contexts/communities/domain/errors/InvalidCommunityOperationError';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityOperationAction } from '@app/contexts/communities/domain/value-objects/CommunityOperationAction';
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
@@ -7,6 +8,7 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 import { mock } from 'jest-mock-extended';
 import { createHash } from 'node:crypto';
 
+import { cryptoVectors } from '../../../../../../support/cryptoVectors';
 import {
   alice,
   ban,
@@ -20,10 +22,9 @@ import {
   owner,
 } from '../../../domain/operations/CommunityOperationFixtures';
 
-const TOKEN = 'token-1';
-const REFERENCE = createHash('sha256')
-  .update(`pigeon:community-invite-reference:v1\n${TOKEN}`)
-  .digest('base64url');
+const { reference: REFERENCE, token: TOKEN } = cryptoVectors<{
+  inviteToken: { reference: string; token: string };
+}>('community-operation').inviteToken;
 const invite = {
   communityId: communityId.valueOf(),
   createdAt: 1,
@@ -325,6 +326,30 @@ describe('CommunityOperationMutationPolicy', () => {
         registry.queryDocuments.mockResolvedValue([invite, use]);
 
         await expect(admit(viaLink)).rejects.toThrow();
+      });
+
+      it('refuses an invite link whose invite names a token that is not 32 canonical bytes', async () => {
+        const malformed = 'token-1';
+        const [created, viaLink] = approvedJoin(
+          'invite_link',
+          createHash('sha256')
+            .update(`pigeon:community-invite-reference:v1\n${malformed}`)
+            .digest('base64url'),
+        );
+
+        await admit(created);
+        registry.queryDocuments.mockResolvedValue([
+          { ...invite, id: malformed, token: malformed },
+          {
+            ...use,
+            id: `invite-use:${malformed}:${alice.valueOf()}`,
+            token: malformed,
+          },
+        ]);
+
+        await expect(admit(viaLink)).rejects.toThrow(
+          InvalidCommunityOperationError,
+        );
       });
 
       it("refuses an invite link redeemed by another member's use", async () => {

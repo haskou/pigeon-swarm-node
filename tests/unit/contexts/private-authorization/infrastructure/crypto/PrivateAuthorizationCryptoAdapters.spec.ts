@@ -9,8 +9,17 @@ import {
   PrivateFreshnessProof,
   PrivateGenesisSignature,
   PrivateOperationSignature,
+  StateDigest,
 } from '@haskou/pigeon-swarm-crypto';
-import { createHash, generateKeyPairSync } from 'crypto';
+import { generateKeyPairSync } from 'crypto';
+
+import { cryptoVectors } from '../../../../../support/cryptoVectors';
+
+const protectedStateVector = cryptoVectors<{
+  bytesDigest: { valid: { bytes: string; id: string; name: string }[] };
+}>('commitment-ids').bytesDigest.valid.find(
+  ({ name }) => name === 'protected state bytes',
+)!;
 
 describe('private authorization cryptography adapters', () => {
   const ownerIdentityId = new IdentityId(
@@ -34,10 +43,8 @@ describe('private authorization cryptography adapters', () => {
   });
 
   it('pins genesis to the expected owner, scope and MLS context', () => {
-    const protectedState = Buffer.from('protected-state');
-    const mlsContextHash = createHash('sha256')
-      .update(protectedState)
-      .digest('base64url');
+    const protectedState = Buffer.from(protectedStateVector.bytes, 'hex');
+    const mlsContextHash = protectedStateVector.id;
     const canonicalGenesis = JSON.stringify({
       headHash: 'head',
       mlsContextHash,
@@ -50,9 +57,13 @@ describe('private authorization cryptography adapters', () => {
       revision: 0,
       scopeId: 'scope',
     });
+    const genesisHash = StateDigest.ofBytes(
+      Buffer.from(canonicalGenesis, 'utf8'),
+    );
     const verify = jest
       .spyOn(PrivateGenesisSignature, 'verify')
       .mockReturnValue(canonicalGenesis);
+    const digest = jest.spyOn(StateDigest, 'ofBytes');
 
     expect(
       new PrivateGenesisVerifier().verify(
@@ -63,8 +74,10 @@ describe('private authorization cryptography adapters', () => {
       ),
     ).toMatchObject({
       checkpoint: expect.any(Object),
-      genesisHash: expect.any(String),
+      genesisHash,
     });
+    expect(digest).toHaveBeenCalledWith(protectedState);
+    expect(digest).toHaveBeenCalledWith(Buffer.from(canonicalGenesis, 'utf8'));
     expect(verify).toHaveBeenCalledWith(
       JSON.stringify({ mlsContextHash, scopeId: 'scope' }),
       'owner',
@@ -134,7 +147,10 @@ describe('private authorization cryptography adapters', () => {
   });
 
   it.each([
-    [PrivateOperationSignature, () => new PrivateOperationVerifier().verify('secret', 'key')],
+    [
+      PrivateOperationSignature,
+      () => new PrivateOperationVerifier().verify('secret', 'key'),
+    ],
     [
       PrivateGenesisSignature,
       () =>

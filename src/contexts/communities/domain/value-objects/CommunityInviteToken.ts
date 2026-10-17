@@ -1,11 +1,11 @@
-import { CommitmentId } from '@haskou/pigeon-swarm-crypto';
+import {
+  CommitmentId,
+  CommunityInviteReference,
+} from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
-import { createHash } from 'crypto';
 
 export class CommunityInviteToken extends StringValueObject {
   private static readonly MAX_LENGTH = 128;
-  private static readonly REFERENCE_CONTEXT =
-    'pigeon:community-invite-reference:v1\n';
 
   /**
    * The token commits to the invite limits, so no record carrying it can
@@ -38,11 +38,10 @@ export class CommunityInviteToken extends StringValueObject {
    * base64url(sha256("pigeon:community-invite-reference:v1\n" + token)). The
    * signed `invite_link` join and the `invite_link_created` moderation log
    * entry carry it instead of the token, because roles without CREATE_INVITES
-   * read both.
+   * read both. Throws InvalidCommunityInviteReferenceError unless the token is
+   * 32 canonical base64url bytes, as every derived token is.
    */
   public toReference(): string {
-    return createHash('sha256')
-      .update(`${CommunityInviteToken.REFERENCE_CONTEXT}${this.valueOf()}`)
-      .digest('base64url');
+    return CommunityInviteReference.of(this.valueOf());
   }
 }

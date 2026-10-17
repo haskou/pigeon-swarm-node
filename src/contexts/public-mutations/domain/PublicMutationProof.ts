@@ -1,6 +1,5 @@
-import { Signature } from '@haskou/pigeon-swarm-crypto';
+import { Signature, StateDigest } from '@haskou/pigeon-swarm-crypto';
 import canonicalize from 'canonicalize';
-import { createHash } from 'crypto';
 
 import { InvalidPublicMutationError } from './errors/InvalidPublicMutationError';
 import { PublicMutationAuthorPrimitives } from './PublicMutationAuthorPrimitives';
@@ -118,14 +117,16 @@ export class PublicMutationProof {
     return frontier ? ['frontier'] : [];
   }
 
+  /**
+   * base64url(sha256(utf8(JCS(payload)))) of a plain JSON object; anything
+   * else (non-finite numbers, class instances, depth beyond 64) is refused.
+   */
   public static digestOf(payload: Record<string, unknown>): string {
-    const canonical = canonicalize(payload);
-
-    if (canonical === undefined) {
+    try {
+      return StateDigest.of(payload);
+    } catch {
       throw new InvalidPublicMutationError();
     }
-
-    return createHash('sha256').update(canonical).digest('base64url');
   }
 
   /** Strict decoder: unknown, missing or malformed fields are rejected. */

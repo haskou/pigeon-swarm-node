@@ -25,8 +25,8 @@ import { CommunityRequestId } from '@app/contexts/communities/domain/value-objec
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
-import { createHash } from 'node:crypto';
 
+import { cryptoVectors } from '../../../../support/cryptoVectors';
 import { signedMutation } from '../../public-mutations/support/signedMutation';
 import {
   genesis,
@@ -34,10 +34,9 @@ import {
 } from '../domain/operations/CommunityOperationFixtures';
 
 const COMMUNITY_ID = '550e8400-e29b-41d4-a716-446655440000';
-const INVITE_TOKEN = 'invite-token';
-const INVITE_REFERENCE = createHash('sha256')
-  .update(`pigeon:community-invite-reference:v1\n${INVITE_TOKEN}`)
-  .digest('base64url');
+const { reference: INVITE_REFERENCE, token: INVITE_TOKEN } = cryptoVectors<{
+  inviteToken: { reference: string; token: string };
+}>('community-operation').inviteToken;
 const ACTOR_ID = 'MCowBQYDK2VwAyEAIZERRRhGaokvb3xQqMGr9Y2ble6jUd51OuZRsvW52Q4=';
 const INVITED_ID =
   'MCowBQYDK2VwAyEACdZwo16pCFQ1jxy5u2ZIOlVxcrx8QTHKDcLqGfWRgFk=';
@@ -72,6 +71,7 @@ describe('Community invitation use cases', () => {
     ).toPrimitives() as unknown as Record<string, unknown>;
     operation = {
       createdAt: at,
+      identitySignature: unverifiedIdentitySignature,
       mutation: (
         await signedMutation({
           identityId: ACTOR_ID,
@@ -81,7 +81,6 @@ describe('Community invitation use cases', () => {
           store: 'communityOperations',
         })
       ).toPrimitives(),
-      identitySignature: unverifiedIdentitySignature,
       parents: [genesis().getHash()],
     };
   });

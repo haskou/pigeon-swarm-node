@@ -208,6 +208,12 @@ version `1` proofs and the `pigeon:public-mutation:v1\n` domain are rejected
 (`InvalidPublicMutationError`) and there is no fallback. The decoder is strict:
 unknown fields are rejected.
 
+`payloadDigest` is `StateDigest.of(payload)` from `@haskou/pigeon-swarm-crypto`:
+`base64url(sha256(utf8(canonicalize(payload))))` of a plain JSON object, pinned
+by `@haskou/pigeon-swarm-crypto/vectors/commitment-ids.json` (`stateDigest`). A
+payload that is not a plain object, carries a non-finite number or nests deeper
+than 64 levels has no digest and is rejected (`InvalidPublicMutationError`).
+
 `author.authorizationRevision` is a non-negative safe integer: the `revision` of
 the identity's device-authorization chain (`GET /identity-devices/authorization`)
 that the signing device observed when it signed. It is inside the signed body.
@@ -2106,17 +2112,17 @@ The response is a source:
 `version`, `lastFetchedAt` and `lastFetchOutcome` are `null` until the first
 fetch. `lastFetchOutcome` is one of:
 
-| Outcome | Meaning |
-|---|---|
-| `accepted` | The fetched document was kept. |
-| `not-newer` | Its `version` was not higher than the one kept. |
+| Outcome             | Meaning                                                                                                                                                                                     |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accepted`          | The fetched document was kept.                                                                                                                                                              |
+| `not-newer`         | Its `version` was not higher than the one kept.                                                                                                                                             |
 | `invalid-signature` | The pinned identity did not sign the served bytes, or `X-Identity-Signature` was missing or malformed. Checked before the bytes are parsed, so a publisher that changed its key lands here. |
-| `invalid-document` | The signed bytes are not a valid block list in canonical form. |
-| `wrong-signer` | The pinned identity signed a list that names another owner. |
-| `too-large` | It was larger than `NODE_BLOCK_LIST_MAX_BYTES`. |
-| `redirected` | The source answered with a redirect. |
-| `refused-address` | The origin resolved to a non-public address. |
-| `unreachable` | The fetch failed or timed out. |
+| `invalid-document`  | The signed bytes are not a valid block list in canonical form.                                                                                                                              |
+| `wrong-signer`      | The pinned identity signed a list that names another owner.                                                                                                                                 |
+| `too-large`         | It was larger than `NODE_BLOCK_LIST_MAX_BYTES`.                                                                                                                                             |
+| `redirected`        | The source answered with a redirect.                                                                                                                                                        |
+| `refused-address`   | The origin resolved to a non-public address.                                                                                                                                                |
+| `unreachable`       | The fetch failed or timed out.                                                                                                                                                              |
 
 Every outcome except `accepted` keeps the last valid version. Remote addresses
 are not stored.
@@ -2159,19 +2165,24 @@ POST /node/block-sources/{ownerIdentityId}/approvals
 ```
 
 ```json
-{ "version": 3, "all": false, "blockedIdentityIds": ["<identityId>"], "blockedNodePeerIds": [] }
+{
+  "version": 3,
+  "all": false,
+  "blockedIdentityIds": ["<identityId>"],
+  "blockedNodePeerIds": []
+}
 ```
 
 Approves every pending entry of `version`, or only the named ones. Send either
 `all: true` without named entries, or `all: false` with at least one named
 entry. Returns the source. Refusals answer `409` with one of these codes:
 
-| Code | When |
-|---|---|
-| `NodeBlockSourceVersionHasChangedError` | A newer version was fetched since the review. |
-| `NodeBlockEntriesAreNotListedBySourceError` | A named entry is not in that version. |
-| `InvalidNodeBlockSourceApprovalError` | `all` and the named entries disagree. |
-| `NodeBlockSourceNotFoundError` | The source is not adopted. |
+| Code                                        | When                                          |
+| ------------------------------------------- | --------------------------------------------- |
+| `NodeBlockSourceVersionHasChangedError`     | A newer version was fetched since the review. |
+| `NodeBlockEntriesAreNotListedBySourceError` | A named entry is not in that version.         |
+| `InvalidNodeBlockSourceApprovalError`       | `all` and the named entries disagree.         |
+| `NodeBlockSourceNotFoundError`              | The source is not adopted.                    |
 
 An `ownerIdentityId` or a named `blockedIdentityIds` entry that is not the
 canonical encoding of a usable key gets `400` code `400080` before anything is
@@ -3346,8 +3357,11 @@ beyond that quota is skipped by the fold on every node without any error.
 `invite_link`: the id of the accepted `community_membership_request` (type
 `request` for `approval`, `invitation` for `invitation`), or for `invite_link`
 the invite reference
-`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`,
-never the token itself, so the operation log does not hand out a usable invite.
+`base64url(sha256(utf8("pigeon:community-invite-reference:v1\n" + inviteToken)))`
+(`CommunityInviteReference.of` from `@haskou/pigeon-swarm-crypto`, pinned by its
+`community-operation.json` vector; a token that is not 32 canonical base64url
+bytes has no reference and matches no invite), never the token itself, so the
+operation log does not hand out a usable invite.
 A node admits it only when it holds the signed invite and the member's
 `community_invite_use` record of a token with that reference, and, for
 `invite_link`, the invite has not expired at the operation's signer-chosen

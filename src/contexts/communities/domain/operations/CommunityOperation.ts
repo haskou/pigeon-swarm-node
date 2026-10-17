@@ -287,7 +287,14 @@ export class CommunityOperation {
     return this.action.isGenesis();
   }
 
+  /**
+   * A JSON copy: the primitives are plain JSON, and `StateDigest` digests only
+   * plain objects of this realm, which `structuredClone` does not return under
+   * a sandboxed realm such as Jest's.
+   */
   public toPrimitives(): CommunityOperationPrimitives {
-    return structuredClone(this.primitives);
+    return JSON.parse(
+      JSON.stringify(this.primitives),
+    ) as CommunityOperationPrimitives;
   }
 }

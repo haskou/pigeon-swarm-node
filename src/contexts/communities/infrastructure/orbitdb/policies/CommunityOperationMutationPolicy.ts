@@ -43,6 +43,15 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
 
   public readonly scopeType = 'community_operation';
 
+  /** A token that is not 32 canonical bytes has no reference and matches none. */
+  private static isReferenceOf(token: string, reference: string): boolean {
+    try {
+      return new CommunityInviteToken(token).toReference() === reference;
+    } catch {
+      return false;
+    }
+  }
+
   constructor(private readonly registry: OrbitDBReplicatedStateRegistry) {
     super();
   }
@@ -128,7 +137,7 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
         record.identityId === member &&
         typeof record.token === 'string' &&
         record.id === `invite-use:${record.token}:${member}` &&
-        new CommunityInviteToken(record.token).toReference() === reference,
+        CommunityOperationMutationPolicy.isReferenceOf(record.token, reference),
     );
     const record = records.find(
       (candidate) =>
