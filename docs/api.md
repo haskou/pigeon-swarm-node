@@ -1855,11 +1855,23 @@ request naming one in `X-Identity-Id` gets `401` code `401020` (see
 _Authentication_). `POST /identities`, `POST /identity-devices/transitions` and
 `/identity-devices/{identityId}/sealed-secrets`, which check the block list for
 a record or path id, answer `400` code `400080` for such an id instead.
-`PUT /node/blocks` answers `400` code `400080` for a list blocking such an id.
+`PUT /node/blocks`, `PUT /node/block-exceptions`,
+`PUT /node/block-sources/{ownerIdentityId}` and
+`POST /node/block-sources/{ownerIdentityId}/approvals` answer `400` code
+`400080`, before anything is stored, for a body or path naming such an id.
 A fetched block source keeps its signed `list` verbatim, so it may still name
-one, but such an id is never pending, approved or enforced. At start the node
-drops such ids from its exceptions and from what its sources apply, and
-leaves the node unclaimed if its owner was stored under one.
+one, but such an id is never pending, approved or enforced. At start, before
+it serves any request, the node drops such ids from its exceptions and from
+what its sources apply, and leaves the node unclaimed if its owner was stored
+under one. It then logs a warning that the node is unclaimed and must be
+claimed again, naming `yarn node:reset-owner` and no id.
+
+Before starting an upgraded node whose owner may have been claimed under such
+an id, stop it and run `yarn node:reset-owner <canonical owner identity id>`
+(see [Resetting the Node Owner](INSTALLATION.md#resetting-the-node-owner)).
+If that id already owns the node, the command changes nothing and exits with
+status `1`. Otherwise it names that owner and clears the owner settings, so
+the node never starts unclaimed.
 
 ```http
 PUT /node/blocks
@@ -2002,7 +2014,9 @@ shown to the owner. A source refuses any list whose version is not above the
 highest one this node ever accepted from that publisher, even after the source
 was removed or the owner settings were reset. `origin` must be a bare
 `https` origin; anything else gets `409 InvalidNodeBlockSourceOriginError`.
-The source is fetched on the next refresh run.
+An `ownerIdentityId` that is not the canonical encoding of a usable key gets
+`400` code `400080` before anything is stored. The source is fetched on the
+next refresh run.
 
 The response is a source:
 
@@ -2089,6 +2103,10 @@ entry. Returns the source. Refusals answer `409` with one of these codes:
 | `InvalidNodeBlockSourceApprovalError` | `all` and the named entries disagree. |
 | `NodeBlockSourceNotFoundError` | The source is not adopted. |
 
+An `ownerIdentityId` or a named `blockedIdentityIds` entry that is not the
+canonical encoding of a usable key gets `400` code `400080` before anything is
+stored.
+
 ```http
 PUT /node/block-exceptions
 ```
@@ -2099,7 +2117,9 @@ PUT /node/block-exceptions
 
 Replaces the local exceptions. Adopted lists never block these identities and
 peer ids; the owner's own list still does. Returns the stored exceptions in
-the same shape. `GET /node/block-exceptions` reads them.
+the same shape. `GET /node/block-exceptions` reads them. An `identityIds` entry
+that is not the canonical encoding of a usable key gets `400` code `400080`,
+and nothing is stored.
 
 ## IPFS HTTP API
 

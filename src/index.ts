@@ -51,13 +51,18 @@ export async function init(application: PigeonApplication): Promise<void> {
 
   application.configureWebSocketEventHub();
 
+  // Initializers (identity id purge, block policy, mutation gates) finish
+  // before the server accepts a request, so no owner write races them.
+  startTimer('Run initializers');
+  await application.runInitializers(...applicationInitializers);
+  endTimer('Run initializers');
+
   startTimer('Run server');
   await application.runServer();
   endTimer('Run server');
 
   startTimer('Run consumers');
   application.addConsumers(...applicationConsumers);
-  await application.runInitializers(...applicationInitializers);
   await application.runConsumers();
   endTimer('Run consumers');
 
