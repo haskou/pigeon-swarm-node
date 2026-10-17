@@ -2,6 +2,7 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../Community';
+import { CommunityInvitations } from '../entities/invitations/CommunityInvitations';
 import { CommunityOperation } from '../operations/CommunityOperation';
 import { CommunityId } from '../value-objects/CommunityId';
 
@@ -21,6 +22,14 @@ export default abstract class CommunityRepository {
     id: CommunityId,
     frontier: string[],
   ): Promise<Community>;
+
+  /**
+   * The invitations of the community as its folded operations state them;
+   * none for a community without a replicated log or that is not active.
+   */
+  public abstract findInvitations(
+    id: CommunityId,
+  ): Promise<CommunityInvitations>;
 
   public abstract findByMember(identityId: IdentityId): Promise<Community[]>;
   /** The operations nobody built on yet: the parents of the next operation. */

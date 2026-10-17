@@ -10,14 +10,17 @@ import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/
 
 import { signedMutation } from '../../../public-mutations/support/signedMutation';
 import {
+  admission,
   alice,
   ban,
   communityId,
   genesis,
+  invitation,
   join,
   mallory,
   operation,
   owner,
+  revoke,
 } from '../../domain/operations/CommunityOperationFixtures';
 
 describe('OrbitDBCommunityRepository', () => {
@@ -306,6 +309,51 @@ describe('OrbitDBCommunityRepository', () => {
       await expect(
         repository.requireAtFrontier(communityId, ['B'.repeat(43)]),
       ).rejects.toThrow();
+    });
+
+    it('states the invitations as they were at the frontier', async () => {
+      const created = genesis();
+      const invited = invitation([created]);
+      const admitted = admission([invited.operation], invited, alice);
+      const revoked = revoke([admitted], invited);
+
+      for (const op of [created, invited.operation, admitted, revoked]) {
+        await save(op);
+      }
+      await flushBackgroundTasks();
+
+      const { community, invitations } =
+        await repository.requireStateAtFrontier(communityId, [
+          admitted.getHash(),
+        ]);
+      const stated = invitations.find(invited.operation.getHash());
+
+      expect(community.isMember(alice)).toBe(true);
+      expect(stated?.hasJoined(alice)).toBe(true);
+      expect(stated?.isRevoked()).toBe(false);
+    });
+  });
+
+  describe('findInvitations', () => {
+    it('states the invitations of the latest state', async () => {
+      const created = genesis();
+      const invited = invitation([created]);
+      const revoked = revoke([invited.operation], invited);
+
+      for (const op of [created, invited.operation, revoked]) await save(op);
+      await flushBackgroundTasks();
+
+      const invitations = await repository.findInvitations(communityId);
+
+      expect(invitations.find(invited.operation.getHash())?.isRevoked()).toBe(
+        true,
+      );
+    });
+
+    it('knows no invitation of an unknown community', async () => {
+      const invitations = await repository.findInvitations(communityId);
+
+      expect(invitations.list()).toEqual([]);
     });
   });
 

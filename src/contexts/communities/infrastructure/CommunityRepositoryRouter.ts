@@ -5,6 +5,7 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Community } from '../domain/Community';
+import { CommunityInvitations } from '../domain/entities/invitations/CommunityInvitations';
 import { CommunityOperation } from '../domain/operations/CommunityOperation';
 import CommunityRepository from '../domain/repositories/CommunityRepository';
 import { CommunityId } from '../domain/value-objects/CommunityId';
@@ -87,6 +88,17 @@ export default class CommunityRepositoryRouter extends CommunityRepository {
 
       return this.publicRepository.requireAtFrontier(id, frontier);
     });
+  }
+
+  /** A protected community has no replicated operation log, so no invitation. */
+  public findInvitations(id: CommunityId): Promise<CommunityInvitations> {
+    return this.storageCoordinator.exclusively(
+      id.valueOf(),
+      async (): Promise<CommunityInvitations> =>
+        (await this.isProtected(id))
+          ? CommunityInvitations.EMPTY
+          : this.publicRepository.findInvitations(id),
+    );
   }
 
   public async findByMember(identityId: IdentityId): Promise<Community[]> {
