@@ -1297,7 +1297,7 @@ export default class Definitions {
       return;
     }
 
-    if (participant) {
+    if (participant && method !== 'PATCH') {
       const at = Date.now();
       const callId = participant[1];
       const recordId = participantPayload({
@@ -1329,7 +1329,7 @@ export default class Definitions {
       return;
     }
 
-    if (method === 'DELETE' && end && end[1] !== 'ice-servers') {
+    if (method === 'DELETE' && end) {
       const at = Date.now();
       const signed = signCallEnd({ at, callId: end[1], signer });
 
@@ -5665,7 +5665,7 @@ export default class Definitions {
 
   @given('I sign the current node public network request')
   public async iSignTheCurrentNodePublicNetworkRequest(): Promise<void> {
-    this.body = this.body ?? JSON.stringify({ name: 'public' });
+    this.body = JSON.stringify({ name: 'public' });
     await this.signCurrentRequest('POST', '/node/networks');
   }
 

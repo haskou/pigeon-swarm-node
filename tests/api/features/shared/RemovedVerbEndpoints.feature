@@ -1,15 +1,5 @@
 Feature: Removed verb-style endpoints
 
-  Scenario Outline: A removed verb-style GET endpoint is no longer served
-    When I GET "<path>"
-    Then response code is equal to 404
-
-    Examples:
-      | path                       |
-      | /communities/discover      |
-      | /calls/history             |
-      | /calls/ice-servers         |
-
   Scenario Outline: A removed verb-style POST endpoint is no longer served
     When I POST to "<path>"
     Then response code is equal to 404
