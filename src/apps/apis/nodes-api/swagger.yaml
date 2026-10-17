@@ -161,7 +161,7 @@ paths:
       tags:
         - nodes
       summary: Publish or unpublish the own block list
-      description: Publication is off by default. While on, GET /node/published-blocks serves the stored own block list. Requires a signed request from the current node owner.
+      description: Publication is off by default. While on, GET /node/published-blocks serves the stored own block list unless that list names an alias of a key, in which case it is kept and not published. Requires a signed request from the current node owner.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -200,7 +200,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/PublishedNodeBlockList'
         '404':
-          description: Publication is off or no list is stored (code 404040).
+          description: Publication is off, no list is stored, or the stored list names an alias of a key (code 404040).
   /node/block-sources:
     get:
       tags:

@@ -4,8 +4,10 @@ Status: design for issue #384, decisions confirmed by the owner. Built:
 registration control (delivery step 1), local blocking (slice 2), sharing
 (slice 3) and the host owner reset `yarn node:reset-owner` (slice 4).
 Hardening: forged owner ids refused (#608), alias identity ids refused
-(#610) and purged from stored blocks, records and owner (#615), the purge run
-before serving and aliases refused on every block write (#617), the owner check
+(#610) and purged from stored blocks and owner (#615). Identity records under
+an alias are ignored on read and never deleted, and an own list naming one is
+kept and not published. The purge runs before serving and aliases are refused
+on every block write (#617), the owner check
 in the same section as owner-only writes (#621) with nested use failing fast
 (#624), the payload-digest depth limit (#638), nested keyed sections refused
 (#639), a time bound on startup initializers (#640) and alias block source
