@@ -3,7 +3,7 @@ import { ArrayMaxSize, IsArray, ValidateNested } from 'class-validator';
 
 import { CallParticipantMediaConnectionBody } from './CallParticipantMediaConnectionBody';
 
-export class PostCallParticipantHeartbeatBody {
+export class PatchCallParticipantBody {
   @IsArray()
   @ArrayMaxSize(32)
   @ValidateNested({ each: true })

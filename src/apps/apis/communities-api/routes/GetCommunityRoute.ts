@@ -1,3 +1,4 @@
+import { CanonicalPathId } from '@app/apps/apis/shared/CanonicalPathId';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
@@ -14,7 +15,9 @@ export class GetCommunityRoute extends CommunityRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const community = await this.findCommunity(communityId);
+    const community = await this.findCommunity(
+      CanonicalPathId.community(communityId),
+    );
 
     community.viewAsMember(identityId);
 

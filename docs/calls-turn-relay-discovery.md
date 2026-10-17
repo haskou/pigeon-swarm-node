@@ -11,7 +11,7 @@ Calls use WebRTC ICE. The backend does not embed a TURN server and does not
 relay media itself. A node that can expose coturn advertises the reachable TURN
 URLs through IPFS pubsub: v1 pool records on public networks and v2 records on
 shared private networks. Other nodes
-validate and cache those records. `GET /calls/ice-servers` uses a discovered
+validate and cache those records. `GET /call-ice-servers` uses a discovered
 record only while its publishing peer is also the currently connected circuit
 relay.
 
@@ -134,7 +134,7 @@ corresponding issues can be closed.
 | `CallIceServerConfig`           | Builds the local or v1 pool HTTP ICE configuration.                                                                            |
 | `FederatedCallRelayCredentials` | Selects connected private v2 relays and fetches, validates and caches owner-issued credentials.                                |
 | `CallRelayCredentialIssuer`     | Issues ten-minute v2 credentials using the owner secret and enforces request quotas.                                           |
-| `GET /calls/ice-servers`        | Authenticated frontend contract for WebRTC ICE configuration.                                                                  |
+| `GET /call-ice-servers`         | Authenticated frontend contract for WebRTC ICE configuration.                                                                  |
 
 ## Discovery Flow
 
@@ -151,7 +151,7 @@ sequenceDiagram
     IPFS-->>NodeB: Deliver pubsub payload
     NodeB->>NodeB: Validate shape, expiry, URLs and signature
     NodeB->>NodeB: Cache active relay record
-    Client->>NodeB: GET /calls/ice-servers
+    Client->>NodeB: GET /call-ice-servers
     alt Local configuration or v1 shared-secret pool
         NodeB->>NodeB: Generate temporary credentials with matching local secret
     else v2 connected private-network relay
@@ -274,7 +274,7 @@ flowchart TD
 Frontend calls:
 
 ```http
-GET /calls/ice-servers
+GET /call-ice-servers
 ```
 
 The request must be signed like the rest of authenticated API calls. A relay

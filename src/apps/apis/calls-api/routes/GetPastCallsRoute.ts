@@ -7,11 +7,11 @@ import { Get, JsonController, Req, Res } from 'routing-controllers';
 import { CallHistoryViewModel } from '../view-model/CallHistoryViewModel';
 import { CallRouteSupport } from './CallRouteSupport';
 
-@JsonController('/calls')
-export class GetCallHistoryRoute extends CallRouteSupport {
+@JsonController('/past-calls')
+export class GetPastCallsRoute extends CallRouteSupport {
   private readonly finder = this.get<CallHistoryFinder>(CallHistoryFinder);
 
-  @Get('/history')
+  @Get()
   public async getCallHistory(
     @Req() request: Request,
     @Res() response: Response,

@@ -1,5 +1,4 @@
 import { NodeNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodeNetworkAdderMessage';
-import { NodePublicNetworkAdderMessage } from '@app/contexts/nodes/application/add-network/messages/NodePublicNetworkAdderMessage';
 import NodeNetworkAdder from '@app/contexts/nodes/application/add-network/NodeNetworkAdder';
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
@@ -205,7 +204,9 @@ describe('Concurrent node owner writes', () => {
       ),
     ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
     await expect(
-      adder.addPublicNetwork(new NodePublicNetworkAdderMessage(former)),
+      adder.addNetwork(
+        new NodeNetworkAdderMessage(undefined, 'public', undefined, former),
+      ),
     ).rejects.toThrow(NodeCanOnlyBeManagedByItsOwnerError);
     await expect(
       new NodeNetworkRemover(

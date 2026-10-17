@@ -1,3 +1,4 @@
+import { CanonicalPathId } from '@app/apps/apis/shared/CanonicalPathId';
 import CallFinder from '@app/contexts/calls/application/find-call/CallFinder';
 import { CallFindMessage } from '@app/contexts/calls/application/find-call/messages/CallFindMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
@@ -19,7 +20,7 @@ export class GetCallRoute extends CallRouteSupport {
     const requesterIdentityId = await this.authenticate(request);
     const call = await this.finder.find(
       new CallFindMessage(
-        callId,
+        CanonicalPathId.call(callId),
         requesterIdentityId.valueOf(),
         this.capability(request),
       ),

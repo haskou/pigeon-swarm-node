@@ -8,7 +8,7 @@ Feature: Post public IPFS content route
     And I register a test IPFS network "api-test-network"
     And I set raw IPFS content with content type "image/png" and text "hello"
     And I sign the current public IPFS content request
-    When I POST to "/ipfs/public"
+    When I POST to "/ipfs/contents"
     Then response code is equal to 201
     And response body should contain "cid"
     And response contains a valid resource with the following fields

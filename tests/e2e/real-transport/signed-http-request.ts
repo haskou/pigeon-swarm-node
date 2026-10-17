@@ -37,7 +37,7 @@ const NODE_PORT = 19240;
 const INVALID_SIGNED_REQUEST_CODE = 401020;
 const SETTINGS_PATH = '/notification-settings';
 const RESERVE_PATH = '/private-blobs';
-const UPLOAD_PATH = '/ipfs/public';
+const UPLOAD_PATH = '/ipfs/contents';
 
 type VectorInput = {
   body?: Record<string, unknown>;

@@ -3,7 +3,6 @@ import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/Doma
 import { Node } from '../../domain/Node';
 import NodeRepository from '../../domain/repositories/NodeRepository';
 import { NodeNetworkAdderMessage } from './messages/NodeNetworkAdderMessage';
-import { NodePublicNetworkAdderMessage } from './messages/NodePublicNetworkAdderMessage';
 
 export default class NodeNetworkAdder {
   constructor(
@@ -11,9 +10,7 @@ export default class NodeNetworkAdder {
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
-  private async saveNetwork(
-    message: NodeNetworkAdderMessage | NodePublicNetworkAdderMessage,
-  ): Promise<Node> {
+  public async addNetwork(message: NodeNetworkAdderMessage): Promise<Node> {
     const node = await this.nodes.updateLocalNode((latest) =>
       latest.addNetwork(message.network, message.authenticatedIdentityId),
     );
@@ -21,15 +18,5 @@ export default class NodeNetworkAdder {
     await this.eventPublisher.publish(node.pullDomainEvents());
 
     return node;
-  }
-
-  public async addNetwork(message: NodeNetworkAdderMessage): Promise<Node> {
-    return this.saveNetwork(message);
-  }
-
-  public async addPublicNetwork(
-    message: NodePublicNetworkAdderMessage,
-  ): Promise<Node> {
-    return this.saveNetwork(message);
   }
 }

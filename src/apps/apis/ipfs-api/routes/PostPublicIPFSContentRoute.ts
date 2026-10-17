@@ -16,7 +16,7 @@ import { IPFSContentUploadRouteSupport } from './IPFSContentUploadRouteSupport';
 
 @JsonController('/ipfs')
 export class PostPublicIPFSContentRoute extends IPFSContentUploadRouteSupport {
-  @Post('/public')
+  @Post('/contents')
   @UseBefore(
     express.raw({
       limit: `${maxContentSizeBytes}b`,

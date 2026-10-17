@@ -44,6 +44,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Poll'
+    patch:
+      tags: [polls]
+      summary: Close a poll
+      description: Sets the poll `status` to `closed`; it is the only accepted transition.
+      security:
+        - signedRequest: []
+      parameters:
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/PollId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchPollBody'
+      responses:
+        '200':
+          description: Closed poll.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Poll'
   /polls/{pollId}/votes:
     post:
       tags: [polls]
@@ -86,29 +109,6 @@ paths:
       responses:
         '200':
           description: Updated poll.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Poll'
-  /polls/{pollId}/close:
-    post:
-      tags: [polls]
-      summary: Close a poll
-      security:
-        - signedRequest: []
-      parameters:
-        - $ref: '#/components/parameters/XIdentityId'
-        - $ref: '#/components/parameters/XTimestamp'
-        - $ref: '#/components/parameters/PollId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PostPollCloseBody'
-      responses:
-        '200':
-          description: Closed poll.
           content:
             application/json:
               schema:
@@ -214,10 +214,13 @@ components:
       properties:
         mutation:
           $ref: '#/components/schemas/SignedPublicMutation'
-    PostPollCloseBody:
+    PatchPollBody:
       type: object
-      required: [createdAt, mutation]
+      required: [createdAt, mutation, status]
       properties:
+        status:
+          type: string
+          enum: [closed]
         createdAt:
           type: integer
           minimum: 0

@@ -793,8 +793,7 @@ package "communities-api" {
   class PostCommunityJoinRequestRoute
   class DeleteCommunityMemberRoute
   class GetCommunityChannelsRoute
-  class PostCommunityTextChannelRoute
-  class PostCommunityVoiceChannelRoute
+  class PostCommunityChannelRoute
   class PatchCommunityChannelRoute
   class PatchCommunityChannelPermissionsRoute
   class DeleteCommunityChannelRoute
@@ -827,8 +826,8 @@ package "communities-api" {
   PostCommunityInvitationRevocationRoute ..> CommunityInvitationRevoker
   DeleteCommunityMemberRoute ..> CommunityLeaver
   GetCommunityChannelsRoute ..> CommunityChannelsFinder
-  PostCommunityTextChannelRoute ..> CommunityTextChannelCreator
-  PostCommunityVoiceChannelRoute ..> CommunityVoiceChannelCreator
+  PostCommunityChannelRoute ..> CommunityTextChannelCreator
+  PostCommunityChannelRoute ..> CommunityVoiceChannelCreator
   PatchCommunityChannelRoute ..> CommunityChannelRenamer
   PatchCommunityChannelPermissionsRoute ..> CommunityChannelPermissionsUpdater
   DeleteCommunityChannelRoute ..> CommunityChannelDeleter

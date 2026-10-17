@@ -37,7 +37,7 @@ Feature: Leave call participant
       | status | active |
     And I present no group call capability
     And I sign the current call heartbeat request
-    When I POST a participant heartbeat to the current call
+    When I PATCH the participant of the current call
     Then response code is equal to 204
     And I sign the current call request
     When I GET the current call
