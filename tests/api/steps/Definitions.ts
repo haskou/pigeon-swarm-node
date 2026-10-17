@@ -126,12 +126,26 @@ async function startApplication(
   // Each scenario's client sends its own forwarded address (see RestClient),
   // so per-address limits such as the replay guard's stranger cap count one
   // scenario at a time, as they would count one client.
+  // The server reads the setting once, when it starts, so it is put back
+  // afterwards.
+  const trustProxy = process.env.API_TRUST_PROXY;
+
   process.env.API_TRUST_PROXY = 'loopback';
   started.loadEnvironmentVariables('test');
   ipfsDefinition.cleanupStorageFolder(process.env.IPFS_STORAGE_PATH);
 
   await started.dependencyInjection();
-  await started.runServer();
+
+  try {
+    await started.runServer();
+  } finally {
+    if (trustProxy === undefined) {
+      delete process.env.API_TRUST_PROXY;
+    } else {
+      process.env.API_TRUST_PROXY = trustProxy;
+    }
+  }
+
   started.logs();
   await started.runRuntimes(
     OrbitDBReplicatedStateRuntime,
