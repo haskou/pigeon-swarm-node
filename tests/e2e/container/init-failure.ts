@@ -9,8 +9,9 @@ import path from 'node:path';
  * that the process exits with status 1 instead of 0 or serving on. Restart
  * policies (Docker `on-failure`, Kubernetes) only react to the exit status.
  * Covers a failure before any listener opens, an API port already taken by
- * another process and a failure after the API has started listening, which
- * must not keep the process alive. Run `yarn build` first.
+ * another process, a failure in an initializer, which must happen before the
+ * API listens, and a failure after the API has started listening, which must
+ * not keep the process alive. Run `yarn build` first.
  */
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '../../..');
@@ -45,10 +46,19 @@ const scenarios: Scenario[] = [
     portInUse: true,
   },
   {
-    name: 'unwritable IPFS storage, after the API starts listening',
+    name: 'unwritable IPFS storage, in an initializer before the API starts listening',
     environment: (port) => ({
       API_PORT: String(port),
       IPFS_STORAGE_PATH: '/dev/null/ipfs',
+    }),
+    listensBeforeFailure: false,
+    portInUse: false,
+  },
+  {
+    name: 'unwritable TURN runtime configuration, after the API starts listening',
+    environment: (port) => ({
+      API_PORT: String(port),
+      PIGEON_TURN_RUNTIME_CONFIG_PATH: '/dev/null/turn/runtime.json',
     }),
     listensBeforeFailure: true,
     portInUse: false,
@@ -150,13 +160,19 @@ async function runScenario(scenario: Scenario): Promise<void> {
     );
   }
 
-  if (scenario.listensBeforeFailure) {
-    const listening = result.output.indexOf('Run server:');
-    const failure = result.output.indexOf('Application error');
+  const listening = result.output.indexOf('Run server:');
+  const failure = result.output.indexOf('Application error');
 
+  if (scenario.listensBeforeFailure) {
     assert.ok(
       listening !== -1 && listening < failure,
       `expected the API to start listening before the failure; ${context}`,
+    );
+  } else {
+    assert.equal(
+      listening,
+      -1,
+      `expected the API not to listen before the failure; ${context}`,
     );
   }
 }
