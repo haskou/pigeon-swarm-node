@@ -184,6 +184,16 @@ export class NodeBlockList extends NodeBlocks {
     return this.toSigned().isSignedBy(this.ownerIdentityId);
   }
 
+  /**
+   * Whether every blocked identity id is the canonical encoding of a usable
+   * key: an alias of a key cannot be blocked, so a list naming one is refused.
+   */
+  public namesOnlyCanonicalIdentityIds(): boolean {
+    return this.blockedIdentityIds.every((identityId) =>
+      identityId.isCanonicalKey(),
+    );
+  }
+
   public isVersion(version: NodeBlockListVersion): boolean {
     return this.version.isEqual(version);
   }

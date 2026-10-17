@@ -1997,8 +1997,10 @@ a record or path id, answer `400` code `400080` for such an id instead.
 `DELETE /node/block-sources/{ownerIdentityId}` and
 `GET /node/block-sources/{ownerIdentityId}/pending-entries` answer it for such a path
 id once the owner is authenticated, before any source is read or removed.
-A fetched block source keeps its signed `list` verbatim, so it may still name
-one, but such an id is never pending, approved or enforced. At start, before
+A fetched block source list that names such an id is refused with the fetch
+outcome `non-canonical-identity-id`, and the last valid list is kept. A list
+kept before ids had to be canonical keeps its signed `list` verbatim, so it may
+still name one, but such an id is never pending, approved or enforced. At start, before
 it serves any request, the node drops such ids from its exceptions and from
 what its sources apply, and leaves the node unclaimed if its owner was stored
 under one. It then logs a warning that the node is unclaimed and must be
@@ -2174,17 +2176,18 @@ The response is a source:
 `version`, `lastFetchedAt` and `lastFetchOutcome` are `null` until the first
 fetch. `lastFetchOutcome` is one of:
 
-| Outcome             | Meaning                                                                                                                                                                                     |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `accepted`          | The fetched document was kept.                                                                                                                                                              |
-| `not-newer`         | Its `version` was not higher than the one kept.                                                                                                                                             |
-| `invalid-signature` | The pinned identity did not sign the served bytes, or `X-Identity-Signature` was missing or malformed. Checked before the bytes are parsed, so a publisher that changed its key lands here. |
-| `invalid-document`  | The signed bytes are not a valid block list in canonical form.                                                                                                                              |
-| `wrong-signer`      | The pinned identity signed a list that names another owner.                                                                                                                                 |
-| `too-large`         | It was larger than `NODE_BLOCK_LIST_MAX_BYTES`.                                                                                                                                             |
-| `redirected`        | The source answered with a redirect.                                                                                                                                                        |
-| `refused-address`   | The origin resolved to a non-public address.                                                                                                                                                |
-| `unreachable`       | The fetch failed or timed out.                                                                                                                                                              |
+| Outcome                     | Meaning                                                                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `accepted`                  | The fetched document was kept.                                                                                                                                                              |
+| `not-newer`                 | Its `version` was not higher than the one kept.                                                                                                                                             |
+| `invalid-signature`         | The pinned identity did not sign the served bytes, or `X-Identity-Signature` was missing or malformed. Checked before the bytes are parsed, so a publisher that changed its key lands here. |
+| `invalid-document`          | The signed bytes are not a valid block list in canonical form.                                                                                                                              |
+| `wrong-signer`              | The pinned identity signed a list that names another owner.                                                                                                                                 |
+| `non-canonical-identity-id` | The list blocks an identity id that is not the canonical encoding of a usable key.                                                                                                          |
+| `too-large`                 | It was larger than `NODE_BLOCK_LIST_MAX_BYTES`.                                                                                                                                             |
+| `redirected`                | The source answered with a redirect.                                                                                                                                                        |
+| `refused-address`           | The origin resolved to a non-public address.                                                                                                                                                |
+| `unreachable`               | The fetch failed or timed out.                                                                                                                                                              |
 
 Every outcome except `accepted` keeps the last valid version. Remote addresses
 are not stored.

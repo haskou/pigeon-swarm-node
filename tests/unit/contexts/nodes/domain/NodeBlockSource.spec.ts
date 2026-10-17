@@ -206,15 +206,14 @@ describe('NodeBlockSource', () => {
   describe('dropNonCanonicalApprovals', () => {
     it('should drop stored approvals of non-canonical identity ids and count them', () => {
       const alias = IdentityIdMother.aliasPrefix(a);
-      const adopted = source();
-
-      adopted.receive(list(1, [alias, a, b]), at);
       const stored = NodeBlockSource.fromPrimitives({
-        ...adopted.toPrimitives(),
+        ...source().toPrimitives(),
         approved: {
           identityIds: [alias.valueOf(), a.valueOf()],
           nodePeerIds: [NODE_PEER_ID_A],
         },
+        list: NodeBlockList.fromSigned(list(1, [alias, a, b])).toPrimitives(),
+        versionFloor: 1,
       });
 
       expect(stored.dropNonCanonicalApprovals()).toBe(1);

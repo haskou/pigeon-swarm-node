@@ -75,11 +75,7 @@ export class PutNodeBlocksRoute extends Route {
       version: body.version,
     });
 
-    if (
-      !message.blockList
-        .getBlockedIdentityIds()
-        .every((identityId) => identityId.isCanonicalKey())
-    ) {
+    if (!message.blockList.namesOnlyCanonicalIdentityIds()) {
       throw new NonCanonicalIdentityIdError();
     }
 

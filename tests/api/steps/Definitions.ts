@@ -1556,10 +1556,7 @@ export default class Definitions {
   ): Promise<void> {
     const source = await this.adoptedBlockSource(autoApply);
 
-    source.receive(
-      await this.signedBlockSourceList(version),
-      Timestamp.now(),
-    );
+    source.receive(await this.signedBlockSourceList(version), Timestamp.now());
     await this.saveBlockSource(source);
   }
 

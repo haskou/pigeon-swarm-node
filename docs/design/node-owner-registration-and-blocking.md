@@ -300,9 +300,12 @@ naming such an id with `400` code `400080` before anything is stored, so no
 owner write can add an alias. `DELETE /node/block-sources/{ownerIdentityId}`
 and `GET /node/block-sources/{ownerIdentityId}/pending-entries` refuse such a path id
 the same way once the owner is authenticated, before any source is read or
-removed, so an alias is never answered as a missing source. A source list is
-kept with the bytes its publisher signed, so an alias it names stays in `list`,
-but it is never pending, approved or enforced. Replicated identity records
+removed, so an alias is never answered as a missing source. A fetched source
+list naming such an id is refused at admission (`non-canonical-identity-id`)
+and the last valid list is kept, so no signed list the node accepts names an
+alias. Stored data is append-only and keeps its signed bytes, so a list kept
+before ids had to be canonical may still name an alias in `list`; on read it
+is never pending, approved or enforced. Replicated identity records
 under an alias id are refused on every load and never held.
 
 **Upgrading a node that ran before ids had to be canonical.** At every start,
@@ -437,7 +440,9 @@ signed by the owner identity:
      form, so the signed bytes and the kept document cannot differ
      (`invalid-document`);
   3. the document names the pinned identity as its owner (`wrong-signer`);
-  4. the version is higher than any this node ever accepted from that
+  4. every blocked identity id is the canonical encoding of a usable key
+     (`non-canonical-identity-id`);
+  5. the version is higher than any this node ever accepted from that
      publisher, even before the source was removed or the owner settings were
      reset, so a served old version cannot roll blocks back (`not-newer`).
 
