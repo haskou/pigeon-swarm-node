@@ -363,7 +363,7 @@ describe('Community operation limits', () => {
       expect(CommunityStateFold.fold([...base, ...flood]).skipped).toEqual([]);
     });
 
-    it('counts an admission toward its joiner, so an admitter at its quota still admits', () => {
+    it('counts an admission toward its admitter, so an admitter at its quota admits no one', () => {
       const { base, channelId, tip } = moderated();
       const invited = invitation([tip], owner, {}, 10);
       const flood = chain(alice, channelId, invited.operation, roomAfter(base));
@@ -376,34 +376,40 @@ describe('Community operation limits', () => {
 
       expect(() =>
         ledger.admit(admission([last], invited, bob, alice, 2_000)),
-      ).not.toThrow();
-      expect(() =>
-        ledger.admit(rename(alice, channelId, [last], QUOTA + EXCESS)),
       ).toThrow(CommunityOperationLimitExceededError);
+      expect(() =>
+        ledger.admit(admission([last], invited, bob, owner, 2_000)),
+      ).not.toThrow();
     });
 
-    it('refuses the admission of a joiner that already signed its quota', () => {
-      const { base, channelId, tip } = moderated();
-      const roleId = String(base[3].getArguments().roleIds);
-      const bobJoins = join([tip], bob);
-      const promoted = operation(
-        CommunityOperationAction.MEMBER_ROLES_UPDATED,
-        owner,
-        { identityId: bob.valueOf(), roleIds: [roleId] },
-        [bobJoins],
+    it('charges sibling admissions of one joiner to their admitter, never to the joiner', () => {
+      const { base, tip } = moderated();
+      const invited = invitation([tip], owner, {}, 10);
+      const admissions = Array.from({ length: QUOTA + EXCESS }, (_, index) =>
+        admission([invited.operation], invited, bob, alice, 2_000 + index),
       );
-      const flood = chain(bob, channelId, promoted, QUOTA - 1);
-      const left = leave([flood[flood.length - 1]], bob);
-      const invited = invitation([left], owner, {}, 10);
+      const left = leave(admissions, bob);
+      const operations = [...base, invited.operation, ...admissions, left];
       const ledger = new CommunityOperationLedger();
 
-      [...base, bobJoins, promoted, ...flood, left, invited.operation].forEach(
-        (operation) => ledger.admit(operation),
+      [...base, invited.operation, ...admissions].forEach((operation) =>
+        ledger.admit(operation),
       );
 
-      expect(() =>
-        ledger.admit(admission([invited.operation], invited, bob, owner, 11)),
-      ).toThrow(CommunityOperationLimitExceededError);
+      expect(() => ledger.admit(left)).not.toThrow();
+
+      const state = CommunityStateFold.fold(operations);
+      const surplus = CommunityStateFold.orderOf(operations)
+        .filter((operation) => operation.getAuthorIdentityId().isEqual(alice))
+        .slice(QUOTA)
+        .map((operation) => operation.getHash());
+
+      expect(surplus).toHaveLength(EXCESS);
+      expect(state.skipped).toEqual(expect.arrayContaining(surplus));
+      expect(state.skipped).not.toContain(left.getHash());
+      expect(state.community?.toPrimitives().memberIds).not.toContain(
+        bob.valueOf(),
+      );
     });
   });
 

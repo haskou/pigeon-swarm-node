@@ -3408,26 +3408,26 @@ beyond the argument limits is refused. An operation another author signed
 concurrently beyond that quota is skipped by the fold on every node without any
 error.
 
-| Route                                                                                                                                      | action                        | `args`                                                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `POST /communities`                                                                                                                        | `community_created`           | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
-| `PATCH /communities/{id}`                                                                                                                  | `community_updated`           | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}`                  |
-| `POST .../channels/text`, `.../channels/voice`                                                                                             | `channel_created`             | `{channelId, name, type}`                                                                 |
-| `PATCH .../channels/{channelId}`                                                                                                           | `channel_renamed`             | `{channelId, name}`                                                                       |
-| `DELETE .../channels/{channelId}`                                                                                                          | `channel_deleted`             | `{channelId}`                                                                             |
-| `PATCH .../channels/{channelId}/permissions`                                                                                               | `channel_permissions_updated` | `{channelId, visibleRoleIds}`                                                             |
-| `POST .../roles`                                                                                                                           | `role_created`                | `{roleId, name, permissions}`                                                             |
-| `PATCH .../roles/{roleId}`                                                                                                                 | `role_updated`                | `{roleId, name, permissions}`                                                             |
-| `DELETE .../roles/{roleId}`                                                                                                                | `role_deleted`                | `{roleId}`                                                                                |
-| `PUT .../members/{identityId}/roles`                                                                                                       | `member_roles_updated`        | `{identityId, roleIds}`                                                                   |
-| `POST .../bans`                                                                                                                            | `member_banned`               | `{identityId}`                                                                            |
-| `DELETE .../bans/{identityId}`                                                                                                             | `member_unbanned`             | `{identityId}`                                                                            |
-| `DELETE .../members/{identityId}/kick`                                                                                                     | `member_kicked`               | `{identityId}`                                                                            |
-| `DELETE .../members/me`                                                                                                                    | `member_left`                 | `{identityId}`                                                                            |
-| `POST /community-membership-requests` (auto-join), `PATCH /community-membership-requests/{id}` (accept)                                    | `member_joined`               | `{identityId, method, reference?}`                                                        |
-| `POST .../invitations/{invitationId}/admissions`                                                                                           | `member_joined`               | `{consent, identityId, invitationId, method: "invitation", possession}`                   |
-| `POST .../invitations`                                                                                                                     | `invitation_created`          | `{expiresAt, invitationKey, maxUses, invitee?}`                                           |
-| `POST .../invitations/{invitationId}/revocation`                                                                                           | `invitation_revoked`          | `{invitationId}`                                                                          |
+| Route                                                                                                   | action                        | `args`                                                                                    |
+| ------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
+| `POST /communities`                                                                                     | `community_created`           | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
+| `PATCH /communities/{id}`                                                                               | `community_updated`           | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}`                  |
+| `POST .../channels/text`, `.../channels/voice`                                                          | `channel_created`             | `{channelId, name, type}`                                                                 |
+| `PATCH .../channels/{channelId}`                                                                        | `channel_renamed`             | `{channelId, name}`                                                                       |
+| `DELETE .../channels/{channelId}`                                                                       | `channel_deleted`             | `{channelId}`                                                                             |
+| `PATCH .../channels/{channelId}/permissions`                                                            | `channel_permissions_updated` | `{channelId, visibleRoleIds}`                                                             |
+| `POST .../roles`                                                                                        | `role_created`                | `{roleId, name, permissions}`                                                             |
+| `PATCH .../roles/{roleId}`                                                                              | `role_updated`                | `{roleId, name, permissions}`                                                             |
+| `DELETE .../roles/{roleId}`                                                                             | `role_deleted`                | `{roleId}`                                                                                |
+| `PUT .../members/{identityId}/roles`                                                                    | `member_roles_updated`        | `{identityId, roleIds}`                                                                   |
+| `POST .../bans`                                                                                         | `member_banned`               | `{identityId}`                                                                            |
+| `DELETE .../bans/{identityId}`                                                                          | `member_unbanned`             | `{identityId}`                                                                            |
+| `DELETE .../members/{identityId}/kick`                                                                  | `member_kicked`               | `{identityId}`                                                                            |
+| `DELETE .../members/me`                                                                                 | `member_left`                 | `{identityId}`                                                                            |
+| `POST /community-membership-requests` (auto-join), `PATCH /community-membership-requests/{id}` (accept) | `member_joined`               | `{identityId, method, reference?}`                                                        |
+| `POST .../invitations/{invitationId}/admissions`                                                        | `member_joined`               | `{consent, identityId, invitationId, method: "invitation", possession}`                   |
+| `POST .../invitations`                                                                                  | `invitation_created`          | `{expiresAt, invitationKey, maxUses, invitee?}`                                           |
+| `POST .../invitations/{invitationId}/revocation`                                                        | `invitation_revoked`          | `{invitationId}`                                                                          |
 
 `member_joined` carries `method` `added`, `approval`, `invitation` or `automatic`.
 `approval` carries `reference`, the id of the accepted
@@ -3902,7 +3902,11 @@ Implemented:
 - `invitationKey` is a canonical Ed25519 public key that is not of small order
   and differs from the key of every invitation in the operation's causal past
 - `maxUses` is 1 to 100, and exactly 1 when `invitee` names a canonical identity
-  id that alone may join
+  id that alone may join. It is exact for admissions that build on each other.
+  Admissions on `k` mutually concurrent branches (a partition, or admitting
+  devices that have not synced) each see only their own past, so together they
+  can admit up to `k * maxUses` identities. This overshoot is an accepted
+  residual and is never repaired: nobody is evicted.
 - `expiresAt` is after the operation's `createdAt` and at most 30 days
   (2 592 000 000 ms) later
 
@@ -3999,7 +4003,10 @@ Implemented:
 
 - require signed request auth from a member with `manage_members`; that member is
   the operation author and the joiner signs nothing
-- the join counts toward the joiner's operation quota, not the admitter's
+- the join counts toward the admitter's operation quota, like every operation
+  of its author; the founder is exempt. The joiner's quota is untouched, so
+  no admitter can spend it, and admitting one joiner on many concurrent
+  branches spends only the admitter's own quota
 - the ledger refuses the admission unless the invitation is live in its causal
   past, `possession` and `consent` verify, the joiner is canonical, not banned,
   not a member and has not used the invitation, `createdAt` lies between the

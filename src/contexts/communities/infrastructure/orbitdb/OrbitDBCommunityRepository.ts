@@ -155,14 +155,13 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     records: Record<string, unknown>[],
     operation: CommunityOperation,
   ): void {
-    const operations = this.operationsOf(communityId, records);
-    const responsible = CommunityOperationLimits.responsibleOf(operation);
+    const author = operation.getAuthorIdentityId().valueOf();
 
     if (
       !CommunityOperationLimits.isAuthorQuotaReached(
-        operations.filter(
-          (stored) =>
-            CommunityOperationLimits.responsibleOf(stored) === responsible,
+        records.filter(
+          (record) =>
+            PublicMutationRecord.payloadOf(record).authorIdentityId === author,
         ).length,
       )
     ) {
@@ -170,7 +169,10 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     }
 
     CommunityOperationLimits.assertAuthorQuota(
-      CommunityStateFold.closureOf(operations, operation.getParents()),
+      CommunityStateFold.closureOf(
+        this.operationsOf(communityId, records),
+        operation.getParents(),
+      ),
       operation,
     );
   }

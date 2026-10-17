@@ -415,7 +415,9 @@ canonical, the invitation is in the community folded at the claim's frontier
 and live there, the proofs verify, and the joiner is neither banned nor a
 member. Like every `requests` record it replicates to all nodes of the network,
 so an operator learns who asked to join which community. Admissions can overshoot
-`maxUses` by one `maxUses` per mutually concurrent branch.
+`maxUses` by one `maxUses` per mutually concurrent branch; this accepted residual
+is never repaired and evicts nobody. An admission counts toward the operation
+quota of its admitter, its author, like every operation.
 An
 operation with an unknown parent or unreplicated evidence is not stored; its head
 is demoted and re-admitted when the evidence replicates (see

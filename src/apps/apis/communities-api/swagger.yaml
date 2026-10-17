@@ -369,7 +369,7 @@ paths:
       tags:
         - communities
       summary: Admit a claimant under an invitation
-      description: Requires manage_members. The operation is member_joined with args consent, identityId, invitationId, method invitation and possession, copied from the claim. The author is the admitter and the join counts toward the joiner's operation quota.
+      description: Requires manage_members. The operation is member_joined with args consent, identityId, invitationId, method invitation and possession, copied from the claim. The author is the admitter and the join counts toward the admitter's operation quota, like every operation of its author; the founder is exempt.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path

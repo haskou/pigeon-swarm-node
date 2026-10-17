@@ -2,8 +2,6 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { assert } from '@haskou/value-objects';
 
 import { CommunityOperationLimitExceededError } from '../errors/CommunityOperationLimitExceededError';
-import { CommunityJoinMethod } from '../value-objects/CommunityJoinMethod';
-import { CommunityOperationAction } from '../value-objects/CommunityOperationAction';
 import { CommunityOperation } from './CommunityOperation';
 import { CommunityOperationArguments } from './CommunityOperationArguments';
 
@@ -57,41 +55,21 @@ export class CommunityOperationLimits {
   }
 
   /**
-   * The identity whose quota an operation counts toward: the joiner of an
-   * admission through an invitation, who consented to it, so link holders
-   * never spend the quota of the manager that admits them; the author of any
-   * other operation.
-   */
-  public static responsibleOf(operation: CommunityOperation): string {
-    const { identityId, method } = operation.getArguments();
-
-    return operation
-      .getAction()
-      .isEqual(CommunityOperationAction.MEMBER_JOINED) &&
-      method === CommunityJoinMethod.INVITATION.valueOf() &&
-      typeof identityId === 'string'
-      ? identityId
-      : operation.getAuthorIdentityId().valueOf();
-  }
-
-  /**
    * Throws when `past`, the causal past of a candidate, already holds the
-   * quota of operations of its responsible identity (see `responsibleOf`),
-   * who is not the founder: whatever the order of arrival, the fold would
-   * skip the candidate.
+   * quota of operations of its author, who is not the founder: whatever the
+   * order of arrival, the fold would skip the candidate.
    */
   public static assertAuthorQuota(
     past: CommunityOperation[],
     candidate: CommunityOperation,
   ): void {
-    const responsible = CommunityOperationLimits.responsibleOf(candidate);
+    const author = candidate.getAuthorIdentityId();
     const genesis = past.find((operation) => operation.isGenesis());
 
-    if (genesis?.getAuthorIdentityId().valueOf() === responsible) return;
+    if (genesis?.getAuthorIdentityId().isEqual(author)) return;
 
-    const signed = past.filter(
-      (operation) =>
-        CommunityOperationLimits.responsibleOf(operation) === responsible,
+    const signed = past.filter((operation) =>
+      operation.getAuthorIdentityId().isEqual(author),
     ).length;
 
     assert(

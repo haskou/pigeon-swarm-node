@@ -24,10 +24,9 @@ import { CommunityState } from './CommunityState';
  * state it applies to (see `CommunityOperationRebase`), so it changes only
  * what its author changed and concurrent changes to the rest are kept.
  *
- * An identity other than the founder (the genesis author) is responsible for
- * a bounded number of operations per community (see
- * `CommunityOperationLimits.responsibleOf`): the ones ordered after its quota
- * are skipped, whether or not they were permitted.
+ * An identity other than the founder (the genesis author) signs a bounded
+ * number of operations per community: the ones ordered after its quota are
+ * skipped, whether or not they were permitted.
  *
  * Invitations and admissions are also judged by the authority cuts of the
  * whole set (see `CommunityAuthorityCuts`): a void one is skipped, and an
@@ -63,9 +62,8 @@ export class CommunityStateFold {
   }
 
   /**
-   * Tells, for each operation of `ordered` taken in that order, whether the
-   * identity responsible for it still has quota left. The founder, who
-   * authors the genesis, has none.
+   * Tells, for each operation of `ordered` taken in that order, whether its
+   * author still has quota left. The founder, who authors the genesis, has none.
    */
   private static quotaOf(
     ordered: CommunityOperation[],
@@ -73,17 +71,16 @@ export class CommunityStateFold {
     const signed = new Map<string, number>();
     const founder = ordered
       .find((operation) => operation.isGenesis())
-      ?.getAuthorIdentityId()
-      .valueOf();
+      ?.getAuthorIdentityId();
 
     return (operation) => {
-      const responsible = CommunityOperationLimits.responsibleOf(operation);
-      const count = signed.get(responsible) ?? 0;
+      const author = operation.getAuthorIdentityId();
+      const count = signed.get(author.valueOf()) ?? 0;
 
-      signed.set(responsible, count + 1);
+      signed.set(author.valueOf(), count + 1);
 
       return (
-        founder === responsible ||
+        !!founder?.isEqual(author) ||
         !CommunityOperationLimits.isAuthorQuotaReached(count)
       );
     };

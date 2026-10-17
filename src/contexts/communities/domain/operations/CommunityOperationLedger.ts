@@ -33,9 +33,8 @@ type CommunityPast = {
  * `invitation_revoked` closes an open invitation of its past and is signed by
  * its issuer while a member, or by a `manage_members` holder.
  *
- * An identity may be responsible for a bounded number of operations of the
- * causal past of each new one (see `CommunityOperationLimits`): later ones
- * are refused.
+ * An author may sign a bounded number of operations of the causal past of
+ * each new one (see `CommunityOperationLimits`): later ones are refused.
  *
  * The state after the latest admitted operations is remembered, so a linear
  * history is admitted in constant work instead of folding it again.
@@ -45,7 +44,7 @@ export class CommunityOperationLedger {
 
   private readonly operations = new Map<string, CommunityOperation>();
 
-  /** Admitted operations per responsible identity, whatever their branch. */
+  /** Admitted operations per author, whatever branch they are on. */
   private readonly signed = new Map<string, number>();
 
   private readonly states = new Map<string, CommunityPast>();
@@ -126,13 +125,13 @@ export class CommunityOperationLedger {
   }
 
   /**
-   * Only an identity with a quota of operations on some branch can have it in
-   * the past of a candidate, so the past is walked for those identities alone.
+   * Only an author with a quota of operations on some branch can have it in
+   * the past of a candidate, so the past is walked for those authors alone.
    */
   private assertWithinQuota(candidate: CommunityOperation): void {
     if (
       !CommunityOperationLimits.isAuthorQuotaReached(
-        this.signed.get(CommunityOperationLimits.responsibleOf(candidate)) ?? 0,
+        this.signed.get(candidate.getAuthorIdentityId().valueOf()) ?? 0,
       )
     ) {
       return;
@@ -242,10 +241,10 @@ export class CommunityOperationLedger {
           invitations: CommunityInvitations.EMPTY,
         }
       : this.applyToPast(candidate);
-    const responsible = CommunityOperationLimits.responsibleOf(candidate);
+    const author = candidate.getAuthorIdentityId().valueOf();
 
     this.operations.set(candidate.getHash(), candidate);
-    this.signed.set(responsible, (this.signed.get(responsible) ?? 0) + 1);
+    this.signed.set(author, (this.signed.get(author) ?? 0) + 1);
     this.remember(candidate.getHash(), community, invitations);
   }
 }
