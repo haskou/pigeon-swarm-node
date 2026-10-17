@@ -161,7 +161,7 @@ only (body hash, key order, Ed25519 from the fixture key), without the node's
 canonicalization code. It then publishes an identity for the fixture key,
 re-signs the same request shapes with a fresh `Date.now()` timestamp and sends
 them to real signed endpoints: a body-less `GET /notification-settings`, a
-JSON `POST /private-blobs` and a raw binary `POST /ipfs/public` with the
+JSON `POST /private-blobs` and a raw binary `POST /ipfs/contents` with the
 vector's bytes. All are accepted. The fixed vector timestamp, a timestamp
 outside the window in either direction, a JSON or binary body changed after
 signing, another path or method than signed, and a replayed `POST` are each
@@ -294,9 +294,10 @@ spec against the route handlers and the OpenAPI documents:
   `relay-configuration` and `diagnostics`, a community `frontier`, `mls`
   group and `invitation-preview`, an invitation `revocation`, a channel
   `draft`, a message `pin` and `thread`, a sticker pack `saved` mark, a
-  sticker `favorite` mark, the sticker `library`,
-  `/client-contract`, `/ipfs/replication-status` and
-  `/push/vapid-public-key`. The namespaces `/ipfs`, `/push`, `/realtime` and
+  sticker `favorite` mark, a sticker `usage` mark, the sticker `library`, the
+  node block-list `publication`, `/client-contract`,
+  `/ipfs/replication-status` and `/push/vapid-public-key`. The namespaces
+  `/ipfs`, `/push`, `/realtime` and
   `/private-authorization` are singletons too.
 - **`me`.** `me` stands for the authenticated identity only as the item of a
   collection keyed by identity: `members/me`, `participants/me`, `votes/me`,
@@ -309,22 +310,28 @@ spec against the route handlers and the OpenAPI documents:
   answers `404`. A signed path is the route path exactly, with no trailing
   slash.
 
-Documented exceptions, kept until issue #606 reshapes them:
+Replaced by issue #606, no longer served (they answer `404`; a client that
+signed one of the old paths must sign the new one):
 
-| Route                                                         | Exception                                |
-| ------------------------------------------------------------- | ---------------------------------------- |
-| `DELETE /communities/{communityId}/members/{identityId}/kick` | Verb                                     |
-| `POST /polls/{pollId}/close`                                  | Verb                                     |
-| `POST /calls/{callId}/participants/me/heartbeat`              | Verb                                     |
-| `POST /stickers/packs/{packId}/stickers/{stickerId}/used`     | Verb                                     |
-| `POST /mailboxes/{mailboxId}/ack`                             | Verb                                     |
-| `POST /push/test`                                             | Verb                                     |
-| `GET /communities/discover`                                   | Verb beside `{communityId}`              |
-| `GET /calls/history`, `GET /calls/ice-servers`                | Static segment beside `{callId}`         |
-| `POST /communities/{communityId}/channels/text` and `/voice`  | Static segment beside `{channelId}`      |
-| `POST /node/networks/public`                                  | Static segment beside `{networkId}`      |
-| `GET` and `PUT /node/blocks/publication`                      | Singleton beside the `blocks` collection |
-| `POST /ipfs/public`                                           | Adjective                                |
+| Removed route                                                 | Replacement                                                       |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `DELETE /communities/{communityId}/members/{identityId}/kick` | `DELETE /communities/{communityId}/members/{identityId}`          |
+| `POST /polls/{pollId}/close`                                  | `PATCH /polls/{pollId}` with `{ "status": "closed" }`             |
+| `POST /calls/{callId}/participants/me/heartbeat`              | `PATCH /calls/{callId}/participants/me`                           |
+| `POST /stickers/packs/{packId}/stickers/{stickerId}/used`     | `PUT /stickers/packs/{packId}/stickers/{stickerId}/usage`         |
+| `POST /communities/{communityId}/channels/text` and `/voice`  | `POST /communities/{communityId}/channels` with `type`            |
+| `GET /communities/discover`                                   | `GET /discoverable-communities`                                   |
+| `GET /calls/history`                                          | `GET /past-calls`                                                 |
+| `GET /calls/ice-servers`                                      | `GET /call-ice-servers`                                           |
+| `POST /node/networks/public`                                  | `POST /node/networks` with `{ "name": "public" }`                 |
+| `POST /ipfs/public`                                           | `POST /ipfs/contents`                                             |
+
+Documented exceptions, RPC-style operations with no resource to write:
+
+| Route                                | Why it stays                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `POST /mailboxes/{mailboxId}/ack`    | Advances a per-reader cursor that is only valid forward; it is not a state the reader owns. |
+| `POST /push/test`                    | Triggers a one-shot delivery with no stored resource.                                       |
 
 ## Realtime WebSocket API
 
@@ -664,10 +671,10 @@ GET /calls
 
 Returns active calls associated with the authenticated identity, filtered by current conversation membership or voice-channel permissions. Former participation does not preserve access.
 
-### List call history
+### List past calls
 
 ```http
-GET /calls/history
+GET /past-calls
 ```
 
 Returns active and finished conversation calls where the authenticated identity participated and still has conversation access. Historical participant states and lifecycle timestamps are available only through this history contract. Community voice-channel histories are excluded.
@@ -731,10 +738,10 @@ still requires the storage migration and metadata work tracked separately.
 An API omission is not cryptographic deletion or protection from a malicious
 node that already holds the replicated records.
 
-### Get ICE servers
+### Get call ICE servers
 
 ```http
-GET /calls/ice-servers
+GET /call-ice-servers
 ```
 
 Response:
@@ -1226,7 +1233,7 @@ Implemented:
 
 ```http
 POST /calls/{callId}/participants
-POST /calls/{callId}/participants/me/heartbeat
+PATCH /calls/{callId}/participants/me
 DELETE /calls/{callId}/participants/me
 ```
 
@@ -1240,7 +1247,8 @@ carry the claimed time and the signed participant record:
 }
 ```
 
-The heartbeat route is unchanged and carries no signed record. The signed `state`
+`PATCH /calls/{callId}/participants/me` is the participant heartbeat: it refreshes
+the participant lease, reports `mediaConnections` and carries no signed record. The signed `state`
 is `joined` for a join and `left` for a leave; a leave while the participant is
 still `ringing` must be signed as `declined`, which is the state the node derives
 for that request. The signed `at` is the `at` of the request.
@@ -1388,7 +1396,7 @@ local and derived on each node and are never replicated.
 Implemented:
 
 - missed participant state is derived locally from the signed start and never replicated
-- missed calls stay available through `GET /calls/history`
+- missed calls stay available through `GET /past-calls`
 - timeout emits `calls.v1.participant.missed`
 - timeout emits `calls.v1.call.missed`
 - missed call notifications use payload fields `callId`, `callerIdentityId`,
@@ -1617,35 +1625,24 @@ Request:
 
 ```json
 {
-  "id": "<networkId>",
+  "id": "<optionalNetworkId>",
   "name": "private",
   "key": "<optionalPrivateNetworkKey>"
 }
 ```
 
+A client that wants the node's public network sends `{ "name": "public" }`:
+`id` is optional and the node generates one when it is omitted, and a network
+without `key` is public.
+
 Implemented:
 
 - allow unsigned network additions while the node has no owner
 - require signed request auth from the owner after the node is claimed
+- generate the `networkId` when the request carries none
+- reject a second public network with `409`
 - persist the network in the local embedded database
 - synchronize the runtime IPFS network registry after saving
-
-### Add generated public node network
-
-```http
-POST /node/networks/public
-```
-
-Request body: none.
-
-Implemented:
-
-- create a public network with a backend-generated `networkId`
-- use the fixed network name `public`
-- allow unsigned creation while the node has no owner
-- require signed request auth from the owner after the node is claimed
-- reject the request when the node already has a public network
-- persist the network in the local embedded database and synchronize the runtime IPFS network registry
 
 ### Delete local node network
 
@@ -2282,7 +2279,7 @@ and nothing is stored.
 ### Publish public content
 
 ```http
-POST /ipfs/public
+POST /ipfs/contents
 ```
 
 Requires signed request headers. The authenticated identity does not need to be
@@ -2321,7 +2318,7 @@ Implemented:
 GET /ipfs/contents/{cid}
 ```
 
-For CIDs uploaded with `POST /ipfs/public`, the response body is the original
+For CIDs uploaded with `POST /ipfs/contents`, the response body is the original
 binary content. It is not wrapped in JSON and it is not base64 encoded.
 
 Response headers:
@@ -2363,7 +2360,7 @@ Requires signed request headers. Call it only after the identity is published
 ```
 
 `context` must be `ipfs_public_upload`, the context for content from
-`POST /ipfs/public`. Any other context, including `ipfs_private_upload`, is
+`POST /ipfs/contents`. Any other context, including `ipfs_private_upload`, is
 rejected with `400`: private content is never published to IPFS. The replicated
 gate applies the same rule to records written by any peer: a record with any
 other context is never listed and never provided by this node, whichever node
@@ -3420,7 +3417,7 @@ error.
 | ------------------------------------------------------------------------------------------------------- | ----------------------------- | ----------------------------------------------------------------------------------------- |
 | `POST /communities`                                                                                     | `community_created`           | `{nonce, name, description, visibility, discoverable, autoJoinEnabled, avatar?, banner?}` |
 | `PATCH /communities/{id}`                                                                               | `community_updated`           | `{name, description, avatar?, banner?, discoverable?, autoJoinEnabled?}`                  |
-| `POST .../channels/text`, `.../channels/voice`                                                          | `channel_created`             | `{channelId, name, type}`                                                                 |
+| `POST .../channels`                                                          | `channel_created`             | `{channelId, name, type}`                                                                 |
 | `PATCH .../channels/{channelId}`                                                                        | `channel_renamed`             | `{channelId, name}`                                                                       |
 | `DELETE .../channels/{channelId}`                                                                       | `channel_deleted`             | `{channelId}`                                                                             |
 | `PATCH .../channels/{channelId}/permissions`                                                            | `channel_permissions_updated` | `{channelId, visibleRoleIds}`                                                             |
@@ -3430,7 +3427,7 @@ error.
 | `PUT .../members/{identityId}/roles`                                                                    | `member_roles_updated`        | `{identityId, roleIds}`                                                                   |
 | `POST .../bans`                                                                                         | `member_banned`               | `{identityId}`                                                                            |
 | `DELETE .../bans/{identityId}`                                                                          | `member_unbanned`             | `{identityId}`                                                                            |
-| `DELETE .../members/{identityId}/kick`                                                                  | `member_kicked`               | `{identityId}`                                                                            |
+| `DELETE .../members/{identityId}`                                                                  | `member_kicked`               | `{identityId}`                                                                            |
 | `DELETE .../members/me`                                                                                 | `member_left`                 | `{identityId}`                                                                            |
 | `POST /community-membership-requests` (auto-join), `PATCH /community-membership-requests/{id}` (accept) | `member_joined`               | `{identityId, method, reference?}`                                                        |
 | `POST .../invitations/{invitationId}/admissions`                                                        | `member_joined`               | `{consent, identityId, invitationId, method: "invitation", possession}`                   |
@@ -3523,10 +3520,10 @@ Implemented:
 ### Discover communities
 
 ```http
-GET /communities/discover?query=Pigeon&networkId=<networkId>
+GET /discoverable-communities?query=Pigeon&networkId=<networkId>
 ```
 
-The request is signed as `GET /communities/discover`; query string values are
+The request is signed as `GET /discoverable-communities`; query string values are
 not part of the signed canonical path because Express verifies `request.path`.
 
 Response:
@@ -3618,7 +3615,7 @@ Implemented:
 - store `avatar` as an optional public IPFS CID, not as base64
 - store `banner` as an optional public IPFS CID, not as base64
 - default `discoverable` to `true`; set it to `false` to hide the community
-  from `GET /communities/discover`
+  from `GET /discoverable-communities`
 - default `autoJoinEnabled` to `false`; set it to `true` to let any non-banned
   identity join through `POST /community-membership-requests`
   without owner approval
@@ -4063,7 +4060,7 @@ Implemented:
 ### Kick community member
 
 ```http
-DELETE /communities/{communityId}/members/{identityId}/kick
+DELETE /communities/{communityId}/members/{identityId}
 ```
 
 Body: `{ "moderationLog": { "createdAt", "mutation" }, "operation": {
@@ -4213,7 +4210,7 @@ checked by the `CommunityModerationLogVectors` unit spec.
 | Route                                                  | action                                                         | target                          | details                                                                                                                                                                     |
 | ------------------------------------------------------ | -------------------------------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PATCH /communities/{id}`                              | `community_updated`                                            | community, `communityId`        | `{autoJoinEnabled, avatar, banner, description, discoverable, name}` as sent in the request (absent or empty `avatar`, `banner`, `autoJoinEnabled`, `discoverable` omitted) |
-| `POST .../channels/text`, `.../channels/voice`         | `channel_created`                                              | channel, derived channel id     | `{name, type: "text" \| "voice"}`                                                                                                                                           |
+| `POST .../channels`         | `channel_created`                                              | channel, derived channel id     | `{name, type: "text" \| "voice"}`                                                                                                                                           |
 | `PATCH .../channels/{channelId}`                       | `channel_renamed`                                              | channel, `channelId`            | `{name}`                                                                                                                                                                    |
 | `DELETE .../channels/{channelId}`                      | `channel_deleted`                                              | channel, `channelId`            | `{type}`                                                                                                                                                                    |
 | `PATCH .../channels/{channelId}/permissions`           | `channel_permissions_updated`                                  | channel, `channelId`            | `{visibleRoleIds}`                                                                                                                                                          |
@@ -4223,7 +4220,7 @@ checked by the `CommunityModerationLogVectors` unit spec.
 | `PUT .../members/{identityId}/roles`                   | `member_roles_updated`                                         | member, `identityId`            | `{roleIds}`                                                                                                                                                                 |
 | `POST .../bans`                                        | `member_banned`                                                | member, banned `identityId`     | `{reason}`                                                                                                                                                                  |
 | `DELETE .../bans/{identityId}`                         | `member_unbanned`                                              | member, `identityId`            | `{}`                                                                                                                                                                        |
-| `DELETE .../members/{identityId}/kick`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
+| `DELETE .../members/{identityId}`                 | `member_kicked`                                                | member, `identityId`            | `{}`                                                                                                                                                                        |
 | `POST .../invitations`                                 | `invitation_created`                                           | invitation, invitation id       | `{expiresAt, maxUses}`                                                                                                                                                      |
 | `POST .../invitations/{invitationId}/revocation`       | `invitation_revoked`                                           | invitation, `invitationId`      | `{}`                                                                                                                                                                        |
 | `PATCH /community-membership-requests/{requestId}`     | `membership_request_accepted` or `membership_request_declined` | membership_request, `requestId` | `{identityId, type}` of the request                                                                                                                                         |
@@ -4413,10 +4410,10 @@ Implemented:
   manually
 - the roles and assignments are folded from the signed operations
 
-### Create text channel
+### Create channel
 
 ```http
-POST /communities/{communityId}/channels/text
+POST /communities/{communityId}/channels
 ```
 
 Request:
@@ -4424,6 +4421,7 @@ Request:
 ```json
 {
   "name": "general",
+  "type": "text",
   "moderationLog": {
     "createdAt": 1773848829055,
     "mutation": { "...": "SignedPublicMutation" }
@@ -4437,41 +4435,14 @@ Request:
 }
 ```
 
-Implemented:
-
-- require signed request auth from the community owner or a member with
-  `manage_channels`
-- create text channel metadata in the community
-
-### Create voice channel
-
-```http
-POST /communities/{communityId}/channels/voice
-```
-
-Request:
-
-```json
-{
-  "name": "Voice",
-  "moderationLog": {
-    "createdAt": 1773848829055,
-    "mutation": { "...": "SignedPublicMutation" }
-  },
-  "operation": {
-    "createdAt": 1773848829055,
-    "identitySignature": "<identity signature>",
-    "parents": ["<frontier>"],
-    "mutation": { "...": "SignedPublicMutation" }
-  }
-}
-```
+`type` is `text` or `voice`; any other value is refused with `400`. The signed
+`channel_created` operation carries the same `type` in its `args`.
 
 Implemented:
 
 - require signed request auth from the community owner or a member with
   `manage_channels`
-- create voice channel metadata in the community
+- create text or voice channel metadata in the community, according to `type`
 - voice channels do not accept text messages
 - calls scoped to community channels must target a voice channel
 
@@ -5849,7 +5820,7 @@ removed the stale subscription.
 ## Stickers API
 
 Sticker files are public IPFS assets. Upload the binary first with
-`POST /ipfs/public`, then store the returned CID in sticker metadata. The
+`POST /ipfs/contents`, then store the returned CID in sticker metadata. The
 sticker pack metadata lives in OrbitDB replicated state and is returned through
 this API.
 
@@ -6092,10 +6063,11 @@ Body: `{ "mutation": SignedPublicMutation (delete proof over the favorite tombst
 ### Record sticker usage
 
 ```http
-POST /stickers/packs/{packId}/stickers/{stickerId}/used
+PUT /stickers/packs/{packId}/stickers/{stickerId}/usage
 ```
 
-Requires signed HTTP headers. The sticker must exist. Returns the updated
+`usage` is a mark on the sticker, like `favorite`: putting it again records a newer
+use. Requires signed HTTP headers. The sticker must exist. Returns the updated
 authenticated identity sticker library with the sticker moved to the front of
 `recentStickers`. The list is capped at 10 entries.
 
@@ -6215,11 +6187,13 @@ record id as the ballot, higher `sequence`).
 ### Close poll
 
 ```http
-POST /polls/{pollId}/close
+PATCH /polls/{pollId}
 ```
 
 Requires signed HTTP headers and access to the poll scope. Closed or expired
-polls reject new votes. Body `{ "createdAt", "mutation" }`; the close is the
+polls reject new votes. Body `{ "status": "closed", "createdAt", "mutation" }`;
+`closed` is the only status a poll can be set to, and any other value is refused
+with `400`; the close is the
 record `poll-close:<pollId>` (`scopeType: "poll_close"`, signer = closer, who
 must be the creator or manage polls in the channel). Signed payload: scope
 fields, `closedByIdentityId`, `createdAt`, `id`, `pollId`, `scopeType`. Ballots
