@@ -87,9 +87,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
         channelId,
         caller,
         limit,
-        cursor === undefined
-          ? undefined
-          : PageCursor.decode(cursor, { caller, resource }),
+        cursor === undefined ? undefined : PageCursor.decode(cursor, resource),
       ),
     );
 
@@ -103,7 +101,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
           page.getReactions(),
           page.getPolls(),
           page.getLimit(),
-          (position) => PageCursor.encode({ caller, position, resource }),
+          (position) => PageCursor.encode({ position, resource }),
         ).toResource(),
       );
   }

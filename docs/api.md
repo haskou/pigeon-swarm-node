@@ -407,9 +407,12 @@ Paged list endpoints take `limit` and an opaque `cursor`, and respond with
   other bounds.
 - `nextCursor` is the cursor for the next older (or next) page. It is `null`
   when the page is empty. Pass it back unchanged as `cursor`.
-- A cursor is opaque. Clients MUST NOT parse or build one. It is bound to the
-  resource it was issued for and to the caller identity; a cursor for another
-  list or caller, or a malformed one, returns `400` with code `400110`.
+- A cursor is opaque, not a capability. Clients MUST NOT parse or build one. It
+  carries only a position and the resource it was issued for; it grants no
+  access. Authorization is re-checked on every request from the request itself,
+  never from the cursor. A cursor for another list, or a malformed one (wrong
+  encoding, unknown fields, or over 512 characters), returns `400` with code
+  `400110`.
 - Protocol cursors (mailbox envelopes, MLS records, identity-device transitions)
   are not part of this scheme. Bounded node lists (block exceptions,
   diagnostics, published blocks, relay configuration) are returned in full.
@@ -5202,7 +5205,7 @@ Implemented:
 - do not include call lifecycle system items; community voice channels expose
   active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
-- when `cursor` is provided, return messages older than the position it encodes; a cursor is bound to this channel and the caller, and a foreign or malformed one returns 400 (code 400110)
+- when `cursor` is provided, return messages older than the position it encodes; a cursor is opaque (not a capability), is bound to this channel only, and a foreign or malformed one returns 400 (code 400110)
 - return `nextCursor` (null when the page is empty); pass it back as `cursor` for the next older page
 
 ### Add channel message reaction
