@@ -25,6 +25,8 @@ const SIGNATURE_BYTES = 64;
 const SLOTS_PER_SIGNER = 1_000;
 const STRANGER_SIGNERS = 10;
 const STRANGER_SLOTS_PER_SOURCE = 250;
+const HELD_SIGNERS = 100;
+const FLOOD_ADDRESS = '198.51.100.9';
 
 const signatureOf = (index: number): Signature => {
   const bytes = Buffer.alloc(SIGNATURE_BYTES);
@@ -157,6 +159,36 @@ describe('SignedHttpRequestAuthenticator', () => {
     expect(acceptFromStranger).not.toHaveBeenCalled();
   });
 
+  it('charges a state-changing request to the client address it arrived from', async () => {
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+
+    await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(accept).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      CLIENT_ADDRESS,
+    );
+  });
+
+  it('charges a state-changing request with no client address to unknown', async () => {
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+    const request = await buildSignedRequest('POST', { value: 1 });
+
+    await authenticator.authenticate({
+      ...request,
+      ip: undefined,
+    } as unknown as Request);
+
+    expect(accept).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'unknown',
+    );
+  });
+
   it('records a state-changing request from an identity this node does not hold in the stranger share', async () => {
     identityRepository.holds.mockResolvedValue(false);
     const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
@@ -199,8 +231,8 @@ describe('SignedHttpRequestAuthenticator', () => {
     const guard = new SignedRequestReplayGuard();
     jest
       .spyOn(signedRequestReplayGuard, 'accept')
-      .mockImplementation((signer, signature) =>
-        guard.accept(signer, signature),
+      .mockImplementation((signer, signature, clientAddress) =>
+        guard.accept(signer, signature, clientAddress),
       );
     jest
       .spyOn(signedRequestReplayGuard, 'acceptFromStranger')
@@ -238,6 +270,33 @@ describe('SignedHttpRequestAuthenticator', () => {
       'Invalid signed request.',
     );
     await expect(authenticator.authenticate(owner)).resolves.toBeDefined();
+  });
+
+  it('admits a held identity while held identities of one address flood the guard', async () => {
+    const guard = new SignedRequestReplayGuard();
+    jest
+      .spyOn(signedRequestReplayGuard, 'accept')
+      .mockImplementation((signer, signature, clientAddress) =>
+        guard.accept(signer, signature, clientAddress),
+      );
+    const heldSigners = await Promise.all(
+      Array.from(
+        { length: HELD_SIGNERS },
+        async () =>
+          new IdentityId((await KeyPair.generate()).toPrimitives().publicKey),
+      ),
+    );
+    heldSigners.forEach((held) =>
+      Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+        guard.accept(held, signatureOf(index), FLOOD_ADDRESS),
+      ),
+    );
+
+    await expect(
+      authenticator.authenticate(
+        await buildSignedRequest('POST', { value: 1 }),
+      ),
+    ).resolves.toBeDefined();
   });
 
   it('records the node owner it does not hold in the shared slots while replicated state is not open', async () => {

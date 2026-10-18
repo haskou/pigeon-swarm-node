@@ -53,10 +53,11 @@ export default class SignedHttpRequestAuthenticator {
   }
 
   /**
-   * Records a state-changing request once, after every other check passed. A
-   * signer this node does not serve, such as an identity creating itself
-   * here, only gets a slot in the share of the replay guard kept for
-   * strangers, charged to its client address.
+   * Records a state-changing request once, after every other check passed.
+   * Every signer takes a slot charged to the request's client address: a
+   * signer this node serves in its share of the replay guard, a signer it
+   * does not serve, such as an identity creating itself here, in the share
+   * kept for strangers.
    */
   private async assertIsNotReplayed(
     request: Request,
@@ -71,12 +72,13 @@ export default class SignedHttpRequestAuthenticator {
       return;
     }
 
+    const clientAddress = request.ip ?? 'unknown';
     const accepted = (await this.serves(identityId))
-      ? signedRequestReplayGuard.accept(identityId, signature)
+      ? signedRequestReplayGuard.accept(identityId, signature, clientAddress)
       : signedRequestReplayGuard.acceptFromStranger(
           identityId,
           signature,
-          request.ip ?? 'unknown',
+          clientAddress,
         );
 
     if (!accepted) {

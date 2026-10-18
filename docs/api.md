@@ -87,8 +87,8 @@ Implemented:
   (`POST /node/networks` included), or a `PUT /node/blocks` body that does not
   hash to `X-Body-Hash`. The signature was valid and fresh, so keeping it
   refuses a resend of the same signed headers. The slot counts against the
-  signing key and, for a stranger (below), against its client address and the
-  stranger share too
+  signing key and against its client address: the served share for a key the
+  node serves, the stranger share for a stranger (below)
 - the guard is bounded and fails closed: each signing key holds at most 1,000
   live entries and the whole guard holds 100,000. The node serves a key when it
   holds its identity or the identity owns the node (read from the local node
@@ -121,12 +121,25 @@ Implemented:
   self-made keys therefore fills only its own part of the stranger share; the
   identities and devices this node serves and its owner keep their slots, and
   no live entry is flushed, so an intercepted signature stays refused
-- served keys have no per-address limit: they are bounded per key, the node
-  admits them (registration mode and owner admission), a blocked key is refused
-  before it takes a slot, and clients behind one address (carrier NAT, a shared
-  proxy) must not lock each other out. Many served identities together can
-  still fill the 100,000 entries (100 identities at 1,000 requests a minute
-  each); the owner answers that by blocking them
+- served keys share the guard too: each client address holds at most
+  `SERVED_SLOTS_PER_SOURCE` of their entries, 2,500 by default (an integer from
+  1 to 10,000, see `docs/INSTALLATION.md`), the same 40-address trade-off as
+  strangers. The maximum is a tenth of the guard, so ten addresses at the
+  maximum fill the shared 100,000 entries. A larger value would let one address
+  fill them alone and refuse the stranger share and the other served clients.
+  That budget is per 60-second window, about 41 signed
+  state-changing requests a second on average, and the node owner's requests
+  from an address count against it too. A busy shared address meets the cap
+  sooner, but a flood from one address cannot fill the guard for the others.
+  Clients behind one address (carrier NAT, a shared proxy) share that budget:
+  2,500 is room for two and a half keys at their full 1,000 each. Behind a
+  reverse proxy, set `API_TRUST_PROXY` so the address is the client's, not the
+  proxy's; otherwise one busy client can starve the owner on the proxy's
+  address. A request with no client address keys on `unknown`, one shared
+  bucket. Served keys are otherwise bounded per key, the node admits them
+  (registration mode and owner admission), and a blocked key is refused before
+  it takes a slot. Served identities spread over 40 or more addresses can still
+  fill the 100,000 entries; the owner answers that by blocking them
 - no identity-signed `GET`, `HEAD` or `OPTIONS` request takes a slot, and
   neither does the transitions read of a key that was never authorized (see
   _Identity device authorization_). Replaying either inside the window only
