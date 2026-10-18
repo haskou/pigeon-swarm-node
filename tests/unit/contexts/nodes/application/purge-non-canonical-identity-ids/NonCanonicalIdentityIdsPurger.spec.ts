@@ -121,6 +121,7 @@ describe('NonCanonicalIdentityIdsPurger', () => {
     expect(purge.removedEntries).toBe(2);
     expect(purge.ownListNonCanonicalEntries).toBe(0);
     expect(node.hasOwner()).toBe(false);
+    expect(node.toPrimitives().ownerResetRequired).toBe(true);
     expect(exceptions.save.mock.calls[0][0].toPrimitives()).toEqual(
       new NodeBlockEntries([b], []).toPrimitives(),
     );

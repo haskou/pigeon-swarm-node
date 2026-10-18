@@ -425,6 +425,31 @@ describe('Node', () => {
       expect(stored.isOwnedBy(replacement)).toBe(true);
       expect(stored.toPrimitives().ownerResetRequired).toBe(false);
     });
+
+    it('should refuse network setup and relay setup by any signer once an alias owner was cleared', () => {
+      const [, forged] = IdentityIdMother.forged()[0];
+      const network = networkMother
+        .withId(new NetworkId('550e8400-e29b-41d4-a716-446655440000'))
+        .withoutKey()
+        .build();
+      const stored = Node.fromPrimitives({
+        ...primitives,
+        owner: forged.valueOf(),
+      });
+
+      stored.clearNonCanonicalOwner();
+
+      expect(() => stored.addNetwork(network, undefined)).toThrow(
+        NodeOwnerResetIsRequiredError,
+      );
+      expect(() =>
+        stored.updateRelayConfiguration(
+          NodeRelayConfiguration.fromPrimitives(primitives.relayConfiguration),
+          undefined,
+        ),
+      ).toThrow(NodeOwnerResetIsRequiredError);
+      expect(stored.hasOwner()).toBe(false);
+    });
   });
 
   describe('updateRelayConfiguration', () => {
