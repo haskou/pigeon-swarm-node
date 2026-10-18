@@ -1136,7 +1136,7 @@ paths:
       tags:
         - communities
       summary: List or search community text channel messages
-      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `beforeMessageId` is ignored and `polls` is empty. Query string values are not part of the signed path.
+      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `cursor` is ignored and `polls` is empty. Query string values are not part of the signed path.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -1151,7 +1151,8 @@ paths:
             minimum: 1
             maximum: 100
         - in: query
-          name: beforeMessageId
+          name: cursor
+          description: Opaque cursor from `nextCursor` of the previous page. It is bound to this channel and to the caller; a cursor from another list or identity is refused with 400.
           schema:
             type: string
         - in: query
@@ -1167,7 +1168,7 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
-          description: Channel timeline items ordered from oldest to newest in the page, or the matching public messages when `query` is given. Community channel poll ids are valid channel message ids and can be used as beforeMessageId.
+          description: Channel timeline items ordered from oldest to newest in the page, or the matching public messages when `query` is given. Pass `nextCursor` as `cursor` to read the next older page; `nextCursor` is null when the page is empty. Community channel poll ids are valid channel message ids.
           content:
             application/json:
               schema:
@@ -2040,8 +2041,10 @@ components:
             oneOf:
               - $ref: '#/components/schemas/CommunityChannelMessageResource'
               - $ref: '../polls-api/swagger.yaml#/components/schemas/Poll'
-        nextBeforeMessageId:
+        nextCursor:
           type: string
+          nullable: true
+          description: Cursor for the next older page; absent on the thread and search responses, which are not paged.
     CommunityChannelDraftBody:
       type: object
       required:

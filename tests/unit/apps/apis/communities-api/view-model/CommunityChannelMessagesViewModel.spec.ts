@@ -12,6 +12,7 @@ describe('CommunityChannelMessagesViewModel', () => {
       [],
       [poll('poll-1', 2000)],
       3,
+      (position) => `cursor:${position}`,
     ).toResource();
 
     expect(resource.messages.map((item) => item.id)).toEqual([
@@ -19,7 +20,21 @@ describe('CommunityChannelMessagesViewModel', () => {
       'poll-1',
     ]);
     expect(resource.messages[1].type).toEqual('poll');
-    expect(resource.nextBeforeMessageId).toEqual('message-1');
+    expect(resource.nextCursor).toEqual('cursor:message-1');
+  });
+
+  it('omits nextCursor when no cursor encoder is provided', () => {
+    const resource = new CommunityChannelMessagesViewModel(
+      'community-id',
+      'channel-id',
+      [message('message-1', 1000)],
+      [],
+      [],
+      3,
+    ).toResource();
+
+    expect(resource).not.toHaveProperty('nextBeforeMessageId');
+    expect(resource.nextCursor).toBeUndefined();
   });
 
   function message(

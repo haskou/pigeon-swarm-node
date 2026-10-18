@@ -398,6 +398,22 @@ Mutable resources do not use `ETag` or `If-Match`. Where a resource carries a
 `If-Match` to drafts, settings, profiles or roles is deferred until a client
 needs it.
 
+## Pagination
+
+Paged list endpoints take `limit` and an opaque `cursor`, and respond with
+`nextCursor`:
+
+- `limit` defaults to 50 and is clamped to 1..100 unless an endpoint documents
+  other bounds.
+- `nextCursor` is the cursor for the next older (or next) page. It is `null`
+  when the page is empty. Pass it back unchanged as `cursor`.
+- A cursor is opaque. Clients MUST NOT parse or build one. It is bound to the
+  resource it was issued for and to the caller identity; a cursor for another
+  list or caller, or a malformed one, returns `400` with code `400110`.
+- Protocol cursors (mailbox envelopes, MLS records, identity-device transitions)
+  are not part of this scheme. Bounded node lists (block exceptions,
+  diagnostics, published blocks, relay configuration) are returned in full.
+
 ## Realtime WebSocket API
 
 Realtime events are exposed through a WebSocket upgrade endpoint:
@@ -4860,7 +4876,7 @@ updated `message` resource.
 ### List channel messages
 
 ```http
-GET /communities/{communityId}/channels/{channelId}/messages?limit=50&beforeMessageId=<messageId>
+GET /communities/{communityId}/channels/{channelId}/messages?limit=50&cursor=<cursor>
 ```
 
 Response:
@@ -4907,7 +4923,7 @@ Response:
       "votes": []
     }
   ],
-  "nextBeforeMessageId": "<messageId>"
+  "nextCursor": "<cursor>"
 }
 ```
 
@@ -4938,8 +4954,7 @@ Response:
       "reactions": [],
       "type": "sent"
     }
-  ],
-  "nextBeforeMessageId": "<replyMessageId>"
+  ]
 }
 ```
 
@@ -5126,7 +5141,7 @@ Implemented:
 - search `plaintextPayload`; private encrypted messages are not searchable by
   the backend
 - return the same `CommunityChannelMessagesResource` shape as the normal list,
-  with no `polls`; `beforeMessageId` is ignored
+  with no `polls`; `cursor` is ignored
 - `limit` accepts 1 to 50 (default 20)
 
 ### Search public community messages
@@ -5182,13 +5197,13 @@ Implemented:
   roles
 - return messages ordered from oldest to newest in the page
 - include OrbitDB replicated reactions for each message
-- include `poll` timeline items scoped to the same community text channel. The
-  poll `id` is also registered as a channel message id, so it is valid as
-  `beforeMessageId` for pagination.
+- include `poll` timeline items scoped to the same community text channel.
+  Poll `id`s are channel message ids in the timeline.
 - do not include call lifecycle system items; community voice channels expose
   active presence through calls/channel state instead of the text timeline
 - support `limit` from 1 to 100
-- when `beforeMessageId` is provided, return messages older than that message
+- when `cursor` is provided, return messages older than the position it encodes; a cursor is bound to this channel and the caller, and a foreign or malformed one returns 400 (code 400110)
+- return `nextCursor` (null when the page is empty); pass it back as `cursor` for the next older page
 
 ### Add channel message reaction
 
@@ -6154,9 +6169,8 @@ Polls are interactive timeline items in a community text channel. Group
 conversation polls are end-to-end encrypted MLS records in the group mailbox and
 never reach this API. `timelineMutation` is required.
 
-Community text channel polls are also registered as channel message ids. The
-poll `id` returned in the community channel messages timeline can be used as
-`beforeMessageId` in pagination.
+Community text channel polls are also registered as channel message ids and
+appear in the community channel messages timeline.
 
 Community channel poll resources include `"type": "poll"` and are also
 returned inside the `messages` array of
