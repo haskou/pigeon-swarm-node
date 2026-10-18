@@ -63,3 +63,19 @@ Feature: Get community channel message pins
     Given the community member signs the current community channel pins request
     When I GET pins from the current community channel with query "?limit=1"
     Then response code is equal to 409
+
+  Scenario: A non-member presenting a valid pins cursor gets the same 409
+    Given I am an anonymous user
+    And I register a test IPFS network "community-channel-pins-non-member-cursor-network"
+    And I have created a private community text channel
+    And I have sent an encrypted community channel message
+    And I have pinned the current community channel message
+    And I have sent an encrypted community channel message
+    And I have pinned the current community channel message
+    Given I sign the current community channel pins request
+    When I GET pins from the current community channel with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community channel pins request
+    When I GET pins from the current community channel with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409

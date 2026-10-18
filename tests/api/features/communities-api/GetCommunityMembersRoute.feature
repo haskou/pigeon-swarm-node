@@ -53,3 +53,12 @@ Feature: Get community members API
     Given the community member signs the current community members request
     When I GET the current community members with query "?limit=1"
     Then response code is equal to 409
+
+  Scenario: A non-member presenting a valid members cursor gets the same 409
+    Given I sign the current community members request
+    When I GET the current community members with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community members request
+    When I GET the current community members with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409

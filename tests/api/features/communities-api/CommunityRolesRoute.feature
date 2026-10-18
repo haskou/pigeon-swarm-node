@@ -147,3 +147,19 @@ Feature: Community roles API
     Given the community member signs the current community roles request
     When I GET the current community roles with query "?limit=1"
     Then response code is equal to 409
+
+  Scenario: A non-member presenting a valid roles cursor gets the same 409
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-roles-non-member-cursor-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community roles request
+    When I GET the current community roles with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409

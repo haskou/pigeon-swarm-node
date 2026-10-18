@@ -159,6 +159,30 @@ Feature: Get community channels API
     When I GET channels from the current community with query "?limit=1"
     Then response code is equal to 409
 
+  Scenario: A non-member presenting a valid channels cursor gets the same 409
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-channels-non-member-cursor-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    Given I sign the current community channels request
+    When I GET channels from the current community with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community channels request
+    When I GET channels from the current community with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+
   Scenario: A member cannot list or read a text channel restricted to a role they lack
     Given I am an anonymous user
     And I register a test IPFS network "communities-api-hidden-text-channel-network"

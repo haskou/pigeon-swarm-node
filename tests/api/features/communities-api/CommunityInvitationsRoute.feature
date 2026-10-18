@@ -164,3 +164,61 @@ Feature: Community invitations API
     Given the community member signs the current community invitation claims request
     When I GET the current community invitation claims with query "?limit=1"
     Then response code is equal to 409
+
+  Scenario: A non-member presenting a valid invitations or claims cursor gets the same 409
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community invitations request
+    When I GET the current community invitations with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+    Given the other identity signs a claim of the current community invitation
+    When the other identity POSTs the claim of the current community invitation
+    Then response code is equal to 200
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+
+  Scenario: A joined member without manage_members can page invitations with a valid cursor
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And I sign the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
+    Given the community member signs the current community invitations request
+    When I GET the current community invitations with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 0 invitations
+
+  Scenario: A joined member without manage_members cannot page claims with a valid cursor
+    Given the other identity signs a claim of the current community invitation
+    When the other identity POSTs the claim of the current community invitation
+    Then response code is equal to 200
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And I sign the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
+    Given the community member signs the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+    And response body should contain "Community permission denied"
