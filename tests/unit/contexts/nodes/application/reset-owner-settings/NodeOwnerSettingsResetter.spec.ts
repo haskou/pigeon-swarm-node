@@ -216,6 +216,32 @@ describe('NodeOwnerSettingsResetter', () => {
     expect((await storedMetadata())?.ownerResetRequired).toBe(false);
   });
 
+  it('should install the new owner over an unreadable owner reset mark on an unclaimed node', async () => {
+    await database.save('node_metadata', 'local', {
+      ...(await storedMetadata()),
+      owner: undefined,
+      ownerResetRequired: 'yes',
+    });
+
+    await resetter.reset(newOwner);
+
+    expect((await storedMetadata())?.owner).toBe(newOwner.valueOf());
+    expect((await storedMetadata())?.ownerResetRequired).toBe(false);
+  });
+
+  it('should install the new owner over an unreadable owner reset mark on a claimed node', async () => {
+    await database.save('node_metadata', 'local', {
+      ...(await storedMetadata()),
+      owner: owner.valueOf(),
+      ownerResetRequired: 'yes',
+    });
+
+    await resetter.reset(newOwner);
+
+    expect((await storedMetadata())?.owner).toBe(newOwner.valueOf());
+    expect((await storedMetadata())?.ownerResetRequired).toBe(false);
+  });
+
   it('should keep the node id, networks, relay configuration and other local data', async () => {
     const before = claimedNode.toPrimitives();
 

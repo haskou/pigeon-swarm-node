@@ -280,6 +280,64 @@ describe('LocalNodeMetadataRepository', () => {
     });
   });
 
+  describe('unreadable owner reset mark', () => {
+    it.each(['yes', 0, null, 'false'])(
+      'should keep the node id when the stored mark %p cannot be read',
+      async (ownerResetRequired) => {
+        database.findOne.mockResolvedValue({
+          _id: 'local',
+          networks: {},
+          nodeId: canonicalNodeId,
+          ownerResetRequired,
+          relayConfiguration: defaultRelayConfiguration,
+        });
+
+        const nodeId = await repository.loadLocalNodeId();
+
+        expect(nodeId.valueOf()).toBe(canonicalNodeId);
+        await expect(
+          repository.isLocalNodeOwnedBy(IdentityIdMother.canonical()),
+        ).resolves.toBe(false);
+      },
+    );
+
+    it.each(['yes', 0, null, 'false'])(
+      'should update a node whose stored mark %p cannot be read and persist it as required',
+      async (ownerResetRequired) => {
+        database.findOne.mockResolvedValue({
+          _id: 'local',
+          networks: {},
+          nodeId: canonicalNodeId,
+          ownerResetRequired,
+          relayConfiguration: defaultRelayConfiguration,
+        });
+        networkRegistry.getAll.mockReturnValue([]);
+
+        const node = await repository.updateLocalNode((latest) => {
+          expect(latest.toPrimitives().ownerResetRequired).toBe(true);
+        });
+
+        expect(node.toPrimitives().ownerResetRequired).toBe(true);
+        const stoppedNode = await repository.updateStoppedLocalNode(
+          (latest) => {
+            expect(latest.toPrimitives().ownerResetRequired).toBe(true);
+          },
+        );
+
+        expect(stoppedNode.toPrimitives().id).toBe(canonicalNodeId);
+        expect(stoppedNode.toPrimitives().ownerResetRequired).toBe(true);
+        expect(database.save).toHaveBeenCalledWith(
+          'node_metadata',
+          'local',
+          expect.objectContaining({
+            nodeId: canonicalNodeId,
+            ownerResetRequired: true,
+          }),
+        );
+      },
+    );
+  });
+
   describe('updateLocalNode', () => {
     it('should apply the change to the stored node and save it inside the node metadata section', async () => {
       const owner = new IdentityMother().id;
