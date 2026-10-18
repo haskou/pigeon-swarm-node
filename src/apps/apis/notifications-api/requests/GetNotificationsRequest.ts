@@ -24,10 +24,21 @@ export class GetNotificationsRequest {
       GetNotificationsRequest.RESOURCE,
     );
 
-    try {
-      return new NotificationId(position).valueOf();
-    } catch {
+    if (!GetNotificationsRequest.isNotificationId(position)) {
       throw new InvalidPageCursorError();
+    }
+
+    return position;
+  }
+
+  /** Only the ids a notification can carry: an invitation or a missed call. */
+  private static isNotificationId(position: string): boolean {
+    try {
+      const id = new NotificationId(position);
+
+      return id.isInvitation() || id.isMissedCall();
+    } catch {
+      return false;
     }
   }
 

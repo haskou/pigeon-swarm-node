@@ -3121,7 +3121,7 @@ Implemented:
 
 - require signed request auth
 - list conversations where the authenticated identity participates
-- support `limit` (1..100, default 50) and an opaque `cursor`. Conversations are ordered newest first by creation time, then conversation id. Responds `{ "conversations": [...], "nextCursor": "<cursor or null>" }`; `nextCursor` is `null` on a short page. A malformed cursor, or one from another list, returns `400` with code `400110`
+- support `limit` (1..100, default 50) and an opaque `cursor`. Conversations are ordered newest first by creation time, then conversation id. Responds `{ "conversations": [...], "nextCursor": "<cursor or null>" }`; `nextCursor` is `null` on a short page. A full last page returns a cursor, so the next read may be empty. Creation time is this node's own fold time, so the order can differ between nodes. A malformed cursor, or one from another list, returns `400` with code `400110`
 
 ### Create a conversation
 

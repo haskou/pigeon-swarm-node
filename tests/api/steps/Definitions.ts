@@ -8574,10 +8574,53 @@ export default class Definitions {
 
   @when('I GET {string} with a cursor for another list')
   public async iGETWithACursorForAnotherList(path: string): Promise<void> {
-    const cursor = PageCursor.encode({
-      position: 'foreign-position',
-      resource: 'discoverable-communities',
-    });
+    await this.getWithCursor(
+      path,
+      PageCursor.encode({
+        position: 'foreign-position',
+        resource: 'discoverable-communities',
+      }),
+    );
+  }
+
+  @when('I GET {string} with a forged {string} cursor at position {string}')
+  public async iGETWithAForgedCursorAtPosition(
+    path: string,
+    resource: string,
+    position: string,
+  ): Promise<void> {
+    await this.getWithCursor(path, PageCursor.encode({ position, resource }));
+  }
+
+  @when(
+    'I GET {string} with a {string} cursor whose position is {int} characters long',
+  )
+  public async iGETWithACursorWhosePositionIsLong(
+    path: string,
+    resource: string,
+    length: number,
+  ): Promise<void> {
+    await this.getWithCursor(
+      path,
+      PageCursor.encode({ position: 'x'.repeat(length), resource }),
+    );
+  }
+
+  @when('I GET {string} with the remembered page cursor followed by {string}')
+  public async iGETWithTheRememberedPageCursorFollowedBy(
+    path: string,
+    suffix: string,
+  ): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(`${this.pageNextCursor ?? ''}${suffix}`),
+      ),
+      this.headers,
+    );
+  }
+
+  private async getWithCursor(path: string, cursor: string): Promise<void> {
     const separator = path.includes('?') ? '&' : '?';
 
     this.response = await this.restClient.get(

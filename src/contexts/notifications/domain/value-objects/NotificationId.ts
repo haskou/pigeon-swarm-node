@@ -39,4 +39,8 @@ export class NotificationId extends StringValueObject {
   public isMissedCall(): boolean {
     return this.valueOf().startsWith(NotificationId.MISSED_CALL_PREFIX);
   }
+
+  public isInvitation(): boolean {
+    return this.valueOf().startsWith(NotificationId.INVITATION_PREFIX);
+  }
 }

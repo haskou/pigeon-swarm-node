@@ -58,3 +58,60 @@ Feature: Get current calls
     When I GET "/calls?limit=1" with a cursor for another list
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A cursor from another identity does not reveal its current calls
+    Given I register a test IPFS network "api-calls-list-replay-network"
+    And I have created a one-to-one conversation
+    And I set a conversation call body
+    And I sign the current call start request
+    When I POST to "/calls"
+    Then response code is equal to 201
+    And I sign the current calls request
+    When I GET "/calls?limit=1"
+    Then response code is equal to 200
+    And response lists 1 calls
+    And I remember the response next cursor
+    Given another identity signs a GET request to "/calls"
+    When I GET "/calls?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 200
+    And response lists 0 calls
+
+  Scenario Outline: A forged current calls cursor is refused
+    Given I register a test IPFS network "api-calls-list-forged-network"
+    And I have created a one-to-one conversation
+    And I set a conversation call body
+    And I sign the current call start request
+    When I POST to "/calls"
+    Then response code is equal to 201
+    And I sign the current calls request
+    When I GET "/calls?limit=1" with a forged "calls" cursor at position "<position>"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+    Examples:
+      | position                                                  |
+      | abc\|00000000-0000-4000-8000-000000000000                 |
+      | 0000000000000001\|00000000-0000-4000-8000-000000000000    |
+      | 99999999999999999\|00000000-0000-4000-8000-000000000000   |
+      | 00000000000000001                                         |
+      | 00000000000000001\|not-a-call-id                          |
+
+  Scenario: Oversized and non-canonical current calls cursors are refused
+    Given I register a test IPFS network "api-calls-list-size-network"
+    And I have created a one-to-one conversation
+    And I set a conversation call body
+    And I sign the current call start request
+    When I POST to "/calls"
+    Then response code is equal to 201
+    And I sign the current calls request
+    When I GET "/calls?limit=1" with a "calls" cursor whose position is 257 characters long
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current calls request
+    When I GET "/calls?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given I sign the current calls request
+    When I GET "/calls?limit=1&cursor=CURSOR" with the remembered page cursor followed by "="
+    Then response code is equal to 400
+    And response body should contain "400110"
