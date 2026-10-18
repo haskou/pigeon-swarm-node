@@ -26,6 +26,15 @@ function hasValidStickerId(sticker: unknown): boolean {
   );
 }
 
+function hasValidIds(document: Record<string, unknown>): boolean {
+  return (
+    typeof document.id === 'string' &&
+    StickerPackId.isValid(document.id) &&
+    Array.isArray(document.stickers) &&
+    document.stickers.every(hasValidStickerId)
+  );
+}
+
 export default class OrbitDBStickerPackRepository extends StickerPackRepository {
   private static readonly HEAD_PREFIX = 'sticker-pack:';
 
@@ -50,13 +59,10 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     return (
       document.removed !== true &&
       document.scopeType === 'sticker_pack' &&
-      typeof document.id === 'string' &&
-      StickerPackId.isValid(document.id) &&
+      hasValidIds(document) &&
       typeof document.createdAt === 'number' &&
       typeof document.name === 'string' &&
       typeof document.ownerIdentityId === 'string' &&
-      Array.isArray(document.stickers) &&
-      document.stickers.every(hasValidStickerId) &&
       typeof document.updatedAt === 'number'
     );
   }

@@ -21,6 +21,19 @@ const TIMESTAMP_FIELDS: Record<string, string> = {
   sticker_saved_pack: 'savedAt',
 };
 
+function hasValidIds(
+  document: Record<string, unknown>,
+  needsSticker: boolean,
+): boolean {
+  return (
+    typeof document.packId === 'string' &&
+    StickerPackId.isValid(document.packId) &&
+    (!needsSticker ||
+      (typeof document.stickerId === 'string' &&
+        StickerId.isValid(document.stickerId)))
+  );
+}
+
 export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibraryRepository {
   private readonly libraryIndex: OrbitDBHeadIndex<OrbitDBStickerLibraryDocument>;
 
@@ -52,12 +65,8 @@ export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibr
       document.removed !== true &&
       typeof document.id === 'string' &&
       typeof document.identityId === 'string' &&
-      typeof document.packId === 'string' &&
-      StickerPackId.isValid(document.packId) &&
-      typeof document[timestampField] === 'number' &&
-      (!needsSticker ||
-        (typeof document.stickerId === 'string' &&
-          StickerId.isValid(document.stickerId)))
+      hasValidIds(document, needsSticker) &&
+      typeof document[timestampField] === 'number'
     );
   }
 
