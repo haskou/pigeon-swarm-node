@@ -87,8 +87,8 @@ paths:
       responses:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
-        '200':
-          description: Scope settings reset.
+        '204':
+          description: Scope settings reset. No body.
 components:
   parameters:
     XIdentityId:

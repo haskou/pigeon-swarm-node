@@ -32,6 +32,6 @@ export class DeleteNotificationScopeSettingsRoute extends Route {
       ).getMessage(),
     );
 
-    return response.status(HttpRouteStatusEnum.OK).send();
+    return response.status(HttpRouteStatusEnum.NO_CONTENT).send();
   }
 }

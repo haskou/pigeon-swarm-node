@@ -362,8 +362,15 @@ response.
 - `httpStatus` repeats the HTTP status for framework errors; `details`, `errors`
   and `requiredDifficultyBits` appear only where the operation documents them.
 - Status codes are listed per operation: each operation documents the codes it
-  can return. Cross-route status changes (for example `415` for a missing
-  content type and `404` for every malformed id) are tracked on #607.
+  can return.
+
+### Delete responses
+
+A successful `DELETE` returns `200` with the updated resource when the resource
+(or the caller's view of it) still exists after the delete, for example a
+community member, a poll vote or a sticker library. It returns `204` with no
+body only when there is nothing to return, as for resetting notification scope
+settings.
 
 ### Operation ids
 
