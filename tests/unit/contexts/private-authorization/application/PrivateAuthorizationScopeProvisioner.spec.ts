@@ -49,7 +49,8 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     genesisHash: 'genesis-hash',
   };
   const projection = { id: 'scope', ownerIdentityId };
-  const protectedMlsState = Buffer.from('protected-state').toString('base64url');
+  const protectedMlsState =
+    Buffer.from('protected-state').toString('base64url');
   const authenticator = mock<PrivateGenesisAuthenticator>();
   const projectionAuthorizer = mock<PrivateGenesisProjectionAuthorizer>();
   const deviceAuthorization = mock<DeviceAuthorizationAccessPolicy>();
@@ -87,9 +88,12 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     expect(message.signedGenesisJson).toBeInstanceOf(PrivateGenesisJson);
     expect(message.protectedMlsState).toBeInstanceOf(PrivateProtectedMlsState);
     expect(message.projection).toBeInstanceOf(PrivateGenesisProjection);
-    await expect(
-      provisioner.provision(message),
-    ).resolves.toEqual(PrivateAuthorizationScopeProvisionStatus.ACCEPTED);
+    const commit = await provisioner.verify(message);
+
+    expect(unitOfWork.commitGenesis).not.toHaveBeenCalled();
+    await expect(provisioner.commit(commit)).resolves.toEqual(
+      PrivateAuthorizationScopeProvisionStatus.ACCEPTED,
+    );
     expect(authenticator.verify).toHaveBeenCalledWith(
       'signed-genesis',
       'owner-device',
@@ -118,19 +122,21 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
   it('returns duplicate when the exact genesis already exists', async () => {
     unitOfWork.commitGenesis.mockResolvedValue('duplicate');
 
-    await expect(
-      provisioner.provision(
-        new PrivateAuthorizationScopeProvisionMessage(
-          ownerIdentityId,
-          'genesis',
-          0,
-          'owner-device',
-          'signed-genesis',
-          protectedMlsState,
-          projection,
-        ),
+    const commit = await provisioner.verify(
+      new PrivateAuthorizationScopeProvisionMessage(
+        ownerIdentityId,
+        'genesis',
+        0,
+        'owner-device',
+        'signed-genesis',
+        protectedMlsState,
+        projection,
       ),
-    ).resolves.toEqual(PrivateAuthorizationScopeProvisionStatus.DUPLICATE);
+    );
+
+    await expect(provisioner.commit(commit)).resolves.toEqual(
+      PrivateAuthorizationScopeProvisionStatus.DUPLICATE,
+    );
   });
 
   it('does not persist a projection that fails authorization', async () => {
@@ -139,7 +145,7 @@ describe('PrivateAuthorizationScopeProvisioner', () => {
     });
 
     await expect(
-      provisioner.provision(
+      provisioner.verify(
         new PrivateAuthorizationScopeProvisionMessage(
           ownerIdentityId,
           'genesis',

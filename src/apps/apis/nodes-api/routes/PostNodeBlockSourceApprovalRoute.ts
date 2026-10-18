@@ -34,26 +34,30 @@ export class PostNodeBlockSourceApprovalRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const source = await this.writeAsNodeOwner(request, async () => {
-      const message = new NodeBlockSourceEntriesApproverMessage({
-        all: body.all,
-        blockedIdentityIds: body.blockedIdentityIds ?? [],
-        blockedNodePeerIds: body.blockedNodePeerIds ?? [],
-        ownerIdentityId,
-        version: body.version,
-      });
+    const source = await this.changeNodeAsOwner(
+      request,
+      async (authenticatedIdentityId) => {
+        const message = new NodeBlockSourceEntriesApproverMessage({
+          all: body.all,
+          authenticatedIdentityId: authenticatedIdentityId.valueOf(),
+          blockedIdentityIds: body.blockedIdentityIds ?? [],
+          blockedNodePeerIds: body.blockedNodePeerIds ?? [],
+          ownerIdentityId,
+          version: body.version,
+        });
 
-      if (
-        ![
-          message.ownerIdentityId,
-          ...(message.entries?.getIdentityIds() ?? []),
-        ].every((identityId) => identityId.isCanonicalKey())
-      ) {
-        throw new NonCanonicalIdentityIdError();
-      }
+        if (
+          ![
+            message.ownerIdentityId,
+            ...(message.entries?.getIdentityIds() ?? []),
+          ].every((identityId) => identityId.isCanonicalKey())
+        ) {
+          throw new NonCanonicalIdentityIdError();
+        }
 
-      return this.approver.approve(message);
-    });
+        return this.approver.approve(message);
+      },
+    );
 
     return response
       .status(HttpRouteStatusEnum.OK)

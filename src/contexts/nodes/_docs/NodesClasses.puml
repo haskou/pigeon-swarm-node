@@ -264,8 +264,7 @@ package "nodes" {
 
     class NodeBlockPolicy {
       +load(): Promise<void>
-      +change<T>(mutation: () => Promise<T>): Promise<T>
-      +ownerChanged(node: Node): Promise<void>
+      +reapply(): Promise<void>
       +isIdentityBlocked(identityId: IdentityId): Promise<boolean>
     }
 
@@ -505,18 +504,23 @@ package "nodes" {
 
     NodeBlockSourceAdopter --> NodeBlockSourceRepository
     NodeBlockSourceAdopter --> NodeBlockPolicy
+    NodeBlockSourceAdopter --> NodeOwnerWriteHolder
     NodeBlockSourceRemover --> NodeBlockSourceRepository
     NodeBlockSourceRemover --> NodeBlockPolicy
+    NodeBlockSourceRemover --> NodeOwnerWriteHolder
     NodeBlockSourceEntriesApprover --> NodeBlockSourceRepository
     NodeBlockSourceEntriesApprover --> NodeBlockPolicy
+    NodeBlockSourceEntriesApprover --> NodeOwnerWriteHolder
     NodeBlockSourcesRefresher --> NodeBlockSourceRepository
     NodeBlockSourcesRefresher --> NodeBlockListDownloader
     NodeBlockSourcesRefresher --> NodeBlockSourceFetchLimits
     NodeBlockSourcesRefresher --> NodeBlockPolicy
+    NodeBlockSourcesRefresher --> NodeRepository
     NodeBlockSourcesFinder --> NodeBlockSourceRepository
     NodeBlockSourceFinder --> NodeBlockSourceRepository
     NodeBlockExceptionsUpdater --> NodeBlockExceptionsRepository
     NodeBlockExceptionsUpdater --> NodeBlockPolicy
+    NodeBlockExceptionsUpdater --> NodeOwnerWriteHolder
     NonCanonicalIdentityIdsPurger --> NodeRepository
     NonCanonicalIdentityIdsPurger --> NodeBlockExceptionsRepository
     NonCanonicalIdentityIdsPurger --> NodeBlockSourceRepository

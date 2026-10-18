@@ -36,7 +36,6 @@ describe('NodeBlockListStorer', () => {
     held = false;
     repository = mock<NodeBlockListRepository>();
     policy = mock<NodeBlockPolicy>();
-    policy.change.mockImplementation((mutation) => mutation());
     storer = new NodeBlockListStorer(nodes, repository, policy);
     node = new NodeMother()
       .withOwner(new IdentityId(owner.toPrimitives().publicKey))
@@ -59,7 +58,7 @@ describe('NodeBlockListStorer', () => {
     );
 
     expect(repository.saveLocal).toHaveBeenCalledWith(stored);
-    expect(policy.change).toHaveBeenCalledTimes(1);
+    expect(policy.reapply).toHaveBeenCalledTimes(1);
   });
 
   it('should refuse a list signed by someone who is not the current owner', async () => {
@@ -106,24 +105,18 @@ describe('NodeBlockListStorer', () => {
     expect(storedWhileHeld).toBe(true);
   });
 
-  it('should store through the policy, so stores and source updates run one at a time', async () => {
-    const earlierChange = Promise.withResolvers<void>();
+  it('should apply the stored list once the node hold is released', async () => {
+    let appliedWhileHeld = true;
 
-    policy.change.mockImplementation(async (mutation) => {
-      await earlierChange.promise;
+    policy.reapply.mockImplementation(() => {
+      appliedWhileHeld = held;
 
-      return mutation();
+      return Promise.resolve();
     });
 
-    const storing = storer.store(
-      message(new NodeBlockListMother(owner).withVersion(2)),
-    );
+    await storer.store(message(new NodeBlockListMother(owner).withVersion(2)));
 
-    await Promise.resolve();
-    expect(repository.saveLocal).not.toHaveBeenCalled();
-
-    earlierChange.resolve();
-    await storing;
-    expect(repository.saveLocal).toHaveBeenCalledTimes(1);
+    expect(policy.reapply).toHaveBeenCalledTimes(1);
+    expect(appliedWhileHeld).toBe(false);
   });
 });

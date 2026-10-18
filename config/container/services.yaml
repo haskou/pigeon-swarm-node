@@ -1827,6 +1827,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+      - '@contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder'
   contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer:
     class: >-
       /contexts/nodes/application/announce-community-state/NodeCommunityStateAnnouncer
@@ -1841,6 +1842,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+      - '@contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder'
   contexts/nodes/application/assign-owner/NodeOwnerAssigner:
     class: /contexts/nodes/application/assign-owner/NodeOwnerAssigner
     arguments:
@@ -1934,6 +1936,7 @@ services:
       - '@contexts/nodes/domain/services/NodeBlockListDownloader'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
       - '@contexts/nodes/domain/NodeBlockSourceFetchLimits'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
   contexts/nodes/application/register-peer/NodePeerRegistrar:
     class: /contexts/nodes/application/register-peer/NodePeerRegistrar
     arguments:
@@ -1944,6 +1947,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeBlockSourceRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+      - '@contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder'
   contexts/nodes/application/remove-network/NodeNetworkRemover:
     class: /contexts/nodes/application/remove-network/NodeNetworkRemover
     arguments:
@@ -1981,6 +1985,7 @@ services:
     arguments:
       - '@contexts/nodes/domain/repositories/NodeBlockExceptionsRepository'
       - '@contexts/nodes/domain/services/NodeBlockPolicy'
+      - '@contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder'
   contexts/nodes/application/update-block-list-publication/NodeBlockListPublicationUpdater:
     class: >-
       /contexts/nodes/application/update-block-list-publication/NodeBlockListPublicationUpdater

@@ -184,58 +184,70 @@ describe('NodeBlockPolicy', () => {
     expect(repository.findLocal).toHaveBeenCalledTimes(1);
   });
 
-  it('should apply a change and enforce the reloaded entries', async () => {
+  it('should enforce a stored change once reapplied', async () => {
     loader.loadNode.mockResolvedValue(
       new NodeMother().withOwner(ownerId).build(),
     );
     repository.findLocal.mockResolvedValue(new NoNodeBlocks());
     await expect(policy.isIdentityBlocked(blocked)).resolves.toBe(false);
 
-    await expect(
-      policy.change(async () => {
-        repository.findLocal.mockResolvedValue(
-          new NodeBlockListMother(owner).blockingIdentities([blocked]).build(),
-        );
-
-        return 'stored';
-      }),
-    ).resolves.toBe('stored');
+    repository.findLocal.mockResolvedValue(
+      new NodeBlockListMother(owner).blockingIdentities([blocked]).build(),
+    );
+    await policy.reapply();
 
     await expect(policy.isIdentityBlocked(blocked)).resolves.toBe(true);
     expect(ids(enforcer.enforce.mock.calls[0][0])).toEqual([blocked.valueOf()]);
   });
 
-  it('should run changes one at a time', async () => {
+  it('should enforce the last stored change after interleaved reapplies', async () => {
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(ownerId).build(),
+    );
+    repository.findLocal.mockResolvedValue(
+      new NodeBlockListMother(owner).blockingIdentities([blocked]).build(),
+    );
+    const first = policy.reapply();
+
+    repository.findLocal.mockResolvedValue(new NoNodeBlocks());
+    const second = policy.reapply();
+    await Promise.all([first, second]);
+
+    await expect(policy.isIdentityBlocked(blocked)).resolves.toBe(false);
+    expect(enforcer.enforce).toHaveBeenLastCalledWith([], []);
+  });
+
+  it('should run reapplies one at a time', async () => {
     loader.loadNode.mockResolvedValue(
       new NodeMother().withOwner(ownerId).build(),
     );
     const first = Promise.withResolvers<void>();
-    const order: string[] = [];
-
-    const firstChange = policy.change(async () => {
+    repository.findLocal.mockImplementationOnce(async () => {
       await first.promise;
-      order.push('first');
-    });
-    const secondChange = policy.change(async () => {
-      order.push('second');
-    });
 
+      return new NoNodeBlocks();
+    });
+    repository.findLocal.mockResolvedValue(new NoNodeBlocks());
+
+    const firstReapply = policy.reapply();
+    const secondReapply = policy.reapply();
     await Promise.resolve();
-    first.resolve();
-    await Promise.all([firstChange, secondChange]);
+    expect(repository.findLocal).toHaveBeenCalledTimes(1);
 
-    expect(order).toEqual(['first', 'second']);
+    first.resolve();
+    await Promise.all([firstReapply, secondReapply]);
+    expect(repository.findLocal).toHaveBeenCalledTimes(2);
   });
 
-  it('should keep running changes after one fails', async () => {
+  it('should keep reapplying after one fails', async () => {
     loader.loadNode.mockResolvedValue(
       new NodeMother().withOwner(ownerId).build(),
     );
+    repository.findLocal.mockRejectedValueOnce(new Error('refused'));
+    repository.findLocal.mockResolvedValue(new NoNodeBlocks());
 
-    await expect(
-      policy.change(() => Promise.reject(new Error('refused'))),
-    ).rejects.toThrow('refused');
-    await expect(policy.change(async () => 'next')).resolves.toBe('next');
+    await expect(policy.reapply()).rejects.toThrow('refused');
+    await expect(policy.reapply()).resolves.toBeUndefined();
   });
 
   it('should block what adopted sources apply on top of the own list', async () => {
@@ -300,9 +312,35 @@ describe('NodeBlockPolicy', () => {
   });
 
   it('should lift the block of a listed identity that becomes owner', async () => {
-    await policy.ownerChanged(new NodeMother().withOwner(blocked).build());
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(blocked).build(),
+    );
+
+    await policy.reapply();
 
     expect(ids(enforcer.enforce.mock.calls[0][0])).toEqual([ownerId.valueOf()]);
+  });
+
+  it('should enforce the new owner when a handover lands during a slow reapply', async () => {
+    const slowRead = Promise.withResolvers<void>();
+    repository.findLocal.mockImplementationOnce(async () => {
+      await slowRead.promise;
+
+      return new NodeBlockListMother(owner)
+        .blockingIdentities([blocked, ownerId])
+        .build();
+    });
+    loader.loadNode
+      .mockResolvedValueOnce(new NodeMother().withOwner(ownerId).build())
+      .mockResolvedValue(new NodeMother().withOwner(blocked).build());
+
+    const slow = policy.reapply();
+    const handover = policy.reapply();
+    slowRead.resolve();
+    await Promise.all([slow, handover]);
+
+    const calls = enforcer.enforce.mock.calls;
+    expect(ids(calls[calls.length - 1][0])).toEqual([ownerId.valueOf()]);
   });
 
   it('should retry loading after a failed load', async () => {

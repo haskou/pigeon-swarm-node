@@ -101,13 +101,25 @@ Both tools reuse the existing node owner unchanged:
   list signed by the current owner under the same hold, so a list signed by an
   owner whose handover lands first is refused with
   `NodeBlockListMustBeSignedByCurrentOwnerError` (`409`) and the stored list is
-  kept. A held write never updates or holds the node itself, and a hold is
-  taken before a block policy change, never inside one. Sections do not nest:
+  kept. Block sources, approvals and exceptions take the same hold in their
+  use case, and the private authorization scope route verifies outside it and
+  commits inside it. A held write never updates or holds the node itself. The
+  block policy reapplies after the hold is released, never inside it:
+  `NodeBlockPolicy.reapply` reads storage fresh and queues behind earlier
+  reapplies, so the last enforcement matches the last stored change. The
+  refresher records a fetched source under the node hold, without an owner
+  check, and then reapplies. Sections do not nest:
   `EmbeddedLocalDatabase.exclusively` runs on `KeyedSerialQueue`, which refuses
   an action entered from inside an open one on the same key at once with
   `KeyedSerialSectionIsNestedError`, instead of leaving the request waiting on
   itself. `IdentityCreationGate` shares the queue, so a publication nested in a
   publication of the same identity is refused the same way.
+
+- **Racing a handover.** Canonical-id checks run before the owner hold, so a
+  request that names a non-canonical identity id and races a handover answers
+  `400080`, not `403010`: the answer depends on the id alone. A handover that
+  lands during the slow verification of an owner-only write still fails the
+  commit with `403010`, because the in-section check refuses it.
 
 ### Owner loss and reset
 

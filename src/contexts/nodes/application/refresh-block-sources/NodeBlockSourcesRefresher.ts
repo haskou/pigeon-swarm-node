@@ -4,6 +4,7 @@ import { NodeBlockSourceFetchFailedError } from '../../domain/errors/NodeBlockSo
 import { NodeBlockSource } from '../../domain/NodeBlockSource';
 import { NodeBlockSourceFetchLimits } from '../../domain/NodeBlockSourceFetchLimits';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
+import NodeRepository from '../../domain/repositories/NodeRepository';
 import NodeBlockListDownloader from '../../domain/services/NodeBlockListDownloader';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
 import { SignedNodeBlockList } from '../../domain/SignedNodeBlockList';
@@ -11,9 +12,9 @@ import { NodeBlockSourceFetchOutcome } from '../../domain/value-objects/NodeBloc
 
 /**
  * Fetches every adopted source whose last fetch is older than the interval,
- * one at a time. Downloads run outside the policy's change queue; the result
- * is applied inside it against the source as stored then, so a source the
- * owner removed or reconfigured meanwhile is not overwritten.
+ * one at a time. Downloads run outside the node hold; the result is recorded
+ * under it against the source as stored then, so a source the owner removed
+ * or reconfigured meanwhile is not overwritten. The policy is reapplied after.
  */
 export default class NodeBlockSourcesRefresher {
   constructor(
@@ -21,6 +22,7 @@ export default class NodeBlockSourcesRefresher {
     private readonly downloader: NodeBlockListDownloader,
     private readonly policy: NodeBlockPolicy,
     private readonly limits: NodeBlockSourceFetchLimits,
+    private readonly nodes: NodeRepository,
   ) {}
 
   private async download(
@@ -69,7 +71,9 @@ export default class NodeBlockSourcesRefresher {
   ): Promise<void> {
     const result = await this.download(source);
 
-    await this.policy.change(() => this.record(source, result, now));
+    await this.nodes.holdLocalNode(() => this.record(source, result, now));
+
+    await this.policy.reapply();
   }
 
   public async refresh(now: Timestamp): Promise<void> {

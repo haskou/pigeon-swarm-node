@@ -15,12 +15,12 @@ import NodeLoaderService from './NodeLoaderService';
  * nobody and the current owner is never blocked, even if listed; this node's
  * own peer id is ignored by the enforcer. Identity ids that are not the
  * canonical encoding of a usable key are never enforced, wherever they were
- * stored. Every change to those inputs runs through `change`, one at a time,
- * and is enforced before it resolves.
+ * stored. Every change to those inputs is stored under the node hold, then
+ * applied through `reapply`, one at a time, before it resolves.
  */
 export default class NodeBlockPolicy {
   private entries?: Promise<NodeBlockEntries>;
-  private changing: Promise<unknown> = Promise.resolve();
+  private applying: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly listRepository: NodeBlockListRepository,
@@ -76,7 +76,7 @@ export default class NodeBlockPolicy {
     );
   }
 
-  /** Reloads the stored inputs and applies them; run at startup and after every change. */
+  /** Reloads the stored inputs and applies them; run at startup and by `reapply`. */
   public async load(): Promise<void> {
     this.entries = undefined;
 
@@ -87,27 +87,16 @@ export default class NodeBlockPolicy {
   }
 
   /**
-   * Runs `mutation`, which stores a new own list, source or exception set,
-   * after every earlier change, then applies the result. Serialising here keeps
-   * versions from going back and a slow fetch from undoing a newer decision.
+   * Applies the stored inputs after a change made under the node hold. Runs
+   * one application at a time, after every earlier one, and reads storage
+   * fresh, so the last application enforces the last stored change.
    */
-  public change<T>(mutation: () => Promise<T>): Promise<T> {
-    const changed = this.changing.then(async () => {
-      const result = await mutation();
+  public reapply(): Promise<void> {
+    const applied = this.applying.then(() => this.load());
 
-      await this.load();
+    this.applying = applied.catch((): void => undefined);
 
-      return result;
-    });
-
-    this.changing = changed.catch((): void => undefined);
-
-    return changed;
-  }
-
-  /** Re-applies the entries after the owner changed, so a listed new owner is unblocked. */
-  public async ownerChanged(node: Node): Promise<void> {
-    await this.enforce(await this.currentEntries(), node);
+    return applied;
   }
 
   public async isIdentityBlocked(identityId: IdentityId): Promise<boolean> {

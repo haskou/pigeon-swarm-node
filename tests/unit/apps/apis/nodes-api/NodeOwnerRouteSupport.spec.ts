@@ -34,6 +34,14 @@ class OwnerRoute extends NodeOwnerRouteSupport {
   ): Promise<T> {
     return this.writeAsNodeOwner(request, write);
   }
+
+  public prepared<P, T>(
+    request: Request,
+    prepare: (identityId: IdentityId) => Promise<P>,
+    write: (identityId: IdentityId, prepared: P) => Promise<T>,
+  ): Promise<T> {
+    return this.prepareThenWriteAsNodeOwner(request, prepare, write);
+  }
 }
 
 /**
@@ -110,6 +118,49 @@ describe('NodeOwnerRouteSupport', () => {
       await expect(
         route.write(request, jest.fn().mockRejectedValue(failure)),
       ).rejects.toBe(failure);
+    });
+  });
+
+  describe('prepareThenWriteAsNodeOwner', () => {
+    it('should prepare outside the hold and write the prepared value while held', async () => {
+      const prepare = jest.fn().mockResolvedValue('prepared');
+      const write = jest.fn().mockResolvedValue('written');
+
+      await expect(route.prepared(request, prepare, write)).resolves.toBe(
+        'written',
+      );
+      expect(prepare).toHaveBeenCalledWith(owner);
+      expect(holder.hold).toHaveBeenCalledWith(
+        new NodeOwnerWriteHolderMessage(owner.valueOf()),
+        expect.any(Function),
+      );
+      expect(write).toHaveBeenCalledWith(owner, 'prepared');
+    });
+
+    it('should refuse anyone but the owner before preparing', async () => {
+      const prepare = jest.fn();
+
+      authenticator.authenticate.mockResolvedValue(
+        IdentityIdMother.canonical(),
+      );
+
+      await expect(route.prepared(request, prepare, jest.fn())).rejects.toThrow(
+        AuthenticatedIdentityIsNotNodeOwnerError,
+      );
+      expect(prepare).not.toHaveBeenCalled();
+      expect(holder.hold).not.toHaveBeenCalled();
+    });
+
+    it('should refuse as a non-owner a write whose node changed hands while preparing', async () => {
+      holder.hold.mockRejectedValue(new NodeCanOnlyBeManagedByItsOwnerError());
+
+      await expect(
+        route.prepared(
+          request,
+          jest.fn().mockResolvedValue('prepared'),
+          jest.fn(),
+        ),
+      ).rejects.toThrow(AuthenticatedIdentityIsNotNodeOwnerError);
     });
   });
 

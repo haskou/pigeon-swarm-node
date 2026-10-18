@@ -29,8 +29,11 @@ export class DeleteNodeBlockSourceRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.writeAsNodeOwner(request, async () => {
-      const message = new NodeBlockSourceRemoverMessage(ownerIdentityId);
+    await this.changeNodeAsOwner(request, async (authenticatedIdentityId) => {
+      const message = new NodeBlockSourceRemoverMessage(
+        ownerIdentityId,
+        authenticatedIdentityId.valueOf(),
+      );
 
       if (!message.ownerIdentityId.isCanonicalKey()) {
         throw new NonCanonicalIdentityIdError();
