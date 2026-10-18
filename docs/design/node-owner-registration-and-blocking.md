@@ -324,10 +324,10 @@ logs counts only (`Purged non-canonical identity ids: ownerCleared=<bool> remove
 when it dropped something), never an id. When the own signed list names aliases, it logs
 a warning with the count only: the own list is kept and enforced locally, it is NOT
 published, and it must be re-signed with a higher version. Canonical stored data writes
-nothing. A node whose
-owner was cleared is unclaimed: the first signed caller of `PUT /node/owner`
-claims it, and the node logs a warning that it is unclaimed and must be claimed
-again, naming `yarn node:reset-owner` and no id. Operators whose owner may have
+nothing. A node whose owner was cleared refuses every owner claim (`403`, code
+`403013`) until the node operator resets it. The mark is stored in the local
+metadata, so it survives restarts. The node logs a warning that the owner was
+cleared and must be reset, naming `yarn node:reset-owner` and no id. Operators whose owner may have
 been claimed under an alias run `yarn node:reset-owner <canonical owner
 identity id>` on the stopped node before starting the upgraded node: the
 command refuses and changes nothing when that id already owns the node, and

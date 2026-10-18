@@ -24,6 +24,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      ownerResetRequired: false,
       registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
@@ -98,6 +99,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      ownerResetRequired: false,
       registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });
@@ -169,6 +171,7 @@ describe('PeersViewModel', () => {
         },
       },
       owner: undefined,
+      ownerResetRequired: false,
       registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
     });

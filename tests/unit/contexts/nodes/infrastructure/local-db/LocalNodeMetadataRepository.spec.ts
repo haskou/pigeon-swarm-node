@@ -111,6 +111,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: owner.valueOf(),
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -168,6 +169,35 @@ describe('LocalNodeMetadataRepository', () => {
       const localNode = await repository.loadLocalNode();
 
       expect(localNode.isClosedForRegistration()).toBe(true);
+    });
+
+    it('should load the persisted owner reset mark', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        ownerResetRequired: true,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const localNode = await repository.loadLocalNode();
+
+      expect(localNode.toPrimitives().ownerResetRequired).toBe(true);
+    });
+
+    it('should load a node without a persisted owner reset mark as not requiring a reset', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const localNode = await repository.loadLocalNode();
+
+      expect(localNode.toPrimitives().ownerResetRequired).toBe(false);
     });
   });
 
@@ -295,6 +325,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -338,6 +369,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -373,6 +405,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -387,6 +420,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -413,6 +447,7 @@ describe('LocalNodeMetadataRepository', () => {
         id: canonicalNodeId,
         networks: {},
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -451,6 +486,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -481,6 +517,7 @@ describe('LocalNodeMetadataRepository', () => {
         networks: {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
+        ownerResetRequired: false,
         owner: undefined,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
@@ -508,6 +545,7 @@ describe('LocalNodeMetadataRepository', () => {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: NodeRelayConfiguration.fromPrimitives({
           privateRelay: {

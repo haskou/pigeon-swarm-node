@@ -10,6 +10,7 @@ import { NodeCanOnlyBeManagedByItsOwnerError } from './errors/NodeCanOnlyBeManag
 import { NodeIsAlreadyOwnedByThisIdentityError } from './errors/NodeIsAlreadyOwnedByThisIdentityError';
 import { NodeNetworkNotFoundError } from './errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from './errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
+import { NodeOwnerResetIsRequiredError } from './errors/NodeOwnerResetIsRequiredError';
 import { NodeNetworkWasAdded } from './events/NodeNetworkWasAdded';
 import { NodeNetworkWasRemoved } from './events/NodeNetworkWasRemoved';
 import { NodeRegistrationModeWasChanged } from './events/NodeRegistrationModeWasChanged';
@@ -32,6 +33,7 @@ export class Node extends AggregateRoot {
       primitives.owner ? new IdentityId(primitives.owner) : undefined,
       NodeRelayConfiguration.fromPrimitives(primitives.relayConfiguration),
       NodeRegistrationMode.fromPrimitives(primitives.registrationMode),
+      primitives.ownerResetRequired,
     );
   }
 
@@ -41,6 +43,7 @@ export class Node extends AggregateRoot {
     private owner?: IdentityId,
     private relayConfiguration: NodeRelayConfiguration = NodeRelayConfiguration.default(),
     private registrationMode: NodeRegistrationMode = NodeRegistrationMode.OPEN,
+    private ownerResetRequired = false,
   ) {
     super();
   }
@@ -108,6 +111,8 @@ export class Node extends AggregateRoot {
     owner: IdentityId,
     authenticatedIdentityId: IdentityId,
   ): void {
+    assert(!this.ownerResetRequired, new NodeOwnerResetIsRequiredError());
+
     if (this.owner) {
       assert(
         this.isOwnedBy(authenticatedIdentityId),
@@ -146,6 +151,7 @@ export class Node extends AggregateRoot {
 
     this.owner = newOwner;
     this.registrationMode = NodeRegistrationMode.OPEN;
+    this.ownerResetRequired = false;
 
     return cleared;
   }
@@ -153,7 +159,8 @@ export class Node extends AggregateRoot {
   /**
    * Leaves the node unowned if its owner was stored before owner ids had to
    * be canonical: no request can be signed under such an id, so it can never
-   * act as owner. The owner claims the node again; it records no event.
+   * act as owner. The node then refuses every claim until the node operator
+   * resets its owner. It records no event.
    */
   public clearNonCanonicalOwner(): boolean {
     if (!this.owner || this.owner.isCanonicalKey()) {
@@ -161,6 +168,7 @@ export class Node extends AggregateRoot {
     }
 
     this.owner = undefined;
+    this.ownerResetRequired = true;
 
     return true;
   }
@@ -243,6 +251,7 @@ export class Node extends AggregateRoot {
         ]),
       ),
       owner: this.owner?.valueOf(),
+      ownerResetRequired: this.ownerResetRequired,
       registrationMode: this.registrationMode.valueOf(),
       relayConfiguration: this.relayConfiguration.toPrimitives(),
     };

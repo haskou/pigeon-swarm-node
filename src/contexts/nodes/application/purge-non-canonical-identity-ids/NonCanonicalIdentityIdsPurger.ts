@@ -9,7 +9,7 @@ import { NonCanonicalIdentityIdsPurge } from './NonCanonicalIdentityIdsPurge';
  * A node that ran before identity ids had to be canonical may hold aliases of
  * a key: as its owner, in its local block exceptions or in what an adopted
  * source applies. No request can be signed under one, so the node clears such
- * an owner, leaving the node to be claimed again, and drops such entries.
+ * an owner, which the node then refuses to replace until its operator resets it, and drops such entries.
  * Signed lists stay verbatim; their aliases are never enforced. The node's own
  * signed list is counted, never edited: its aliases are never enforced and it
  * is not published while it names one. Canonical data is never written.

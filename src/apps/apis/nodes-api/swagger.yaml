@@ -649,6 +649,8 @@ paths:
                 $ref: '#/components/schemas/NodeResource'
         '409':
           description: The current owner did not sign the request, or the identity id is not the canonical encoding of a usable Ed25519 key (code `InvalidNodeOwnerIdentityIdError`).
+        '403':
+          description: The node owner was cleared because it was stored under an identity id that is not canonical, so every claim is refused (code 403013) until the node operator resets the owner with `yarn node:reset-owner`.
   /node/registration:
     put:
       tags:
