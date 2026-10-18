@@ -44,17 +44,6 @@ export class SignedHttpRequestVerifier {
     }
   }
 
-  /**
-   * Refuses an oversized raw request target before any header is read, hashed
-   * or verified: the crypto package never verifies a longer path, so this only
-   * answers earlier and says why.
-   */
-  private assertTargetWithinLimit(request: SignedHttpRequest): void {
-    if (Buffer.byteLength(request.originalUrl, 'utf8') > MAX_TARGET_BYTES) {
-      throw new SignedRequestTargetIsTooLongError(MAX_TARGET_BYTES);
-    }
-  }
-
   private verifyIdentitySignature(
     request: SignedHttpRequest,
     body: SignedHttpRequestBody,
@@ -92,6 +81,19 @@ export class SignedHttpRequestVerifier {
       return new SignedRequestBodyHash(header);
     } catch {
       throw new InvalidSignedRequestError();
+    }
+  }
+
+  /**
+   * Refuses an oversized raw request target before any signature header is
+   * read, hashed or verified: the crypto package never verifies a longer path,
+   * so this only answers earlier and says why. Callers that catch verification
+   * errors call it first, so an oversized target stays 414 and is not rewritten
+   * as 401.
+   */
+  public assertTargetWithinLimit(request: SignedHttpRequest): void {
+    if (Buffer.byteLength(request.originalUrl, 'utf8') > MAX_TARGET_BYTES) {
+      throw new SignedRequestTargetIsTooLongError(MAX_TARGET_BYTES);
     }
   }
 

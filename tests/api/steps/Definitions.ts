@@ -9107,6 +9107,40 @@ export default class Definitions {
     );
   }
 
+  @when(
+    'I GET the current device authorization checkpoint with a request target of {int} bytes signed by the enrolled device',
+  )
+  public async iGetTheCurrentDeviceAuthorizationCheckpointWithTargetBytes(
+    bytes: number,
+  ): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    const pad = '?pad=';
+    const query = `${pad}${'a'.repeat(bytes - Buffer.byteLength(`${path}${pad}`))}`;
+
+    await this.signDeviceAuthorizationRequest(
+      query,
+      this.identityDeviceTargetKeyPair as KeyPair,
+    );
+    this.response = await this.getSignedTarget(`${path}${query}`, this.headers);
+  }
+
+  @when(
+    'I GET the current device authorization checkpoint with a request target of {int} bytes using the headers signed for a shorter target',
+  )
+  public async iGetTheCurrentDeviceAuthorizationCheckpointWithTargetBytesSignedForAShorterTarget(
+    bytes: number,
+  ): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    const pad = '?pad=';
+    const target = `${path}${pad}${'a'.repeat(bytes - Buffer.byteLength(`${path}${pad}`))}`;
+
+    // The crypto package refuses to sign a target this long, so the request
+    // carries the headers of the shorter signed target, which no longer match.
+    this.response = await this.restClient.get(target, this.headers);
+  }
+
   @when('I GET the current device transition log')
   public async iGetTheCurrentDeviceTransitionLog(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;

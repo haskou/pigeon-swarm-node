@@ -291,3 +291,18 @@ Feature: Device authorization route
     When I POST the current device authorization transition to another identity
     Then response code is equal to 400
     And response body should contain "400090"
+
+  Scenario: Answer an oversized device-authenticated request target with 414
+    Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
+    And I set a client-signed identity body with name "oversized owner" and handle "oversized-target"
+    When I POST to "/identities"
+    Then response code is equal to 200
+    Given I set a signed device enrollment transition body
+    When I POST the current device authorization transition
+    Then response code is equal to 200
+    When I GET the current device authorization checkpoint with a request target of 8192 bytes signed by the enrolled device
+    Then response code is equal to 200
+    When I GET the current device authorization checkpoint with a request target of 8193 bytes using the headers signed for a shorter target
+    Then response code is equal to 414
+    And response body should contain "414010"

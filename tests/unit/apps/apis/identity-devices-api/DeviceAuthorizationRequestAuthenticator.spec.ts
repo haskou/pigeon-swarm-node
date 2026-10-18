@@ -1,4 +1,5 @@
 import { DeviceAuthorizationRequestAuthenticator } from '@app/apps/apis/identity-devices-api/DeviceAuthorizationRequestAuthenticator';
+import { SignedRequestTargetIsTooLongError } from '@app/apps/apis/shared/errors/SignedRequestTargetIsTooLongError';
 import { signedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
@@ -352,6 +353,36 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       ),
     ).toThrow('Invalid signed request.');
   });
+
+  it.each(ENTRY_POINTS)(
+    'answers 414 for an oversized target before reading any proof to %s',
+    async (entryPoint) => {
+      const { authorization } = await fixture();
+      const noHeaders: Record<string, string | undefined> = {};
+      const request = {
+        body: undefined,
+        header: (name: string) => noHeaders[name],
+        method: 'GET',
+        originalUrl: `/identity-devices/x?pad=${'a'.repeat(8193)}`,
+      } as Request;
+
+      expect(() => authenticateBy(entryPoint, request, authorization)).toThrow(
+        SignedRequestTargetIsTooLongError,
+      );
+    },
+  );
+
+  it.each(ENTRY_POINTS)(
+    'answers 414, not 401, for an oversized target whose proof covers a shorter one to %s',
+    async (entryPoint) => {
+      const { authorization, request } = await fixture();
+      request.originalUrl = `${request.originalUrl}?pad=${'a'.repeat(8193)}`;
+
+      expect(() => authenticateBy(entryPoint, request, authorization)).toThrow(
+        SignedRequestTargetIsTooLongError,
+      );
+    },
+  );
 
   describe('authenticateReader', () => {
     async function removedReader() {

@@ -64,7 +64,7 @@ Implemented:
   `SignedHttpRequestSignature` from `@haskou/pigeon-swarm-crypto`; the signed
   bytes are `utf8("pigeon:signed-http-request:v1\n")` followed by the RFC 8785
   canonical JSON of that payload
-- request target size: the raw request target (path and query, as sent) is limited to 8192 UTF-8 bytes. A longer target is refused with `414` code `414010` before any signature is hashed or verified. Every signed route can answer this; the swagger operations that take query parameters list it, and the shared response is `RequestTargetTooLong` in `open-api.yaml`. Node's HTTP parser applies its own `--max-http-header-size` limit to the whole header block before the application sees the request, so a target that fits the 8192-byte limit can still be refused for oversized headers
+- request target size: the raw request target (path and query, as sent) is limited to 8192 UTF-8 bytes. A longer target is refused with `414` code `414010` before any signature header is read, hashed or verified. Every signed route can answer this, device-authenticated routes included; the swagger operations that take query parameters list it, and the shared response is `RequestTargetTooLong` in `open-api.yaml`. Node's HTTP parser applies its own `--max-http-header-size` limit to the whole header block before the application sees the request, so a target that fits the 8192-byte limit can still be refused for oversized headers
 - canonical payload `timestamp` is a JSON number; HTTP headers carry it as text
 - timestamp freshness validation with a 30 second maximum clock skew
 - replay rejection: a mutating (non-GET/HEAD/OPTIONS) signed request whose

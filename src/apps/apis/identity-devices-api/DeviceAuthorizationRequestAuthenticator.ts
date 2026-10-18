@@ -146,6 +146,7 @@ export class DeviceAuthorizationRequestAuthenticator {
     request: Request,
     authorization: DeviceAuthorization,
   ): void {
+    this.verifier.assertTargetWithinLimit(request);
     try {
       const { signature, signer } = this.signerOf(
         request,
@@ -173,6 +174,7 @@ export class DeviceAuthorizationRequestAuthenticator {
     request: Request,
     log: DeviceAuthorizationTransitionLog,
   ): DeviceAuthorizationTransitionReader {
+    this.verifier.assertTargetWithinLimit(request);
     try {
       const { signature, signer } = this.signerOf(
         request,
@@ -193,6 +195,7 @@ export class DeviceAuthorizationRequestAuthenticator {
     request: Request,
     authorization: DeviceAuthorization,
   ): DeviceCredential {
+    this.verifier.assertTargetWithinLimit(request);
     try {
       assert(
         request.header('x-recovery-signature') === undefined,
