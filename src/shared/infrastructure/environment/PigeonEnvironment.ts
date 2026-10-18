@@ -196,12 +196,24 @@ export const pigeonEnvironmentIntegerRanges = {
   SERVED_SLOTS_PER_SOURCE: { max: 10_000, min: 1 },
 } as const;
 
+// Blank is unset only for integer variables (type 'number').
+function isUnset(
+  rawValue: string | undefined,
+  definition: (typeof pigeonEnvironmentSchema)[keyof typeof pigeonEnvironmentSchema],
+): boolean {
+  return (
+    rawValue === undefined ||
+    (definition.type === 'number' && rawValue.trim() === '')
+  );
+}
+
 function parseEnvironmentValue(
   rawValue: string | undefined,
   definition: (typeof pigeonEnvironmentSchema)[keyof typeof pigeonEnvironmentSchema],
 ): boolean | number | string | undefined {
-  // A blank value is unset, as the kernel reads it: never 0, NaN or a string.
-  if (rawValue === undefined || rawValue.trim() === '') {
+  // Only integers treat a blank value as unset: a blank integer would otherwise
+  // become 0. A blank boolean or string keeps the value it parsed to before.
+  if (isUnset(rawValue, definition)) {
     return 'defaultValue' in definition ? definition.defaultValue : undefined;
   }
 
@@ -257,7 +269,7 @@ function fallbackEnvironment(): PigeonEnvironment {
 function environmentOverrides(): Partial<PigeonEnvironment> {
   return Object.fromEntries(
     Object.entries(pigeonEnvironmentSchema)
-      .filter(([key]) => (process.env[key] ?? '').trim() !== '')
+      .filter(([key, definition]) => !isUnset(process.env[key], definition))
       .map(([key, definition]) => [
         key,
         parseEnvironmentValue(process.env[key], definition),

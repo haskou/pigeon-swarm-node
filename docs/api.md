@@ -124,9 +124,10 @@ Implemented:
 - served keys share the guard too: each client address holds at most
   `SERVED_SLOTS_PER_SOURCE` of their entries, 2,500 by default (an integer from
   1 to 10,000, see `docs/INSTALLATION.md`), the same 40-address trade-off as
-  strangers. The maximum is a tenth of the guard: a larger value would let one
-  address hold most of the 100,000 entries and crowd out the stranger share and
-  the other served clients. That budget is per 60-second window, about 41 signed
+  strangers. The maximum is a tenth of the guard, so ten addresses at the
+  maximum fill the shared 100,000 entries. A larger value would let one address
+  fill them alone and refuse the stranger share and the other served clients.
+  That budget is per 60-second window, about 41 signed
   state-changing requests a second on average, and the node owner's requests
   from an address count against it too. A busy shared address meets the cap
   sooner, but a flood from one address cannot fill the guard for the others.
