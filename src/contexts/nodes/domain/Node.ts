@@ -64,6 +64,8 @@ export class Node extends AggregateRoot {
 
   // Whoever runs an unclaimed node sets it up; once claimed, only its owner.
   private assertSetUpBy(authenticatedIdentityId: IdentityId | undefined): void {
+    assert(!this.ownerResetRequired, new NodeOwnerResetIsRequiredError());
+
     if (!this.owner) {
       return;
     }
