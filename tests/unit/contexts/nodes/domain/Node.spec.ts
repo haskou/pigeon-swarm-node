@@ -1,9 +1,8 @@
-import { InvalidNodeOwnerIdentityIdError } from '@app/contexts/nodes/domain/errors/InvalidNodeOwnerIdentityIdError';
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeCanOnlyBeManagedByItsOwnerError } from '@app/contexts/nodes/domain/errors/NodeCanOnlyBeManagedByItsOwnerError';
 import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
-import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
+import { NodeOwnerResetIsRequiredError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetIsRequiredError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
 import { NodeNetworkWasRemoved } from '@app/contexts/nodes/domain/events/NodeNetworkWasRemoved';
 import { NodeRegistrationModeWasChanged } from '@app/contexts/nodes/domain/events/NodeRegistrationModeWasChanged';
@@ -50,6 +49,7 @@ describe('Node', () => {
       owner: mother.owner?.valueOf(),
       registrationMode: 'open',
       relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
+      ownerResetRequired: false,
     };
   });
 
@@ -351,6 +351,7 @@ describe('Node', () => {
         expect(stored.toPrimitives()).toEqual({
           ...primitives,
           owner: undefined,
+          ownerResetRequired: true,
         });
       },
     );
@@ -373,6 +374,53 @@ describe('Node', () => {
 
       expect(unowned.clearNonCanonicalOwner()).toBe(false);
       expect(unowned.hasOwner()).toBe(false);
+    });
+
+    it('should refuse a claim by any identity once an alias owner was cleared', () => {
+      const [, forged] = IdentityIdMother.forged()[0];
+      const claimant = generateIdentityId();
+      const stored = Node.fromPrimitives({
+        ...primitives,
+        owner: forged.valueOf(),
+      });
+
+      stored.clearNonCanonicalOwner();
+
+      expect(() => stored.assignOwner(claimant, claimant)).toThrow(
+        NodeOwnerResetIsRequiredError,
+      );
+      expect(stored.hasOwner()).toBe(false);
+    });
+
+    it('should keep refusing a claim after the node is reloaded', () => {
+      const [, forged] = IdentityIdMother.forged()[0];
+      const claimant = generateIdentityId();
+      const stored = Node.fromPrimitives({
+        ...primitives,
+        owner: forged.valueOf(),
+      });
+
+      stored.clearNonCanonicalOwner();
+      const reloaded = Node.fromPrimitives(stored.toPrimitives());
+
+      expect(() => reloaded.assignOwner(claimant, claimant)).toThrow(
+        NodeOwnerResetIsRequiredError,
+      );
+    });
+
+    it('should lift the refusal when the reset installs the replacement owner', () => {
+      const [, forged] = IdentityIdMother.forged()[0];
+      const replacement = generateIdentityId();
+      const stored = Node.fromPrimitives({
+        ...primitives,
+        owner: forged.valueOf(),
+      });
+
+      stored.clearNonCanonicalOwner();
+      stored.replaceLostOwner(replacement);
+
+      expect(stored.isOwnedBy(replacement)).toBe(true);
+      expect(stored.toPrimitives().ownerResetRequired).toBe(false);
     });
   });
 

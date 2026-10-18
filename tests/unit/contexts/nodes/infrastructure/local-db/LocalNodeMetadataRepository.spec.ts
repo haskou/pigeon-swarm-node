@@ -169,6 +169,35 @@ describe('LocalNodeMetadataRepository', () => {
 
       expect(localNode.isClosedForRegistration()).toBe(true);
     });
+
+    it('should load the persisted owner reset mark', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        ownerResetRequired: true,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const localNode = await repository.loadLocalNode();
+
+      expect(localNode.toPrimitives().ownerResetRequired).toBe(true);
+    });
+
+    it('should load a node without a persisted owner reset mark as not requiring a reset', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      const localNode = await repository.loadLocalNode();
+
+      expect(localNode.toPrimitives().ownerResetRequired).toBe(false);
+    });
   });
 
   describe('loadLocalNodeRegistrationMode', () => {
