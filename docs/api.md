@@ -2844,6 +2844,11 @@ canonical PEM representation, and both are covered by the identity signature.
 recovery material remains exclusively with the client. The initial
 `authorizationRevision` is `0`.
 
+Response: `200` with the published identity. It is not `201 Created`: publishing
+is idempotent, so the same signed body can be sent again and names the same
+identity without creating anything new. The admission path (proof of work and
+registration control above) is unchanged by this rule.
+
 The signature covers this canonical property order:
 
 ```json
