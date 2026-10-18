@@ -21,7 +21,7 @@ export class ConversationPosition {
   public static isValid(position: string): boolean {
     const separator = position.indexOf(ConversationPosition.SEPARATOR);
 
-    if (separator === -1) return false;
+    if (separator === -1 || separator === position.length - 1) return false;
 
     try {
       new ConversationId(position.slice(separator + 1));
