@@ -195,6 +195,7 @@ export default class Definitions {
   private readonly callProofs = new Map<string, PublicMutationProof>();
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
+  private communityMessageNextCursor: string | undefined;
   private communityThreadRootMessageId: string | undefined;
   private communityMessageCreatedAt = 0;
   private communityId: string | undefined;
@@ -7571,6 +7572,39 @@ export default class Definitions {
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?limit=50`,
       this.headers,
     );
+  }
+
+  @when(
+    'I GET messages from the current community text channel with query {string}',
+  )
+  public async iGETMessagesFromTheCurrentCommunityTextChannelWithQuery(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const resolved = query.replace(
+      'CURSOR',
+      this.communityMessageNextCursor ?? '',
+    );
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages${resolved}`,
+      this.headers,
+    );
+  }
+
+  @then('I remember the response next cursor')
+  public iRememberTheResponseNextCursor(): void {
+    const cursor = (this.response?.data as { nextCursor?: unknown } | undefined)
+      ?.nextCursor;
+
+    if (typeof cursor !== 'string') {
+      throw new Error('Response next cursor not found.');
+    }
+
+    this.communityMessageNextCursor = cursor;
   }
 
   @when('I search messages from the current community text channel')

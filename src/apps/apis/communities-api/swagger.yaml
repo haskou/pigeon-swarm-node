@@ -1152,7 +1152,7 @@ paths:
             maximum: 100
         - in: query
           name: cursor
-          description: Opaque cursor from `nextCursor` of the previous page. It is bound to this channel and to the caller; a cursor from another list or identity is refused with 400.
+          description: Opaque cursor from `nextCursor` of the previous page. It is not a capability and grants no access; it is bound to this channel, and a cursor from another list or a malformed one is refused with 400 (code 400110).
           schema:
             type: string
         - in: query
