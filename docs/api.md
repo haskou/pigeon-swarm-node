@@ -3761,7 +3761,7 @@ Implemented:
 ### Get community operations
 
 ```http
-GET /communities/{communityId}/operations?after=<digest>&limit=<n>
+GET /communities/{communityId}/operations?cursor=<cursor>&limit=<n>
 ```
 
 Implemented:
@@ -3770,12 +3770,13 @@ Implemented:
 - allow only members, like `GET /communities/{communityId}`
   (`CommunityMemberNotFoundError` otherwise)
 - fail with `CommunityNotFoundError` when the community is unknown to the node
-- `limit` is an integer from 1 to 500 (default 500); `after` is an exclusive
-  operation digest (43 base64url characters). Any other value answers `400` with
-  code `400060` (`Invalid community operations query.`)
+- `limit` is an integer from 1 to 100 (default 50); `cursor` is an opaque cursor
+  returned as `nextCursor` (see Pagination). A `limit` outside that range answers
+  `400` with code `400060` (`Invalid community operations query.`). A malformed
+  cursor, or one issued for another list, answers `400` with code `400110`
 - return every stored operation of the community that passed verification,
   including the ones the fold skipped, verbatim and sorted by digest ascending
-  (code-unit order), the first `limit` after `after`:
+  (code-unit order), the next `limit` after the cursor position:
 
 ```json
 {
@@ -3798,12 +3799,13 @@ Implemented:
 }
 ```
 
-A client reads the next page with `after` = the digest of the last operation while
-a page holds `limit` operations. Each operation carries its author's
-`identitySignature` (see _Signed community operations_), so a member replays the
-roles and memberships back to the creator and verifies every author itself
-instead of trusting the node: it is what authorizes community MLS commits and
-welcomes.
+A client reads the next page by passing `nextCursor` back unchanged as `cursor`
+while a page is full. The cursor is opaque and only carries the position of the
+last operation; authorization is re-checked on every request. Each operation
+carries its author's `identitySignature` (see _Signed community operations_), so
+a member replays the roles and memberships back to the creator and verifies
+every author itself instead of trusting the node: it is what authorizes
+community MLS commits and welcomes.
 
 Every member reads every operation, so what an operation signs is public to the
 community: `member_banned` and `member_kicked` name the moderator as
@@ -4224,7 +4226,7 @@ Implemented:
 ### List community moderation log
 
 ```http
-GET /communities/{communityId}/moderation-logs?limit=50&beforeLogId=<logId>
+GET /communities/{communityId}/moderation-logs?limit=50&cursor=<cursor>
 ```
 
 Response:
@@ -4248,7 +4250,7 @@ Response:
       "createdAt": 1773848829055
     }
   ],
-  "nextBeforeLogId": "<logId>"
+  "nextCursor": "<cursor>"
 }
 ```
 
@@ -4256,7 +4258,7 @@ Implemented:
 
 - require signed request auth from the owner or a member with `manage_members`
 - store log entries in OrbitDB replicated state; they are not written to IPFS
-- return newest entries first, with `beforeLogId` pagination
+- return newest entries first, with `cursor` pagination (see Pagination)
 - currently recorded actions:
   `community_updated`, `channel_created`, `channel_renamed`,
   `channel_deleted`, `channel_permissions_updated`, `role_created`,

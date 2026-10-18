@@ -1,3 +1,4 @@
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import CommunityOperationsFinder from '@app/contexts/communities/application/find-operations/CommunityOperationsFinder';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -24,23 +25,30 @@ export class GetCommunityOperationsRoute extends CommunityRouteSupport {
   @Get('/:communityId/operations')
   public async getCommunityOperations(
     @Param('communityId') communityId: string,
-    @QueryParam('after') after: string | undefined,
+    @QueryParam('cursor') cursor: string | undefined,
     @QueryParam('limit') limit: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const page = await this.finder.find(
-      new GetCommunityOperationsRequest(
-        communityId,
-        actorIdentityId.valueOf(),
-        after,
-        limit,
-      ).getMessage(),
+    const pageRequest = new GetCommunityOperationsRequest(
+      communityId,
+      actorIdentityId.valueOf(),
+      cursor,
+      limit,
     );
+    const page = await this.finder.find(pageRequest.getMessage());
+    const nextPosition = page.getNextPosition();
     const resource: CommunityOperationsResource = {
       communityId: page.getCommunityId().valueOf(),
       networkId: page.getNetworkId().valueOf(),
+      nextCursor:
+        nextPosition === undefined
+          ? null
+          : PageCursor.encode({
+              position: nextPosition,
+              resource: pageRequest.scope(),
+            }),
       operations: page
         .getOperations()
         .map((operation) => operation.toPrimitives()),

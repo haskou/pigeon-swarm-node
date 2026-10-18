@@ -244,22 +244,21 @@ paths:
       tags:
         - communities
       summary: List the signed operations of a community
-      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with after = the digest of the last operation while a page holds limit operations. Every member reads what an operation signs, so member_banned and member_kicked name the moderator as authorIdentityId (hiding it needs a protocol change), and an invitation member_joined carries the invitation id and the possession and consent proofs of one joiner, never the link secret. A page is selected by record id and only its operations are decoded; selecting it still compares the ids of every stored operation.
+      description: Members only, like GET /communities/{communityId}. Returns every stored community operation that passed verification, including the ones the fold skipped, verbatim and sorted by digest ascending (code-unit order). Each carries the identitySignature of its author, so a member replays roles and memberships back to the creator and verifies every author itself (it authorizes community MLS commits and welcomes). Read the next page with cursor = nextCursor while a page is full. Every member reads what an operation signs, so member_banned and member_kicked name the moderator as authorIdentityId (hiding it needs a protocol change), and an invitation member_joined carries the invitation id and the possession and consent proofs of one joiner, never the link secret. A page is selected by record id and only its operations are decoded; selecting it still compares the ids of every stored operation.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
-          name: after
+          name: cursor
           schema:
             type: string
-            pattern: '^[A-Za-z0-9_-]{43}$'
-          description: Exclusive operation digest to page after.
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - in: query
           name: limit
           schema:
             type: integer
             minimum: 1
-            maximum: 500
-            default: 500
+            maximum: 100
+            default: 50
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -274,7 +273,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CommunityOperationsResource'
         '400':
-          description: limit is not an integer from 1 to 500, or after is not a 43-char base64url digest (code 400060).
+          description: limit is not an integer from 1 to 100, or the cursor is malformed or issued for another list (codes 400060 and 400110).
         '409':
           description: The community is unknown to the node (CommunityNotFoundError) or the authenticated identity is not a member (CommunityMemberNotFoundError).
   /communities/{communityId}/invitations:
@@ -506,10 +505,10 @@ paths:
             maximum: 100
             default: 50
         - in: query
-          name: beforeLogId
+          name: cursor
           schema:
             type: string
-          description: Cursor returned as nextBeforeLogId.
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -1694,8 +1693,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityModerationLogResource'
-        nextBeforeLogId:
+        nextCursor:
           type: string
+          nullable: true
     CommunityModerationLogResource:
       type: object
       required:
@@ -2454,6 +2454,10 @@ components:
           description: Sorted by digest ascending.
           items:
             $ref: '#/components/schemas/CommunityOperationRecord'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     PostCommunityInvitationBody:
       type: object
       required:

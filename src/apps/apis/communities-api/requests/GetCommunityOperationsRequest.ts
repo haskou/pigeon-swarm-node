@@ -1,26 +1,29 @@
+import { InvalidPageCursorError } from '@app/apps/apis/shared/errors/InvalidPageCursorError';
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import { CommunityOperationsFindMessage } from '@app/contexts/communities/application/find-operations/messages/CommunityOperationsFindMessage';
+import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { assert } from '@haskou/value-objects';
 
 import { InvalidCommunityOperationsQueryError } from '../errors/InvalidCommunityOperationsQueryError';
 
-/** The `after` digest and `limit` of one page of community operations. */
+/** One page of community operations, read after the position of its cursor. */
 export class GetCommunityOperationsRequest {
-  private static readonly DIGEST_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+  private static readonly DEFAULT_LIMIT = 50;
   private static readonly LIMIT_PATTERN = /^[1-9]\d{0,2}$/;
-  private static readonly MAX_LIMIT = 500;
+  private static readonly MAX_LIMIT = 100;
 
   public constructor(
     private readonly communityId: string,
     private readonly actorIdentityId: string,
-    private readonly after: unknown,
+    private readonly cursor: string | undefined,
     private readonly limit: unknown,
   ) {}
 
-  /** A decimal integer from 1 to 500 without leading zeros, 500 when absent. */
+  /** A decimal integer from 1 to 100 without leading zeros, 50 when absent. */
   private pageLimit(): number {
     const { limit } = this;
 
-    if (limit === undefined) return GetCommunityOperationsRequest.MAX_LIMIT;
+    if (limit === undefined) return GetCommunityOperationsRequest.DEFAULT_LIMIT;
 
     assert(
       typeof limit === 'string' &&
@@ -32,18 +35,22 @@ export class GetCommunityOperationsRequest {
     return Number(limit);
   }
 
-  /** An operation digest: 43 base64url characters. */
+  /** The digest to read after: the position of a decoded cursor, an operation digest. */
   private afterDigest(): string | undefined {
-    const { after } = this;
+    if (this.cursor === undefined) return undefined;
 
-    assert(
-      after === undefined ||
-        (typeof after === 'string' &&
-          GetCommunityOperationsRequest.DIGEST_PATTERN.test(after)),
-      new InvalidCommunityOperationsQueryError(),
-    );
+    const position = PageCursor.decode(this.cursor, this.scope());
 
-    return after as string | undefined;
+    if (!CommunityOperation.DIGEST.test(position)) {
+      throw new InvalidPageCursorError();
+    }
+
+    return position;
+  }
+
+  /** The resource a cursor for this list is issued for. */
+  public scope(): string {
+    return `communities/${this.communityId}/operations`;
   }
 
   public getMessage(): CommunityOperationsFindMessage {

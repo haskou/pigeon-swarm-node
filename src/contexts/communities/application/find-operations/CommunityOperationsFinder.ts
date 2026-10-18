@@ -28,6 +28,7 @@ export default class CommunityOperationsFinder {
         message.after,
         message.limit,
       ),
+      message.limit,
     );
   }
 }

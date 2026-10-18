@@ -59,6 +59,29 @@ describe(CommunityOperationsFinder.name, () => {
     );
   });
 
+  it('offers the last digest of a full page as the next position', async () => {
+    const operations = [genesis()];
+    communityRepository.findOperations.mockResolvedValue(operations);
+
+    const page = await finder.find(
+      new CommunityOperationsFindMessage(
+        communityId.valueOf(),
+        alice.valueOf(),
+        1,
+      ),
+    );
+
+    expect(page.getNextPosition()).toBe(genesis().getHash());
+  });
+
+  it('offers no next position after a short page', async () => {
+    communityRepository.findOperations.mockResolvedValue([genesis()]);
+
+    const page = await finder.find(messageBy(alice.valueOf()));
+
+    expect(page.getNextPosition()).toBeUndefined();
+  });
+
   it('denies a non-member before reading any operation', async () => {
     await expect(
       finder.find(messageBy(mallory.valueOf())),

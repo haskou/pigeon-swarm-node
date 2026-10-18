@@ -196,7 +196,7 @@ export default class Definitions {
   private readonly callProofs = new Map<string, PublicMutationProof>();
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
-  private communityMessageNextCursor: string | undefined;
+  private pageNextCursor: string | undefined;
   private communityThreadRootMessageId: string | undefined;
   private communityMessageCreatedAt = 0;
   private communityId: string | undefined;
@@ -7496,8 +7496,10 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
     this.response = await this.restClient.get(
-      `/communities/${this.communityId}/operations${query}`,
+      `/communities/${this.communityId}/operations${resolved}`,
       this.headers,
     );
   }
@@ -7512,6 +7514,84 @@ export default class Definitions {
       `/communities/${this.communityId}/moderation-logs?limit=50`,
       this.headers,
     );
+  }
+
+  @when('I GET moderation logs from the current community with query {string}')
+  public async iGETModerationLogsFromTheCurrentCommunityWithQuery(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/moderation-logs${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET moderation logs from the current community with a cursor for another list',
+  )
+  public async iGETModerationLogsWithACursorForAnotherList(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'A'.repeat(24),
+      resource: `communities/${this.communityId}/operations`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/moderation-logs?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current community operations with a cursor for another list')
+  public async iGETTheCurrentCommunityOperationsWithACursorForAnotherList(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'A'.repeat(43),
+      resource: `communities/${this.communityId}/moderation-logs`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/operations?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community operations with a cursor whose position is not a digest',
+  )
+  public async iGETTheCurrentCommunityOperationsWithANonDigestCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'not-a-digest',
+      resource: `communities/${this.communityId}/operations`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/operations?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @then('response lists {int} moderation logs')
+  public responseListsModerationLogs(count: number): void {
+    const { logs } = this.response.data as { logs: unknown[] };
+
+    expect(logs).to.have.lengthOf(count);
   }
 
   @when('I POST a text channel to the current community')
@@ -7615,10 +7695,7 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    const resolved = query.replace(
-      'CURSOR',
-      this.communityMessageNextCursor ?? '',
-    );
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
     this.response = await this.restClient.get(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages${resolved}`,
@@ -7654,7 +7731,7 @@ export default class Definitions {
       throw new Error('Response next cursor not found.');
     }
 
-    this.communityMessageNextCursor = cursor;
+    this.pageNextCursor = cursor;
   }
 
   @when('I search messages from the current community text channel')

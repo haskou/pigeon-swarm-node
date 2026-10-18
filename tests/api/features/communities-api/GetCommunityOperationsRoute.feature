@@ -21,8 +21,13 @@ Feature: Get community operations
     When I GET the current community operations with query "?limit=1"
     Then response code is equal to 200
     And response lists 1 community operations by digest, each signed by its author identity
+    And I remember the response next cursor
+    And I sign the current community operations request
+    When I GET the current community operations with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 1 community operations by digest, each signed by its author identity
 
-  Scenario: An invalid page query is refused
+  Scenario: An invalid page query or cursor is refused
     Given I register a test IPFS network "community-operations-query-network"
     And I set a private community body
     And I sign the current community creation request
@@ -34,9 +39,17 @@ Feature: Get community operations
     Then response code is equal to 400
     And response body should contain "400060"
     And I sign the current community operations request
-    When I GET the current community operations with query "?after=not-a-digest"
+    When I GET the current community operations with query "?cursor=not-a-cursor"
     Then response code is equal to 400
-    And response body should contain "400060"
+    And response body should contain "400110"
+    And I sign the current community operations request
+    When I GET the current community operations with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"
+    And I sign the current community operations request
+    When I GET the current community operations with a cursor whose position is not a digest
+    Then response code is equal to 400
+    And response body should contain "400110"
 
   Scenario: A non-member cannot read the operations of a community
     Given I register a test IPFS network "community-operations-member-network"

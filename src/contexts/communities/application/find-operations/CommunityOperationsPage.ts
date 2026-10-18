@@ -9,6 +9,7 @@ export class CommunityOperationsPage {
     private readonly communityId: CommunityId,
     private readonly networkId: NetworkId,
     private readonly operations: CommunityOperation[],
+    private readonly limit: number,
   ) {}
 
   public getCommunityId(): CommunityId {
@@ -21,5 +22,12 @@ export class CommunityOperationsPage {
 
   public getOperations(): CommunityOperation[] {
     return [...this.operations];
+  }
+
+  /** The digest to read after next: the last operation of a full page, otherwise none. */
+  public getNextPosition(): string | undefined {
+    return this.operations.length === this.limit
+      ? this.operations[this.operations.length - 1].getHash()
+      : undefined;
   }
 }

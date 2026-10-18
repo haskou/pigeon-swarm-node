@@ -3,5 +3,6 @@ import { CommunityOperationPrimitives } from '@app/contexts/communities/domain/o
 export interface CommunityOperationsResource {
   communityId: string;
   networkId: string;
+  nextCursor: string | null;
   operations: CommunityOperationPrimitives[];
 }
