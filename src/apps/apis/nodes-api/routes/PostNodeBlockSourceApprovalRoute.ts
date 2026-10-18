@@ -34,26 +34,26 @@ export class PostNodeBlockSourceApprovalRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const message = new NodeBlockSourceEntriesApproverMessage({
-      all: body.all,
-      blockedIdentityIds: body.blockedIdentityIds ?? [],
-      blockedNodePeerIds: body.blockedNodePeerIds ?? [],
-      ownerIdentityId,
-      version: body.version,
+    const source = await this.writeAsNodeOwner(request, async () => {
+      const message = new NodeBlockSourceEntriesApproverMessage({
+        all: body.all,
+        blockedIdentityIds: body.blockedIdentityIds ?? [],
+        blockedNodePeerIds: body.blockedNodePeerIds ?? [],
+        ownerIdentityId,
+        version: body.version,
+      });
+
+      if (
+        ![
+          message.ownerIdentityId,
+          ...(message.entries?.getIdentityIds() ?? []),
+        ].every((identityId) => identityId.isCanonicalKey())
+      ) {
+        throw new NonCanonicalIdentityIdError();
+      }
+
+      return this.approver.approve(message);
     });
-
-    if (
-      ![
-        message.ownerIdentityId,
-        ...(message.entries?.getIdentityIds() ?? []),
-      ].every((identityId) => identityId.isCanonicalKey())
-    ) {
-      throw new NonCanonicalIdentityIdError();
-    }
-
-    const source = await this.writeAsNodeOwner(request, () =>
-      this.approver.approve(message),
-    );
 
     return response
       .status(HttpRouteStatusEnum.OK)
