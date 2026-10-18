@@ -41,6 +41,7 @@ describe('HTTP log privacy', () => {
     const logger = new WinstonLogger();
     logger.attach({ app: app as unknown as HttpApp });
     logger.run();
+    logger.enableFileLogging();
     app.use(express.json());
     app.use((_request, response) =>
       response.status(404).json({ sdp: 'PRIVATE-SDP' }),
@@ -106,9 +107,19 @@ describe('WinstonLogger file transport', () => {
     SERVICE_NAME: process.env.SERVICE_NAME,
   };
   let directory: string;
+  let captured: unknown[];
+
+  const logFile = (): string => join(directory, 'file-transport-test.log');
+  const closeLogger = (logger: WinstonLogger): Promise<void> => {
+    const finished = Promise.withResolvers<void>();
+    logger.logger.on('finish', finished.resolve);
+    logger.logger.end();
+    return finished.promise;
+  };
 
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'pigeon-file-transport-'));
+    captured = [];
     Object.assign(process.env, {
       LOG_LEVEL: 'info',
       LOG_URL: '.',
@@ -117,7 +128,8 @@ describe('WinstonLogger file transport', () => {
     jest.spyOn(Kernel, 'rootDirectory', 'get').mockReturnValue(directory);
     jest
       .spyOn(winston.transports.Console.prototype, 'log')
-      .mockImplementation((_info, callback) => {
+      .mockImplementation((info, callback) => {
+        captured.push(info);
         if (typeof callback === 'function') callback();
       });
   });
@@ -131,34 +143,70 @@ describe('WinstonLogger file transport', () => {
     await rm(directory, { recursive: true, force: true });
   });
 
-  it('should not construct the file transport before file logging is enabled', () => {
-    const open = jest
-      .spyOn(winston.transports.File.prototype, 'open')
-      .mockImplementation(() => undefined);
+  it('should keep the log file absent and print to the console until file logging is enabled', async () => {
     const logger = new WinstonLogger();
 
     logger.info('before validation');
+    await closeLogger(logger);
 
-    expect(open).not.toHaveBeenCalled();
+    await expect(readFile(logFile(), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+    expect(JSON.stringify(captured)).toContain('before validation');
   });
 
-  it('should write to the file resolved at first use once file logging is enabled', async () => {
+  it('should write only the lines logged after file logging is enabled', async () => {
     const logger = new WinstonLogger();
 
     logger.info('before validation');
-    process.env.LOG_URL = 'elsewhere';
+    await expect(readFile(logFile(), 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
     logger.enableFileLogging();
     logger.info('after validation');
-    await new Promise<void>((resolve) => {
-      logger.logger.on('finish', resolve);
-      logger.logger.end();
-    });
+    await closeLogger(logger);
 
-    const file = await readFile(
-      join(directory, 'file-transport-test.log'),
-      'utf8',
-    );
+    const file = await readFile(logFile(), 'utf8');
     expect(file).toContain('after validation');
     expect(file).not.toContain('before validation');
+  });
+
+  it('should send HTTP request logs through the file transport only once file logging is enabled', async () => {
+    const app = express();
+    const logger = new WinstonLogger();
+    logger.attach({ app: app as unknown as HttpApp });
+    logger.run();
+    app.use((_request, response) => response.status(404).end());
+    const started = Promise.withResolvers<void>();
+    const server = app.listen(0, '127.0.0.1', () => started.resolve());
+    await started.promise;
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+    const get = async (): Promise<number> => {
+      const response = await fetch(url);
+      await response.text();
+      return response.status;
+    };
+    try {
+      expect(await get()).toBe(404);
+      // Gives any file transport opened by the HTTP path time to create the file.
+      const settled = Promise.withResolvers<void>();
+      setTimeout(settled.resolve, 50);
+      await settled.promise;
+      await expect(readFile(logFile(), 'utf8')).rejects.toMatchObject({
+        code: 'ENOENT',
+      });
+      expect(JSON.stringify(captured)).toContain('HTTP GET 404');
+
+      logger.enableFileLogging();
+      expect(await get()).toBe(404);
+      await closeLogger(logger);
+
+      const file = await readFile(logFile(), 'utf8');
+      expect(file.match(/HTTP GET 404/g)).toHaveLength(1);
+    } finally {
+      const closed = Promise.withResolvers<void>();
+      server.close(() => closed.resolve());
+      await closed.promise;
+    }
   });
 });

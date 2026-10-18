@@ -42,20 +42,6 @@ export default class WinstonLogger implements Log {
 
   private server?: HttpAppProvider;
 
-  private createLoggerOptions() {
-    const environment = pigeonEnvironment();
-
-    return {
-      level: environment.LOG_LEVEL,
-      transports: [
-        this.createConsoleTransport(environment.LOG_LEVEL),
-        new winston.transports.File(
-          this.createFileOptions(environment.LOG_LEVEL),
-        ),
-      ],
-    };
-  }
-
   private createConsoleTransport(level: string) {
     return new winston.transports.Console({
       format: this.consoleFormat,
@@ -161,7 +147,7 @@ export default class WinstonLogger implements Log {
   /**
    * Adds the file transport. Winston opens the file as soon as the transport
    * is constructed, so this is called only once the configuration is valid.
-   * The path and level are the ones resolved at first use, as before.
+   * The path and level are the ones resolved at the logger's first use.
    */
   public enableFileLogging(): void {
     if (this.fileTransport) {
@@ -182,11 +168,12 @@ export default class WinstonLogger implements Log {
     this.prefix = prefix || '';
     this.server?.app.use(
       expressWinston.logger({
-        ...this.createLoggerOptions(),
+        level: pigeonEnvironment().LOG_LEVEL,
         meta: false,
         msg: 'HTTP {{req.method}} {{res.statusCode}}',
         requestWhitelist: [],
         responseWhitelist: [],
+        winstonInstance: this.logger,
       }),
     );
   }
