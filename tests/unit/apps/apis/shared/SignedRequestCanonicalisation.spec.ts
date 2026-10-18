@@ -1,5 +1,6 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from '@app/apps/apis/shared/errors/MissingSignedRequestHeaderError';
+import { SignedRequestTargetIsTooLongError } from '@app/apps/apis/shared/errors/SignedRequestTargetIsTooLongError';
 import {
   SignedHttpRequest,
   SignedHttpRequestVerifier,
@@ -246,18 +247,50 @@ describe('signed request canonicalisation', () => {
       ).toThrow(InvalidSignedRequestError);
     });
 
-    it('refuses a target longer than the 8192-unit path bound as an invalid signature', async () => {
+    it.each([
+      [
+        'verifySignature',
+        (verifier: SignedHttpRequestVerifier, request: SignedHttpRequest) =>
+          verifier.verifySignature(request),
+      ],
+      [
+        'verifyDeclaredBodySignature',
+        (verifier: SignedHttpRequestVerifier, request: SignedHttpRequest) =>
+          verifier.verifyDeclaredBodySignature(request),
+      ],
+    ])(
+      'refuses a validly signed target over 8192 bytes with 414 before %s checks it',
+      async (_entry, verifyEntry) => {
+        const keyPair = await KeyPair.generate();
+        const oversized = `/resource?q=${'a'.repeat(8192)}`;
+        const signed = sign(keyPair, {
+          method: 'GET',
+          target: oversized,
+          timestamp: TIMESTAMP,
+        });
+        const verifySpy = jest.spyOn(SignedHttpRequestSignature, 'verify');
+
+        try {
+          expect(() => verifyEntry(verifier, toRequest(signed))).toThrow(
+            SignedRequestTargetIsTooLongError,
+          );
+          expect(verifySpy).not.toHaveBeenCalled();
+        } finally {
+          verifySpy.mockRestore();
+        }
+      },
+    );
+
+    it('accepts a target of exactly 8192 bytes', async () => {
       const keyPair = await KeyPair.generate();
+      const target = `/resource?q=${'a'.repeat(8192 - '/resource?q='.length)}`;
       const signed = sign(keyPair, {
         method: 'GET',
-        target: TARGET,
+        target,
         timestamp: TIMESTAMP,
       });
-      const oversized = `/resource?q=${'a'.repeat(8192)}`;
 
-      expect(() =>
-        verifier.verifySignature(toRequest({ ...signed, target: oversized })),
-      ).toThrow(InvalidSignedRequestError);
+      expect(() => verifier.verifySignature(toRequest(signed))).not.toThrow();
     });
   });
 
