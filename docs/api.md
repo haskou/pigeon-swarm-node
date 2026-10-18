@@ -1633,6 +1633,8 @@ Implemented:
   multiaddrs from node metadata instead of environment variables
 - recreate private IPFS networks when relay settings change so ports, manual
   relay multiaddrs and discovery settings take effect
+- refuse the replacement with `403`, code `403013`, while the owner reset is
+  required, until the node operator runs `yarn node:reset-owner`
 - reload the public relay runtime when owner-owned relay settings change
 
 ### Open a diagnostics session
@@ -1754,6 +1756,9 @@ Request:
 A client that wants the node's public network sends `{ "name": "public" }`:
 `id` is optional and the node generates one when it is omitted, and a network
 without `key` is public.
+
+While the owner reset is required, the request is refused with `403`, code
+`403013`, until the node operator runs `yarn node:reset-owner`.
 
 Implemented:
 

@@ -1,4 +1,5 @@
 import { LocalNodeNotFoundError } from '@app/contexts/nodes/domain/errors/LocalNodeNotFoundError';
+import { NodeOwnerResetFlagIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetFlagIsUnreadableError';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
@@ -38,7 +39,6 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       this.hasValidNetworks(document.networks) &&
       this.hasValidOwner(document.owner) &&
       this.hasValidRegistrationMode(document.registrationMode) &&
-      this.hasValidOwnerResetRequired(document.ownerResetRequired) &&
       this.hasValidRelayConfiguration(document.relayConfiguration)
     );
   }
@@ -61,10 +61,19 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     );
   }
 
-  private hasValidOwnerResetRequired(ownerResetRequired: unknown): boolean {
+  // An unreadable marker counts as required, so a write can never clear it by accident.
+  private readOwnerResetRequired(ownerResetRequired: unknown): boolean {
+    return ownerResetRequired === undefined
+      ? false
+      : ownerResetRequired !== false;
+  }
+
+  private hasUnreadableOwnerResetRequired(
+    ownerResetRequired: unknown,
+  ): boolean {
     return (
-      ownerResetRequired === undefined ||
-      typeof ownerResetRequired === 'boolean'
+      ownerResetRequired !== undefined &&
+      typeof ownerResetRequired !== 'boolean'
     );
   }
 
@@ -92,7 +101,9 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       networks: document.networks,
       nodeId: new NodeId(document.nodeId).valueOf(),
       owner: document.owner,
-      ownerResetRequired: document.ownerResetRequired,
+      ownerResetRequired: this.readOwnerResetRequired(
+        document.ownerResetRequired,
+      ),
       registrationMode:
         document.registrationMode ?? NodeRegistrationMode.OPEN.valueOf(),
       relayConfiguration:
@@ -248,7 +259,23 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     });
   }
 
+  private async assertOwnerResetMarkerIsReadable(): Promise<void> {
+    const document = await this.database.findOne(
+      LocalNodeMetadataRepository.NAMESPACE,
+      LocalNodeMetadataRepository.LOCAL_NODE_ID,
+    );
+
+    if (
+      document &&
+      this.hasUnreadableOwnerResetRequired(document.ownerResetRequired)
+    ) {
+      throw new NodeOwnerResetFlagIsUnreadableError();
+    }
+  }
+
   public async loadLocalNode(): Promise<Node> {
+    await this.assertOwnerResetMarkerIsReadable();
+
     const metadata = await this.loadOrCreateMetadata();
     const node = this.nodeFromMetadata(metadata);
 

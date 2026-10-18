@@ -3,6 +3,7 @@ import { NodeOwnerWriteHolderMessage } from '@app/contexts/nodes/application/hol
 import NodeOwnerWriteHolder from '@app/contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import { NodeCanOnlyBeManagedByItsOwnerError } from '@app/contexts/nodes/domain/errors/NodeCanOnlyBeManagedByItsOwnerError';
+import { NodeOwnerResetIsRequiredError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetIsRequiredError';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
@@ -10,6 +11,7 @@ import { assert } from '@haskou/value-objects';
 import { Request } from 'express';
 
 import { AuthenticatedIdentityIsNotNodeOwnerError } from '../errors/AuthenticatedIdentityIsNotNodeOwnerError';
+import { NodeOwnerClaimIsAwaitingResetError } from '../errors/NodeOwnerClaimIsAwaitingResetError';
 
 /**
  * Owner-only routes check the signer owns the node up front, and the write
@@ -80,14 +82,19 @@ export abstract class NodeOwnerRouteSupport extends Route {
     change: (authenticatedIdentityId: IdentityId | undefined) => Promise<T>,
   ): Promise<T> {
     const node = await this.nodeLoader.loadNode();
+    const authenticatedIdentityId = node.hasOwner()
+      ? await this.assertAuthenticatedOwner(request, node)
+      : undefined;
 
-    return this.asOwner(
-      change(
-        node.hasOwner()
-          ? await this.assertAuthenticatedOwner(request, node)
-          : undefined,
-      ),
-    );
+    try {
+      return await this.asOwner(change(authenticatedIdentityId));
+    } catch (error: unknown) {
+      if (error instanceof NodeOwnerResetIsRequiredError) {
+        throw new NodeOwnerClaimIsAwaitingResetError();
+      }
+
+      throw error;
+    }
   }
 
   /** Runs an owner-only write stored outside the node while it cannot change hands. */

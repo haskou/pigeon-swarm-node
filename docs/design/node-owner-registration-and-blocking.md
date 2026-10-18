@@ -333,6 +333,7 @@ identity id>` on the stopped node before starting the upgraded node: the
 command refuses and changes nothing when that id already owns the node, and
 otherwise installs it in the same write that drops the alias owner (clearing
 the owner settings like any owner reset), so the node never starts unclaimed.
+A marker that cannot be read (any stored value other than a boolean) stops the node from starting until `yarn node:reset-owner` runs; the reset overwrites it. Writes read such a marker as required, so no write can clear it by accident.
 
 ### What a node block does on this node
 
