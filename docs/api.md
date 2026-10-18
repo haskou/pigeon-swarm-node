@@ -6029,6 +6029,10 @@ every id and timestamp, signs the resulting record, and the node applies the sam
 change and verifies that the digest of the result equals the signed digest. Missing,
 forged, copied, stale or wrong-author proofs fail with 409.
 
+Sticker pack and sticker ids are 1 to 32 ASCII letters, digits, `-` or `_`
+characters. An id outside that rule is refused with `409` and code
+`InvalidStickerIdError`, the same response as other domain validation failures.
+
 - Store `stickerPacks`: one whole-pack document per pack, signed by the owner. The
   proof has `recordId = <packId>`, kind `put`, and `payloadDigest` covers
   `{ id, name, ownerIdentityId, createdAt, updatedAt, stickers: [{ id, type,
@@ -6084,7 +6088,17 @@ Body:
 GET /stickers/packs?ownerIdentityId=<identityId>&limit=50&cursor=<cursor>
 ```
 
-`ownerIdentityId` is optional. Without it, the endpoint returns known packs. Packs are ordered by `updatedAt` newest first, then pack id. Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Responds `{ "results": [...], "nextCursor": "<cursor or null>" }`; pass `nextCursor` as `cursor` to read the next page. `nextCursor` is `null` on a short page; a full last page returns a cursor, so the next read may be empty. A malformed cursor, or one from another list, returns `400` with code `400110`.
+`ownerIdentityId` is optional. Without it, the endpoint returns known packs.
+Packs are ordered by `updatedAt` newest first, then pack id. Query: `limit`
+(1..100, default 50) and `cursor` (the `nextCursor` of the previous page).
+Responds `{ "results": [...], "nextCursor": "<cursor or null>" }`; pass
+`nextCursor` as `cursor` to read the next page. `nextCursor` is `null` on a short
+page; a full last page returns a cursor, so the next read may be empty. A cursor
+is opaque and grants no access. A malformed, non-canonical, oversized or foreign
+cursor (one issued for another list) returns `400` with code `400110`.
+
+Breaking change: this route used to return every pack in one response. Without
+`limit` it now returns the first 50 packs.
 
 ### Get sticker pack
 
@@ -6105,8 +6119,14 @@ its own `limit` (1..100, default 50) and `cursor`
 and each returns its own `savedPacksNextCursor` / `favoriteStickersNextCursor`
 (`null` on the last page). Saved packs are ordered by pack `updatedAt` newest
 first, then pack id. Favorite stickers are ordered by `favoritedAt` newest
-first, then pack id and sticker id. A malformed cursor, or one issued for
-another list, returns `400` with code `400110`. Recent stickers are not paged.
+first, then pack id and sticker id. A cursor is bound to its list and carries
+only a position, so a cursor replayed by another identity lists that identity's
+own items after the position. A malformed, non-canonical, oversized or foreign
+cursor (one issued for another list) returns `400` with code `400110`. Recent
+stickers are not paged.
+
+Breaking change: `savedPacks` and `favoriteStickers` used to be unbounded. Each
+list now returns one page of at most 100 items (default 50).
 
 ```json
 {
@@ -6153,8 +6173,9 @@ another list, returns `400` with code `400110`. Recent stickers are not paged.
 ```
 
 The routes that also return the library (saving, favoriting and usage) answer
-with its first page at the default limits. Clients that need further pages
-must call `GET /stickers/library` with the cursors.
+with the first page of each list at the default limits. Before this change they
+returned the full lists. Clients that need further pages must call
+`GET /stickers/library` with the cursors.
 
 `recentStickers` keeps the last 10 stickers explicitly reported by the client.
 The backend cannot infer recent stickers from encrypted message payloads, so the

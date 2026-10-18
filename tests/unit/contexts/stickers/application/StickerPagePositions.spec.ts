@@ -32,6 +32,15 @@ describe('Sticker page positions', () => {
         StickerPackPosition.isValid(`garbage|${StickerPackMother.packId}`),
       ).toBe(false);
     });
+
+    it('refuses an id outside the id rule, however long the position', () => {
+      const timestamp = PageTimestamp.of(1780000000000);
+
+      expect(StickerPackPosition.isValid(`${timestamp}|a|b`)).toBe(false);
+      expect(
+        StickerPackPosition.isValid(`${timestamp}|${'a'.repeat(33)}`),
+      ).toBe(false);
+    });
   });
 
   describe('StickerFavoritePosition', () => {
@@ -41,36 +50,42 @@ describe('Sticker page positions', () => {
       ).toBe(true);
     });
 
-    it('accepts ids that hold the separator, and keeps them distinct', () => {
-      const split = StickerFavoritePosition.of({
+    it('keeps the longest possible position under the 256-character cap', () => {
+      const longest = StickerFavoritePosition.of({
         favoritedAt: favorite.favoritedAt,
-        packId: 'a|b',
-        stickerId: 'c',
-      });
-      const other = StickerFavoritePosition.of({
-        favoritedAt: favorite.favoritedAt,
-        packId: 'a',
-        stickerId: 'b|c',
+        packId: 'a'.repeat(32),
+        stickerId: 'b'.repeat(32),
       });
 
-      expect(StickerFavoritePosition.isValid(split)).toBe(true);
-      expect(StickerFavoritePosition.isValid(other)).toBe(true);
-      expect(split).not.toBe(other);
+      expect(longest.length).toBe(83);
+      expect(StickerFavoritePosition.isValid(longest)).toBe(true);
     });
 
-    it('refuses a raw separator inside an id part, a non-canonical escape, and a missing part', () => {
+    it('refuses an id that is too long, holds a separator, or uses a non-ASCII letter', () => {
       const timestamp = PageTimestamp.of(favorite.favoritedAt);
 
-      expect(StickerFavoritePosition.isValid(`${timestamp}|a|b|c`)).toBe(false);
       expect(
-        StickerFavoritePosition.isValid(`${timestamp}|%70ack|sticker-1`),
+        StickerFavoritePosition.isValid(`${timestamp}|${'a'.repeat(33)}|b`),
       ).toBe(false);
+      expect(StickerFavoritePosition.isValid(`${timestamp}|a|b|c`)).toBe(false);
+      expect(StickerFavoritePosition.isValid(`${timestamp}|a%7Cb|c`)).toBe(
+        false,
+      );
+      expect(StickerFavoritePosition.isValid(`${timestamp}|é|c`)).toBe(false);
+    });
+
+    it('refuses a missing id part and a bad timestamp', () => {
+      const timestamp = PageTimestamp.of(favorite.favoritedAt);
+
       expect(
         StickerFavoritePosition.isValid(`${timestamp}|sticker-pack-1`),
       ).toBe(false);
       expect(StickerFavoritePosition.isValid(`${timestamp}||sticker-1`)).toBe(
         false,
       );
+      expect(
+        StickerFavoritePosition.isValid(`garbage|sticker-pack-1|sticker-1`),
+      ).toBe(false);
     });
   });
 });

@@ -411,13 +411,13 @@ components:
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/StickerPackIdentifier'
     StickerId:
       name: stickerId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/StickerIdentifier'
     XIdentityId:
       in: header
       name: X-Identity-Id
@@ -431,6 +431,18 @@ components:
       schema:
         type: string
   schemas:
+    StickerPackIdentifier:
+      type: string
+      minLength: 1
+      maxLength: 32
+      pattern: '^[A-Za-z0-9_-]+$'
+      description: "Pack id: 1 to 32 ASCII letters, digits, '-' or '_'. Other ids are refused with 409 (InvalidStickerIdError)."
+    StickerIdentifier:
+      type: string
+      minLength: 1
+      maxLength: 32
+      pattern: '^[A-Za-z0-9_-]+$'
+      description: "Sticker id: 1 to 32 ASCII letters, digits, '-' or '_'. Other ids are refused with 409 (InvalidStickerIdError)."
     CreateStickerPackBody:
       type: object
       description: The client chooses the pack id and the creation time and signs both records. mutation is a put proof (store stickerPacks, recordId packId) over the whole pack document {id, name, ownerIdentityId, createdAt, updatedAt = createdAt, stickers [], scopeType sticker_pack}; savedPackMutation is a put proof (store stickerUserLibraries, recordId saved:<identityId>:<packId>) over {id, identityId, packId, savedAt = createdAt, scopeType sticker_saved_pack}.
@@ -442,7 +454,7 @@ components:
         - savedPackMutation
       properties:
         packId:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         name:
           type: string
           maxLength: 80
@@ -532,8 +544,7 @@ components:
             - stickerId
           properties:
             stickerId:
-              type: string
-              description: Client-chosen id of the new sticker.
+              $ref: '#/components/schemas/StickerIdentifier'
     DeleteStickerBody:
       type: object
       required:
@@ -647,7 +658,7 @@ components:
             - id
           properties:
             id:
-              type: string
+              $ref: '#/components/schemas/StickerIdentifier'
     StickerPackResource:
       type: object
       required:
@@ -659,7 +670,7 @@ components:
         - updatedAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         ownerIdentityId:
           type: string
         name:
@@ -695,9 +706,9 @@ components:
         - sticker
       properties:
         packId:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         stickerId:
-          type: string
+          $ref: '#/components/schemas/StickerIdentifier'
         favoritedAt:
           type: integer
         sticker:
@@ -711,9 +722,9 @@ components:
         - sticker
       properties:
         packId:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         stickerId:
-          type: string
+          $ref: '#/components/schemas/StickerIdentifier'
         usedAt:
           type: integer
         sticker:

@@ -8728,6 +8728,60 @@ export default class Definitions {
     );
   }
 
+  @when('I GET {string} with an oversized cursor')
+  public async iGETWithAnOversizedCursor(path: string): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace('CURSOR', 'A'.repeat(513)),
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET {string} with a {string} cursor holding a {int} character position',
+  )
+  public async iGETWithACursorHoldingAPosition(
+    path: string,
+    resource: string,
+    length: number,
+  ): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(
+          PageCursor.encode({ position: 'x'.repeat(length), resource }),
+        ),
+      ),
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET {string} with a non-canonical {string} cursor shaped as {string}',
+  )
+  public async iGETWithANonCanonicalCursor(
+    path: string,
+    resource: string,
+    shape: string,
+  ): Promise<void> {
+    const encodeJson = (value: object): string =>
+      Buffer.from(JSON.stringify(value)).toString('base64url');
+    const shapes: Record<string, string | undefined> = {
+      padded: `${PageCursor.encode({ position: 'x', resource })}=`,
+      'reordered keys': encodeJson({ resource, position: 'x' }),
+      'extra key': encodeJson({ position: 'x', resource, extra: 'y' }),
+    };
+    const cursor = shapes[shape];
+
+    if (cursor === undefined) {
+      throw new Error(`Unknown non-canonical cursor shape ${shape}.`);
+    }
+
+    this.response = await this.restClient.get(
+      path.replace('CURSOR', encodeURIComponent(cursor)),
+      this.headers,
+    );
+  }
+
   @when(
     'I GET {string} with the cursor for resource {string} at position {string}',
   )
