@@ -38,7 +38,7 @@ describe('Sticker page positions', () => {
 
       expect(StickerPackPosition.isValid(`${timestamp}|a|b`)).toBe(false);
       expect(
-        StickerPackPosition.isValid(`${timestamp}|${'a'.repeat(33)}`),
+        StickerPackPosition.isValid(`${timestamp}|${'a'.repeat(37)}`),
       ).toBe(false);
     });
   });
@@ -53,11 +53,11 @@ describe('Sticker page positions', () => {
     it('keeps the longest possible position under the 256-character cap', () => {
       const longest = StickerFavoritePosition.of({
         favoritedAt: favorite.favoritedAt,
-        packId: 'a'.repeat(32),
-        stickerId: 'b'.repeat(32),
+        packId: 'a'.repeat(36),
+        stickerId: 'b'.repeat(36),
       });
 
-      expect(longest.length).toBe(83);
+      expect(longest.length).toBe(91);
       expect(StickerFavoritePosition.isValid(longest)).toBe(true);
     });
 
@@ -65,7 +65,7 @@ describe('Sticker page positions', () => {
       const timestamp = PageTimestamp.of(favorite.favoritedAt);
 
       expect(
-        StickerFavoritePosition.isValid(`${timestamp}|${'a'.repeat(33)}|b`),
+        StickerFavoritePosition.isValid(`${timestamp}|${'a'.repeat(37)}|b`),
       ).toBe(false);
       expect(StickerFavoritePosition.isValid(`${timestamp}|a|b|c`)).toBe(false);
       expect(StickerFavoritePosition.isValid(`${timestamp}|a%7Cb|c`)).toBe(
