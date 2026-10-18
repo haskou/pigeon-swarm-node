@@ -1696,6 +1696,7 @@ components:
         nextCursor:
           type: string
           nullable: true
+          description: Cursor for the next older page; null unless the page is full.
     CommunityModerationLogResource:
       type: object
       required:

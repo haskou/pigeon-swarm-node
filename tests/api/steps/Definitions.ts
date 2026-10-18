@@ -7587,6 +7587,25 @@ export default class Definitions {
     );
   }
 
+  @when(
+    'I GET moderation logs from the current community with a cursor whose position is not a log id',
+  )
+  public async iGETModerationLogsWithANonLogIdCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'forged-log-id-0123456789',
+      resource: `communities/${this.communityId}/moderation-logs`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/moderation-logs?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
   @then('response lists {int} moderation logs')
   public responseListsModerationLogs(count: number): void {
     const { logs } = this.response.data as { logs: unknown[] };

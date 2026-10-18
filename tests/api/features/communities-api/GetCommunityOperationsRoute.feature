@@ -62,3 +62,27 @@ Feature: Get community operations
     When I GET the current community operations with query ""
     Then response code is equal to 409
     And response body should contain "CommunityMemberNotFoundError"
+
+  Scenario: A non-member cannot page the operations with a valid cursor
+    Given I register a test IPFS network "community-operations-cursor-member-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I sign the current community operations request
+    When I GET the current community operations with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    And the community member signs the current community operations request
+    When I GET the current community operations with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+    And response body should contain "CommunityMemberNotFoundError"
+    And the community member signs the current community operations request
+    When I GET the current community operations with query ""
+    Then response code is equal to 409
+    And response body should contain "CommunityMemberNotFoundError"

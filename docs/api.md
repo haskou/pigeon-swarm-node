@@ -411,7 +411,8 @@ Paged list endpoints take `limit` and an opaque `cursor`, and respond with
 - `limit` defaults to 50 and is clamped to 1..100 unless an endpoint documents
   other bounds.
 - `nextCursor` is the cursor for the next older (or next) page. It is `null`
-  when the page is empty. Pass it back unchanged as `cursor`.
+  when there is no further page: an empty channel timeline, or an operations or
+  moderation-log page that is not full. Pass it back unchanged as `cursor`.
 - A cursor is opaque, not a capability. Clients MUST NOT parse or build one. It
   carries only a position and the resource it was issued for; it grants no
   access. Authorization is re-checked on every request from the request itself,
@@ -4258,6 +4259,9 @@ Implemented:
 
 - require signed request auth from the owner or a member with `manage_members`
 - store log entries in OrbitDB replicated state; they are not written to IPFS
+- `limit` is clamped to 1..100 (default 50); `cursor` is an opaque cursor
+  returned as `nextCursor` (see Pagination). A malformed cursor, or one issued
+  for another list, answers `400` with code `400110`
 - return newest entries first, with `cursor` pagination (see Pagination)
 - currently recorded actions:
   `community_updated`, `channel_created`, `channel_renamed`,

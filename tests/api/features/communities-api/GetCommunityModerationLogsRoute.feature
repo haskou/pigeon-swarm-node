@@ -74,3 +74,79 @@ Feature: Get community moderation logs
     Then response code is equal to 200
     And response body should contain "member_kicked"
     And response body should contain "member"
+
+  Scenario: A valid cursor does not widen moderation log access
+    Given I register a test IPFS network "community-moderation-logs-refusal-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I sign the current community moderation logs request
+    When I GET moderation logs from the current community with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    And the community member signs the current community moderation logs request
+    When I GET moderation logs from the current community with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+    And response body should contain "Community permission denied"
+    And the community member signs the current community moderation logs request
+    When I GET moderation logs from the current community
+    Then response code is equal to 409
+    And response body should contain "Community permission denied"
+
+  Scenario: A joined member without manage_members cannot page the moderation log with a valid cursor
+    Given I register a test IPFS network "community-moderation-logs-member-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I sign the current community moderation logs request
+    When I GET moderation logs from the current community with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    And the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And I sign the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
+    And the community member signs the current community moderation logs request
+    When I GET moderation logs from the current community with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409
+    And response body should contain "Community permission denied"
+    And the community member signs the current community moderation logs request
+    When I GET moderation logs from the current community
+    Then response code is equal to 409
+    And response body should contain "Community permission denied"
+
+  Scenario: A cursor with a forged log id position is refused
+    Given I register a test IPFS network "community-moderation-logs-forged-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I sign the current community moderation logs request
+    When I GET moderation logs from the current community with a cursor whose position is not a log id
+    Then response code is equal to 400
+    And response body should contain "400110"
