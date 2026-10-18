@@ -3,7 +3,7 @@ import { PublicRelayConfiguration } from '@app/shared/infrastructure/network/rel
 describe('PublicRelayConfiguration', () => {
   const relayEnvironmentKeys = [
     'PIGEON_PRIVATE_RELAY_RECORD_REFRESH_SECONDS',
-    'PIGEON_RELAY_RECORD_TTL_SECONDS',
+    'PIGEON_RELAY_RECORD_TTL_MS',
   ];
 
   const previousEnvironment = new Map<string, string | undefined>();
@@ -32,5 +32,13 @@ describe('PublicRelayConfiguration', () => {
 
     expect(configuration.getPrivateRelayRecordRefreshMs()).toBe(60 * 60_000);
     expect(configuration.getRelayRecordTtlMs()).toBe(2 * 60 * 60_000);
+  });
+
+  it('reads the relay record lifetime from the millisecond variable', () => {
+    process.env.PIGEON_RELAY_RECORD_TTL_MS = '3600000';
+
+    const configuration = PublicRelayConfiguration.fromEnvironment();
+
+    expect(configuration.getRelayRecordTtlMs()).toBe(60 * 60_000);
   });
 });
