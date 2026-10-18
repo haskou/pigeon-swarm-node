@@ -57,8 +57,11 @@ export class PostPollRoute extends PollRouteSupport {
       ),
     );
 
+    const resource = new PollViewModel(poll).toResource();
+
     return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new PollViewModel(poll).toResource());
+      .status(HttpRouteStatusEnum.CREATED)
+      .location(`/polls/${encodeURIComponent(resource.id)}`)
+      .send(resource);
   }
 }

@@ -37,8 +37,11 @@ export class PostCommunityRoute extends CommunityRouteSupport {
       ),
     );
 
+    const resource = new CommunityViewModel(community).toResource();
+
     return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new CommunityViewModel(community).toResource());
+      .status(HttpRouteStatusEnum.CREATED)
+      .location(`/communities/${encodeURIComponent(resource.id)}`)
+      .send(resource);
   }
 }

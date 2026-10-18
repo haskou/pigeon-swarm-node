@@ -11,7 +11,7 @@ Feature: Post sticker pack route
     And I set a sticker pack body
     And I sign the current sticker pack creation request
     When I POST to "/stickers/packs"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | name | API stickers primary |
     And response body should contain "ownerIdentityId"

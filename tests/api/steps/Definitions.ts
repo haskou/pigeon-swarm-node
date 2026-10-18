@@ -6421,7 +6421,7 @@ export default class Definitions {
       { headers: this.headers },
     );
 
-    if (this.response.status !== 200) {
+    if (this.response.status !== 201) {
       throw new Error(
         `Could not create community: ${JSON.stringify(this.response.data)}`,
       );

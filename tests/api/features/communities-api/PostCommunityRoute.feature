@@ -9,7 +9,7 @@ Feature: Post community API
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | name       | API community |
       | visibility | private       |
@@ -22,7 +22,7 @@ Feature: Post community API
     And I set a public community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | name       | Public API community |
       | visibility | public               |

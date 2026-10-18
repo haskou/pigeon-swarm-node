@@ -46,8 +46,13 @@ paths:
       responses:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
-        '200':
+        '201':
           description: Sticker pack created.
+          headers:
+            Location:
+              description: Relative URL of the created sticker pack.
+              schema:
+                type: string
           content:
             application/json:
               schema:

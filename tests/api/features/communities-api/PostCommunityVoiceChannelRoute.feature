@@ -9,7 +9,7 @@ Feature: Post community voice channel API
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I set a community voice channel body
     And I sign the current community voice channel request

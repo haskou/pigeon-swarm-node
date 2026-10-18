@@ -9,7 +9,7 @@ Feature: Community roles API
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I set a community administrator role body
     And I sign the current community role request
@@ -42,7 +42,7 @@ Feature: Community roles API
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I set a community administrator role body
     And I sign the current community role request
@@ -66,7 +66,7 @@ Feature: Community roles API
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I set a community administrator role body
     And I sign the current community role request

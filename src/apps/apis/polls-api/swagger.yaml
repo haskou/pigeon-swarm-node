@@ -24,8 +24,13 @@ paths:
       responses:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
-        '200':
+        '201':
           description: Created poll.
+          headers:
+            Location:
+              description: Relative URL of the created poll.
+              schema:
+                type: string
           content:
             application/json:
               schema:
