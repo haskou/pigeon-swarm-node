@@ -1,6 +1,7 @@
 import { SignedRequestReplayGuard } from '@app/apps/apis/shared/SignedRequestReplayGuard';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { Kernel } from '@haskou/ddd-kernel';
 import {
   KeyPair,
   Signature,
@@ -338,6 +339,30 @@ describe('SignedRequestReplayGuard', () => {
         delete process.env.SERVED_SLOTS_PER_SOURCE;
       } else {
         process.env.SERVED_SLOTS_PER_SOURCE = previous;
+      }
+    }
+  });
+
+  it('takes the served cap from the kernel-loaded SERVED_SLOTS_PER_SOURCE', () => {
+    const worker = process.env.JEST_WORKER_ID;
+    delete process.env.JEST_WORKER_ID;
+    const active = jest
+      .spyOn(Kernel, 'active', 'get')
+      .mockReturnValue({
+        environment: { SERVED_SLOTS_PER_SOURCE: 3 },
+      } as unknown as Kernel);
+
+    try {
+      const guard = new SignedRequestReplayGuard();
+
+      expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
+      expect(guard.accept(identity, signatureOf(1), SOURCE)).toBe(true);
+      expect(guard.accept(identity, signatureOf(2), SOURCE)).toBe(true);
+      expect(guard.accept(identity, signatureOf(3), SOURCE)).toBe(false);
+    } finally {
+      active.mockRestore();
+      if (worker !== undefined) {
+        process.env.JEST_WORKER_ID = worker;
       }
     }
   });

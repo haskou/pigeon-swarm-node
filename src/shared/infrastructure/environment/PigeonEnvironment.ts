@@ -193,14 +193,15 @@ export type PigeonEnvironment = KernelEnvironment<
 // numbers are finite. Kept beside the schema so the bounds sit with the names.
 export const pigeonEnvironmentIntegerRanges = {
   NODE_INITIALIZER_TIMEOUT_MS: { max: MAX_TIMER_DELAY_MS, min: 1 },
-  SERVED_SLOTS_PER_SOURCE: { max: 100_000, min: 1 },
+  SERVED_SLOTS_PER_SOURCE: { max: 10_000, min: 1 },
 } as const;
 
 function parseEnvironmentValue(
   rawValue: string | undefined,
   definition: (typeof pigeonEnvironmentSchema)[keyof typeof pigeonEnvironmentSchema],
 ): boolean | number | string | undefined {
-  if (rawValue === undefined) {
+  // A blank value is unset, as the kernel reads it: never 0, NaN or a string.
+  if (rawValue === undefined || rawValue.trim() === '') {
     return 'defaultValue' in definition ? definition.defaultValue : undefined;
   }
 
@@ -256,7 +257,7 @@ function fallbackEnvironment(): PigeonEnvironment {
 function environmentOverrides(): Partial<PigeonEnvironment> {
   return Object.fromEntries(
     Object.entries(pigeonEnvironmentSchema)
-      .filter(([key]) => process.env[key] !== undefined)
+      .filter(([key]) => (process.env[key] ?? '').trim() !== '')
       .map(([key, definition]) => [
         key,
         parseEnvironmentValue(process.env[key], definition),
@@ -264,13 +265,15 @@ function environmentOverrides(): Partial<PigeonEnvironment> {
   ) as Partial<PigeonEnvironment>;
 }
 
+// A merged value out of range never reaches the caller: it falls back to the
+// process environment, which is validated too.
 export function pigeonEnvironment(): PigeonEnvironment {
   if (process.env.JEST_WORKER_ID) {
     return fallbackEnvironment();
   }
 
   try {
-    return {
+    const environment = {
       ...fallbackEnvironment(),
       ...Object.fromEntries(
         Object.entries(Kernel.active.environment).filter(
@@ -279,6 +282,10 @@ export function pigeonEnvironment(): PigeonEnvironment {
       ),
       ...environmentOverrides(),
     } as PigeonEnvironment;
+
+    validatePigeonEnvironment(environment);
+
+    return environment;
   } catch {
     return fallbackEnvironment();
   }
