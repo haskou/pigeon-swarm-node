@@ -202,6 +202,20 @@ describe('NodeOwnerSettingsResetter', () => {
     );
   });
 
+  it('should clear the owner reset mark when the new owner is installed over a flagged node', async () => {
+    await database.save('node_metadata', 'local', {
+      ...(await storedMetadata()),
+      owner: undefined,
+      ownerResetRequired: true,
+    });
+    expect((await storedMetadata())?.ownerResetRequired).toBe(true);
+
+    await resetter.reset(newOwner);
+
+    expect((await storedMetadata())?.owner).toBe(newOwner.valueOf());
+    expect((await storedMetadata())?.ownerResetRequired).toBe(false);
+  });
+
   it('should keep the node id, networks, relay configuration and other local data', async () => {
     const before = claimedNode.toPrimitives();
 

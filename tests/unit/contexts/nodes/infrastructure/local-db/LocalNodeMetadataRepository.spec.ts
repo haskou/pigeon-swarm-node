@@ -1,3 +1,4 @@
+import { NodeOwnerResetFlagIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetFlagIsUnreadableError';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
 import { NetworkName } from '@app/contexts/nodes/domain/value-objects/NetworkName';
@@ -198,6 +199,21 @@ describe('LocalNodeMetadataRepository', () => {
       const localNode = await repository.loadLocalNode();
 
       expect(localNode.toPrimitives().ownerResetRequired).toBe(false);
+    });
+
+    it('should refuse to load a node whose persisted owner reset mark cannot be read', async () => {
+      database.findOne.mockResolvedValue({
+        _id: 'local',
+        networks: {},
+        nodeId: canonicalNodeId,
+        ownerResetRequired: 'yes',
+        relayConfiguration: defaultRelayConfiguration,
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        NodeOwnerResetFlagIsUnreadableError,
+      );
     });
   });
 
