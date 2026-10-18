@@ -1203,6 +1203,8 @@ in [the synchronization contract](pubsub-sync-protocol.md).
 POST /calls
 ```
 
+A new call returns `201 Created` with `Location: /calls/{callId}`. A live community channel call returned instead is `200` (see below).
+
 Conversation call request:
 
 ```json

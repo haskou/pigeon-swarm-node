@@ -1,8 +1,6 @@
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 
-import { Call } from '../../domain/Call';
-
 type PendingCommunityChannelCallStart = {
   channelId: CommunityChannelId;
   communityId: CommunityId;
@@ -38,11 +36,11 @@ export default class CommunityChannelCallStartCoordinator {
     }
   }
 
-  public async coordinate(
+  public async coordinate<T>(
     communityId: CommunityId,
     channelId: CommunityChannelId,
-    start: () => Promise<Call>,
-  ): Promise<Call> {
+    start: () => Promise<T>,
+  ): Promise<T> {
     const pendingStart = this.findPendingStart(communityId, channelId) ?? {
       channelId,
       communityId,

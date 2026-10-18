@@ -9,7 +9,7 @@ Feature: End call
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And I sign the current call end request
     When I DELETE the current call
@@ -23,7 +23,7 @@ Feature: End call
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And call requests are sent without a mutation
     And I sign the current call end request

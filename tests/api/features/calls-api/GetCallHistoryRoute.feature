@@ -9,7 +9,7 @@ Feature: Get call history
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And I sign the current call end request
     When I DELETE the current call

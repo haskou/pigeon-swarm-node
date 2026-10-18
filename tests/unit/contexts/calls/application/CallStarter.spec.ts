@@ -141,7 +141,7 @@ describe('CallStarter', () => {
       type: 'conversation',
     });
 
-    const call = await starter.start(message);
+    const { call } = await starter.start(message);
 
     expect(repository.saveStart).toHaveBeenCalledWith(call, message.getProof());
     expect(call.hasParticipant(caller)).toBe(true);
@@ -169,7 +169,7 @@ describe('CallStarter', () => {
 
     const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
-    const call = await starter.start(message, onRecordAccepted);
+    const { call, created } = await starter.start(message, onRecordAccepted);
 
     expect(onRecordAccepted).toHaveBeenCalledTimes(1);
     expect(onRecordAccepted.mock.invocationCallOrder[0]).toBeLessThan(
@@ -178,6 +178,7 @@ describe('CallStarter', () => {
     expect(repository.saveStart).toHaveBeenCalledWith(call, message.getProof());
     expect(call.toPrimitives().participantIds).toEqual([caller.valueOf()]);
     expect(call.toPrimitives()).toHaveProperty('sessionEpoch', 1);
+    expect(created).toBe(true);
   });
 
   it('returns the live community call without storing another start', async () => {
@@ -201,7 +202,7 @@ describe('CallStarter', () => {
     );
     const onRecordAccepted = jest.fn().mockResolvedValue(undefined);
 
-    const call = await starter.start(
+    const { call, created } = await starter.start(
       startMessage(
         {
           channelId: 'voice-1',
@@ -212,6 +213,7 @@ describe('CallStarter', () => {
       ),
       onRecordAccepted,
     );
+    expect(created).toBe(false);
 
     expect(call.getId().isEqual(active.getId())).toBe(true);
     expect(repository.saveStart).not.toHaveBeenCalled();
@@ -300,7 +302,7 @@ describe('CallStarter', () => {
         type: 'group_capability',
       });
 
-      const call = await starter.start(message);
+      const { call } = await starter.start(message);
 
       expect(repository.saveStart).toHaveBeenCalledWith(
         call,
