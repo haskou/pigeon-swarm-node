@@ -91,7 +91,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeRelayConfigurationResource'
         '403':
-          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
+          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way. Setup is refused (code 403013) while the node owner reset is required, until the node operator resets the owner with `yarn node:reset-owner`.
         '409':
           description: The relay configuration is invalid.
   /node/blocks:
@@ -589,7 +589,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NetworksResource'
         '403':
-          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way.
+          description: The authenticated identity is not the node owner. A write still in flight when the node changes hands is refused the same way. Setup is refused (code 403013) while the node owner reset is required, until the node operator resets the owner with `yarn node:reset-owner`.
         '409':
           description: The node already has a public network.
   /node/networks/{networkId}:
