@@ -1,6 +1,8 @@
+import { InvalidNodeOwnerIdentityIdError } from '@app/contexts/nodes/domain/errors/InvalidNodeOwnerIdentityIdError';
 import { NodeCannotHaveMoreThanOnePublicNetworkError } from '@app/contexts/nodes/domain/errors/NodeCannotHaveMoreThanOnePublicNetworkError';
 import { NodeCanOnlyBeManagedByItsOwnerError } from '@app/contexts/nodes/domain/errors/NodeCanOnlyBeManagedByItsOwnerError';
 import { NodeIsAlreadyOwnedByThisIdentityError } from '@app/contexts/nodes/domain/errors/NodeIsAlreadyOwnedByThisIdentityError';
+import { NodeNetworkNotFoundError } from '@app/contexts/nodes/domain/errors/NodeNetworkNotFoundError';
 import { NodeOwnerCanOnlyBeChangedByCurrentOwnerError } from '@app/contexts/nodes/domain/errors/NodeOwnerCanOnlyBeChangedByCurrentOwnerError';
 import { NodeOwnerResetIsRequiredError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetIsRequiredError';
 import { NodeNetworkWasAdded } from '@app/contexts/nodes/domain/events/NodeNetworkWasAdded';
@@ -154,6 +156,7 @@ describe('Node', () => {
           [networkId.valueOf()]: network.toPrimitives(),
         },
         owner: owner.valueOf(),
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: NodeRelayConfiguration.default().toPrimitives(),
       });

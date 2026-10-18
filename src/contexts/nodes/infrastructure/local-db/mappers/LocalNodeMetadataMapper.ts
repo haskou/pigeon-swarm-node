@@ -17,6 +17,7 @@ export default class LocalNodeMetadataMapper {
       networks: primitives.networks,
       nodeId: primitives.id,
       owner: primitives.owner,
+      ownerResetRequired: primitives.ownerResetRequired,
       registrationMode: primitives.registrationMode,
       relayConfiguration: primitives.relayConfiguration,
     };

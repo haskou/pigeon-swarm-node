@@ -42,6 +42,10 @@ Feature: Put node owner
     And the local node is owned by the other identity
 
   Scenario: A restart clears an alias owner and refuses every claim until the operator resets the node
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner"
+    Then response code is equal to 200
     Given the local node owner was stored under "an alias DER prefix" of my key
     When the node restarts
     And I sign the current node owner request

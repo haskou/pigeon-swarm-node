@@ -46,7 +46,7 @@ describe('NonCanonicalIdentityIdsPurgeInitializer', () => {
 
     expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.warn.mock.calls[0][0]).toBe(
-      'The stored node owner was not a canonical identity id and was cleared: this node is unclaimed and the first signed PUT /node/owner claims it. Stop the node and run yarn node:reset-owner <owner identity id> to name the owner.',
+      'The stored node owner was not a canonical identity id and was cleared: this node refuses every owner claim until the node operator runs yarn node:reset-owner <owner identity id> to name the owner.',
     );
   });
 

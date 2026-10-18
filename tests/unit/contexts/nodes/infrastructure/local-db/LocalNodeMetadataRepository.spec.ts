@@ -111,6 +111,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: owner.valueOf(),
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -324,6 +325,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -367,6 +369,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -402,6 +405,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -416,6 +420,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -442,6 +447,7 @@ describe('LocalNodeMetadataRepository', () => {
         id: canonicalNodeId,
         networks: {},
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -480,6 +486,7 @@ describe('LocalNodeMetadataRepository', () => {
             .toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
       });
@@ -510,6 +517,7 @@ describe('LocalNodeMetadataRepository', () => {
         networks: {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
+        ownerResetRequired: false,
         owner: undefined,
         registrationMode: 'open',
         relayConfiguration: defaultRelayConfiguration,
@@ -537,6 +545,7 @@ describe('LocalNodeMetadataRepository', () => {
           [privateNetworkId.valueOf()]: networkMother.build().toPrimitives(),
         },
         owner: undefined,
+        ownerResetRequired: false,
         registrationMode: 'open',
         relayConfiguration: NodeRelayConfiguration.fromPrimitives({
           privateRelay: {

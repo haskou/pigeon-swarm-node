@@ -1808,6 +1808,7 @@ Implemented:
   on the stopped node (see
   [Resetting the Node Owner](INSTALLATION.md#resetting-the-node-owner)), the
   named identity owns the node and a claim by any other identity is refused
+- after the alias purge cleared an owner stored under a non-canonical id, every claim is refused with `403`, code `403013`, until the node operator runs `yarn node:reset-owner <new owner identity id>` on the stopped node; the refusal survives restarts
 - refuse an `identityId` that is not the one canonical encoding of a usable
   Ed25519 key (an alias DER prefix, a re-encoded base64, a small-order or an
   off-curve point) with `409`, code `InvalidNodeOwnerIdentityIdError`, so the
@@ -2127,9 +2128,10 @@ outcome `non-canonical-identity-id`, and the last valid list is kept. A list
 kept before ids had to be canonical keeps its signed `list` verbatim, so it may
 still name one, but such an id is never pending, approved or enforced. At start,
 before it serves any request, the node drops such ids from its exceptions and
-from what its sources apply, and leaves the node unclaimed if its owner was stored
-under one. It then logs a warning that the node is unclaimed and must be claimed
-again, naming `yarn node:reset-owner` and no id. A stored own block list that
+from what its sources apply. If its owner was stored under such an id, the node
+clears it and refuses every owner claim (`403`, code `403013`) until the node
+operator resets it. It then logs a warning that the owner was cleared and must be
+reset, naming `yarn node:reset-owner` and no id. A stored own block list that
 names such an id is kept, signed verbatim: its alias entries are never enforced,
 and `GET /node/published-blocks` answers `404` while it names one. To lift the hold, the
 owner re-signs a clean list (only canonical ids) at a version above the kept one and

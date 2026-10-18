@@ -2,12 +2,14 @@ import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequ
 import { NodeOwnerAssignerMessage } from '@app/contexts/nodes/application/assign-owner/messages/NodeOwnerAssignerMessage';
 import NodeOwnerAssigner from '@app/contexts/nodes/application/assign-owner/NodeOwnerAssigner';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
+import { NodeOwnerResetIsRequiredError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetIsRequiredError';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
 import { Body, JsonController, Put, Req, Res } from 'routing-controllers';
 
 import { PutNodeOwnerBody } from '../bodies/PutNodeOwnerBody';
+import { NodeOwnerClaimIsAwaitingResetError } from '../errors/NodeOwnerClaimIsAwaitingResetError';
 import { NodeViewModel } from '../view-model/NodeViewModel';
 
 @JsonController('/node/owner')
@@ -31,12 +33,20 @@ export class PutNodeOwnerRoute extends Route {
     const ownerIdentityId =
       body.identityId ?? authenticatedIdentityId.valueOf();
 
-    await this.assigner.assignOwner(
-      new NodeOwnerAssignerMessage(
-        ownerIdentityId,
-        authenticatedIdentityId.valueOf(),
-      ),
-    );
+    try {
+      await this.assigner.assignOwner(
+        new NodeOwnerAssignerMessage(
+          ownerIdentityId,
+          authenticatedIdentityId.valueOf(),
+        ),
+      );
+    } catch (error: unknown) {
+      if (error instanceof NodeOwnerResetIsRequiredError) {
+        throw new NodeOwnerClaimIsAwaitingResetError();
+      }
+
+      throw error;
+    }
 
     const node = await this.loader.loadNode();
 

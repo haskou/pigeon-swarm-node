@@ -38,6 +38,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       this.hasValidNetworks(document.networks) &&
       this.hasValidOwner(document.owner) &&
       this.hasValidRegistrationMode(document.registrationMode) &&
+      this.hasValidOwnerResetRequired(document.ownerResetRequired) &&
       this.hasValidRelayConfiguration(document.relayConfiguration)
     );
   }
@@ -57,6 +58,13 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   private hasValidRegistrationMode(registrationMode: unknown): boolean {
     return (
       registrationMode === undefined || typeof registrationMode === 'string'
+    );
+  }
+
+  private hasValidOwnerResetRequired(ownerResetRequired: unknown): boolean {
+    return (
+      ownerResetRequired === undefined ||
+      typeof ownerResetRequired === 'boolean'
     );
   }
 
@@ -84,6 +92,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       networks: document.networks,
       nodeId: new NodeId(document.nodeId).valueOf(),
       owner: document.owner,
+      ownerResetRequired: document.ownerResetRequired,
       registrationMode:
         document.registrationMode ?? NodeRegistrationMode.OPEN.valueOf(),
       relayConfiguration:
@@ -217,6 +226,7 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       id: metadata.nodeId,
       networks: metadata.networks,
       owner: metadata.owner,
+      ownerResetRequired: metadata.ownerResetRequired ?? false,
       registrationMode: metadata.registrationMode,
       relayConfiguration: metadata.relayConfiguration,
     });

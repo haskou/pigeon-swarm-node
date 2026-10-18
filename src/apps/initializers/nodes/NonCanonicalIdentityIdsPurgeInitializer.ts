@@ -4,7 +4,7 @@ import Kernel from '@haskou/ddd-kernel';
 /**
  * Purges, at every startup and before blocks are enforced or a request is
  * served, identity ids that are not the canonical encoding of a key. It logs
- * counts only, never an id, and warns when the node was left unclaimed.
+ * counts only, never an id, and warns when an owner was cleared.
  */
 export default class NonCanonicalIdentityIdsPurgeInitializer {
   constructor(private readonly purger: NonCanonicalIdentityIdsPurger) {}
@@ -27,7 +27,7 @@ export default class NonCanonicalIdentityIdsPurgeInitializer {
 
     if (ownerCleared) {
       Kernel.logger.warn(
-        'The stored node owner was not a canonical identity id and was cleared: this node is unclaimed and the first signed PUT /node/owner claims it. Stop the node and run yarn node:reset-owner <owner identity id> to name the owner.',
+        'The stored node owner was not a canonical identity id and was cleared: this node refuses every owner claim until the node operator runs yarn node:reset-owner <owner identity id> to name the owner.',
       );
     }
   }

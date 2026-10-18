@@ -25,6 +25,7 @@ describe('LocalNodeMetadataMapper', () => {
       networks: primitives.networks,
       nodeId: primitives.id,
       owner: owner.valueOf(),
+      ownerResetRequired: false,
       registrationMode: 'open',
       relayConfiguration: primitives.relayConfiguration,
     });
