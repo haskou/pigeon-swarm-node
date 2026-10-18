@@ -432,9 +432,20 @@ Paged list endpoints take `limit` and an opaque `cursor`, and respond with
   never from the cursor. A cursor for another list, or a malformed one (wrong
   encoding, unknown fields, or over 512 characters), returns `400` with code
   `400110`.
+- Responses with two arrays page each array on its own. Each array's `limit`
+  and `cursor` take the array name as a prefix, and its response field is
+  `<name>NextCursor`: `peersLimit`, `peersCursor`, `peersNextCursor`, and
+  `ipfsPeersLimit`, `ipfsPeersCursor`, `ipfsPeersNextCursor` on `GET /peers`;
+  `blockedIdentityIdsLimit`, `blockedIdentityIdsCursor`,
+  `blockedIdentityIdsNextCursor`, and the same `blockedNodePeerIds` names on
+  pending block entries.
 - Protocol cursors (mailbox envelopes, MLS records, identity-device transitions)
   are not part of this scheme. Bounded node lists (block exceptions,
   diagnostics, published blocks, relay configuration) are returned in full.
+  Node lists that stay whole by design are capped by their domain: networks are
+  owner-curated and read whole by anonymous bootstrap; mailbox readers are
+  capped by `maxReaders` (default 129); notification settings are capped at 256
+  per identity; identity devices are capped at 128.
 
 ## Realtime WebSocket API
 
@@ -1910,7 +1921,7 @@ The code travels in the fragment, so it never reaches the UI host's logs or a
 ### List registration codes
 
 ```http
-GET /node/registration-codes
+GET /node/registration-codes?limit=50&cursor=<cursor>
 X-Identity-Id: <ownerIdentityId>
 X-Timestamp: <millisecondsSinceEpoch>
 X-Signature: <signature>
@@ -1927,7 +1938,8 @@ Response:
       "usesLeft": 3,
       "expiresAt": 1773848829055
     }
-  ]
+  ],
+  "nextCursor": "<cursor>"
 }
 ```
 
@@ -1937,6 +1949,8 @@ Implemented:
 - never return the code itself
 - expired codes are dropped; used-up codes are not listed but kept until they
   expire, so a use given back by a failed creation is not lost
+- paged by `limit` and `cursor` (see Pagination); `nextCursor` is `null`
+  unless the page is full
 
 ### Revoke a registration code
 
@@ -1958,7 +1972,7 @@ Implemented:
 ### Get active peers
 
 ```http
-GET /peers
+GET /peers?peersLimit=50&peersCursor=<cursor>&ipfsPeersLimit=50&ipfsPeersCursor=<cursor>
 ```
 
 Response:
@@ -2038,6 +2052,12 @@ Response:
   ]
 }
 ```
+
+`peers` and `ipfsPeers` page independently, each with its own `limit` and
+cursor (`peersLimit`/`peersCursor` and `ipfsPeersLimit`/`ipfsPeersCursor`,
+limit 1..100, default 50). Responses add `peersNextCursor` and
+`ipfsPeersNextCursor`. Both cursors are checked before either list is read.
+`networkSynchronization` is a status object and is not paged.
 
 `connectedPeerIds` comes from live libp2p connections.
 `replicationPeerIds` is the union of peers observed by OrbitDB stores. Public
@@ -2304,10 +2324,11 @@ Every outcome except `accepted` keeps the last valid version. Remote addresses
 are not stored.
 
 ```http
-GET /node/block-sources
+GET /node/block-sources?limit=50&cursor=<cursor>
 ```
 
-Returns `{ "sources": [<source>] }`.
+Returns `{ "sources": [<source>], "nextCursor": "<cursor>" }`, paged by `limit`
+and `cursor` (see Pagination). `nextCursor` is `null` unless the page is full.
 
 ```http
 DELETE /node/block-sources/{ownerIdentityId}
@@ -2320,7 +2341,7 @@ remaining `{ "sources": [...] }`. Returns
 code `400080` after the owner check, and nothing is removed.
 
 ```http
-GET /node/block-sources/{ownerIdentityId}/pending
+GET /node/block-sources/{ownerIdentityId}/pending-entries?blockedIdentityIdsLimit=50&blockedIdentityIdsCursor=<cursor>&blockedNodePeerIdsLimit=50&blockedNodePeerIdsCursor=<cursor>
 ```
 
 Returns the entries of the source's latest version that wait for review:
@@ -2330,13 +2351,20 @@ Returns the entries of the source's latest version that wait for review:
   "ownerIdentityId": "<identityId>",
   "version": 3,
   "blockedIdentityIds": ["<identityId>"],
-  "blockedNodePeerIds": ["<libp2pPeerId>"]
+  "blockedIdentityIdsNextCursor": null,
+  "blockedNodePeerIds": ["<libp2pPeerId>"],
+  "blockedNodePeerIdsNextCursor": null
 }
 ```
 
 Returns `409 NodeBlockSourceNotFoundError` when the source is not adopted. An
 `ownerIdentityId` that is not the canonical encoding of a usable key gets `400`
 code `400080` after the owner check, before any source is read.
+
+Both arrays page on their own, using the prefixed `limit` and `cursor`
+parameters shown above. Both cursors are validated before either list is read.
+A cursor from another list, or one whose position does not parse, is refused
+with `400` code `400110`.
 
 ```http
 POST /node/block-sources/{ownerIdentityId}/approvals
