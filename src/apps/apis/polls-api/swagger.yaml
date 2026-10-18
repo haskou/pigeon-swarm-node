@@ -20,7 +20,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostPollBody'
+      operationId: postPolls
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Created poll.
           content:
@@ -37,7 +40,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/PollId'
+      operationId: getPollsByPollId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Poll.
           content:
@@ -60,7 +66,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchPollBody'
+      operationId: patchPollsByPollId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Closed poll.
           content:
@@ -83,7 +92,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostPollVoteBody'
+      operationId: postPollsByPollIdVotes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Updated poll.
           content:
@@ -106,7 +118,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeletePollVoteBody'
+      operationId: deletePollsByPollIdVotesMe
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Updated poll.
           content:

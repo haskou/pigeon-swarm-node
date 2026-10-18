@@ -21,7 +21,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostConversationBody'
+      operationId: postConversations
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Conversation created.
           content:
@@ -45,7 +48,10 @@ paths:
           name: beforeConversationId
           schema:
             type: string
+      operationId: getConversations
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Authenticated identity conversations page.
           content:
@@ -62,7 +68,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getConversationDrafts
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Conversation drafts.
           content:
@@ -86,7 +95,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ConversationDraftBody'
+      operationId: putConversationDraftsByDraftKey
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Draft saved.
           content:
@@ -107,7 +119,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: deleteConversationDraftsByDraftKey
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Draft deleted.
           content:

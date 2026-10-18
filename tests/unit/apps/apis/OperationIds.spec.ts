@@ -4,7 +4,7 @@ import YAML from 'yaml';
 
 type OpenAPIOperation = {
   operationId?: unknown;
-  responses?: Record<string, unknown>;
+  responses?: Record<string, { $ref?: unknown }>;
 };
 
 type OpenAPIDocument = {
@@ -16,7 +16,6 @@ type OpenAPIDocument = {
 };
 
 type ApiOperation = {
-  document: OpenAPIDocument;
   file: string;
   id: string;
   operation: OpenAPIOperation;
@@ -25,8 +24,12 @@ type ApiOperation = {
 const apisRoot = resolve(__dirname, '../../../../src/apps/apis');
 const httpMethods = ['delete', 'get', 'patch', 'post', 'put'];
 const operationIdPattern = /^[a-z][A-Za-z0-9]*$/;
-const errorResponseRef = '#/components/responses/Error';
+const errorResponseRef = '../open-api.yaml#/components/responses/Error';
 const errorSchemaRef = '#/components/schemas/ErrorResponse';
+
+const aggregated = YAML.parse(
+  readFileSync(join(apisRoot, 'open-api.yaml'), 'utf8'),
+) as OpenAPIDocument;
 
 const apiFiles = readdirSync(apisRoot, { withFileTypes: true })
   .filter((entry) => entry.isDirectory() && entry.name.endsWith('-api'))
@@ -40,7 +43,6 @@ const operations: ApiOperation[] = apiFiles.flatMap((file) => {
     Object.entries(item)
       .filter(([method]) => httpMethods.includes(method))
       .map(([method, operation]) => ({
-        document,
         file,
         id: `${method.toUpperCase()} ${path}`,
         operation: operation as OpenAPIOperation,
@@ -48,20 +50,40 @@ const operations: ApiOperation[] = apiFiles.flatMap((file) => {
   );
 });
 
-function documentsErrorShape({ document, operation }: ApiOperation): boolean {
-  const defaultResponse = operation.responses?.default as
-    | { $ref?: unknown }
-    | undefined;
-  const errorResponse = document.components?.responses?.Error as
-    | { content?: Record<string, { schema?: { $ref?: unknown } }> }
-    | undefined;
+const errorResponse = aggregated.components?.responses?.Error as
+  { content?: Record<string, { schema?: { $ref?: unknown } }> } | undefined;
+const errorShapeIsShared =
+  errorResponse?.content?.['application/json']?.schema?.$ref ===
+    errorSchemaRef &&
+  aggregated.components?.schemas?.ErrorResponse !== undefined;
 
+function documentsErrorShape(operation: OpenAPIOperation): boolean {
   return (
-    defaultResponse?.$ref === errorResponseRef &&
-    errorResponse?.content?.['application/json']?.schema?.$ref ===
-      errorSchemaRef &&
-    document.components?.schemas?.ErrorResponse !== undefined
+    operation.responses?.default?.$ref === errorResponseRef &&
+    errorShapeIsShared
   );
+}
+
+// Convention documented in docs/api.md ("Errors", "Operation ids").
+function expectedOperationId(id: string): string {
+  const [method, path] = id.split(' ');
+  const upperFirst = (value: string) =>
+    value.charAt(0).toUpperCase() + value.slice(1);
+  const segments = path
+    .split('/')
+    .filter((segment) => segment.length > 0)
+    .map((segment) => {
+      const parameter = /^\{(.+)\}$/.exec(segment);
+      const name = parameter ? parameter[1] : segment;
+      const camel = name
+        .split(/[-_]/)
+        .map((part, index) => (index === 0 ? part : upperFirst(part)))
+        .join('');
+
+      return parameter ? `By${upperFirst(camel)}` : upperFirst(camel);
+    });
+
+  return method.toLowerCase() + segments.join('');
 }
 
 describe('API operations', () => {
@@ -101,9 +123,22 @@ describe('API operations', () => {
 
   it('should document the shared error shape on every operation', () => {
     const undocumented = operations
-      .filter((entry) => !documentsErrorShape(entry))
+      .filter(({ operation }) => !documentsErrorShape(operation))
       .map(({ file, id }) => `${file}: ${id}`);
 
     expect(undocumented).toEqual([]);
+  });
+
+  it('should derive each operationId from its method and path', () => {
+    const mismatched = operations
+      .map(({ id, operation }) => ({
+        actual: String(operation.operationId),
+        expected: expectedOperationId(id),
+        id,
+      }))
+      .filter(({ actual, expected }) => actual !== expected)
+      .map(({ actual, expected, id }) => `${id}: ${actual} != ${expected}`);
+
+    expect(mismatched).toEqual([]);
   });
 });

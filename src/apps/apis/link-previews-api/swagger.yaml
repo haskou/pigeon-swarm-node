@@ -29,7 +29,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostLinkPreviewBody'
+      operationId: postLinkPreviews
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Link preview.
           content:

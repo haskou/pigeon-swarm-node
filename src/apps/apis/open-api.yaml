@@ -245,3 +245,39 @@ paths:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1favorite'
   /stickers/packs/{packId}/stickers/{stickerId}/usage:
     $ref: './stickers-api/swagger.yaml#/paths/~1stickers~1packs~1{packId}~1stickers~1{stickerId}~1usage'
+components:
+  responses:
+    Error:
+      description: >-
+        Any refused request. The body is a JSON error object; `code` is a stable
+        numeric code or the error class name, see "Errors" in docs/api.md.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          oneOf:
+            - type: integer
+            - type: string
+          description: Stable numeric code (for example 400060) or the error class name.
+        message:
+          type: string
+        httpStatus:
+          type: integer
+        details:
+          type: object
+          additionalProperties: true
+        errors:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        requiredDifficultyBits:
+          type: integer

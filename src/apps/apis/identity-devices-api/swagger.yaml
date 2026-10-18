@@ -43,7 +43,10 @@ paths:
         - $ref: '#/components/parameters/XDeviceCredential'
         - $ref: '#/components/parameters/XDeviceSignature'
         - $ref: '#/components/parameters/XRecoverySignature'
+      operationId: getIdentityDevicesByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Current deterministic authorization checkpoint.
           content:
@@ -78,7 +81,10 @@ paths:
         - $ref: '#/components/parameters/XDeviceCredential'
         - $ref: '#/components/parameters/XDeviceSignature'
         - $ref: '#/components/parameters/XRecoverySignature'
+      operationId: getIdentityDevicesByIdentityIdDevices
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Authorized device credentials at the current head.
           content:
@@ -139,7 +145,10 @@ paths:
         - $ref: '#/components/parameters/XDeviceCredential'
         - $ref: '#/components/parameters/XDeviceSignature'
         - $ref: '#/components/parameters/XRecoverySignature'
+      operationId: getIdentityDevicesByIdentityIdTransitions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The signed transitions disclosed to the requesting key.
           content:
@@ -199,7 +208,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeviceAuthorizationTransition'
+      operationId: postIdentityDevicesByIdentityIdTransitions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Current deterministic authorization checkpoint.
           content:
@@ -257,7 +269,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeviceSealedSecretPublication'
+      operationId: putIdentityDevicesByIdentityIdSealedSecrets
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Generation stored.
           content:
@@ -305,7 +320,10 @@ paths:
           schema:
             type: string
           description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, path, timestamp and body hash).
+      operationId: getIdentityDevicesByIdentityIdSealedSecrets
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The caller's entry of the stored generation.
           content:

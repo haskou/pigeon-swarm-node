@@ -33,7 +33,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostKeychainBody'
+      operationId: postKeychains
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Keychain published successfully.
           content:
@@ -72,7 +75,10 @@ paths:
           required: true
           schema:
             type: string
+      operationId: getKeychainsByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Current encrypted keychain.
           content:

@@ -13,7 +13,10 @@ paths:
       summary: Discover the client compatibility contract
       description: Public declarative metadata. apiVersion is the implemented breaking-major client API contract, not the node software version or an operator setting. Clients must reject unsupported versions. No executable code or code URLs are returned.
       security: []
+      operationId: getClientContract
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Implemented client API contract. Responses must not be cached.
           headers:
@@ -30,7 +33,10 @@ paths:
       tags:
         - nodes
       summary: Get local node information
+      operationId: getNode
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Local node information.
           content:
@@ -47,7 +53,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeRelayConfiguration
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Local node relay configuration.
           content:
@@ -71,7 +80,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NodeRelayConfigurationResource'
+      operationId: putNodeRelayConfiguration
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Relay configuration replaced.
           content:
@@ -92,7 +104,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeBlocks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The stored block list.
           content:
@@ -117,7 +132,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NodeBlockList'
+      operationId: putNodeBlocks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The stored block list.
           content:
@@ -148,7 +166,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeBlocksPublication
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The publication setting.
           content:
@@ -172,7 +193,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NodeBlockPublicationResource'
+      operationId: putNodeBlocksPublication
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The stored publication setting.
           content:
@@ -187,7 +211,10 @@ paths:
         - nodes
       summary: Get the published own block list
       description: Public. Returns the stored own block list as the exact bytes its owner signed, the RFC 8785 canonical JSON of the document without identitySignature, and the signature in the X-Identity-Signature header, so a subscriber verifies the bytes against the identity it pinned before parsing them.
+      operationId: getNodePublishedBlocks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The canonical JSON bytes the owner signed.
           headers:
@@ -211,7 +238,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeBlockSources
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The adopted sources.
           content:
@@ -245,7 +275,10 @@ paths:
                   description: A bare https origin, such as https://node.example.
                 autoApply:
                   type: boolean
+      operationId: putNodeBlockSourcesByOwnerIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The adopted source.
           content:
@@ -268,7 +301,10 @@ paths:
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
         - $ref: '#/components/parameters/OwnerIdentityId'
+      operationId: deleteNodeBlockSourcesByOwnerIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The remaining sources.
           content:
@@ -292,7 +328,10 @@ paths:
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
         - $ref: '#/components/parameters/OwnerIdentityId'
+      operationId: getNodeBlockSourcesByOwnerIdentityIdPendingEntries
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The pending entries of the latest fetched version.
           content:
@@ -353,7 +392,10 @@ paths:
                   type: array
                   items:
                     type: string
+      operationId: postNodeBlockSourcesByOwnerIdentityIdApprovals
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The source after the approval.
           content:
@@ -376,7 +418,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeBlockExceptions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The local exceptions.
           content:
@@ -400,7 +445,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/NodeBlockExceptionsResource'
+      operationId: putNodeBlockExceptions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The stored exceptions.
           content:
@@ -427,7 +475,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutNodeDiagnosticsBody'
+      operationId: putNodeDiagnostics
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Diagnostics session opened.
           content:
@@ -447,7 +498,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeDiagnostics
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Diagnostics session export.
           content:
@@ -467,7 +521,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: deleteNodeDiagnostics
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Diagnostics session discarded.
         '403':
@@ -482,7 +539,10 @@ paths:
         - $ref: '#/components/parameters/XOptionalIdentityId'
         - $ref: '#/components/parameters/XOptionalTimestamp'
         - $ref: '#/components/parameters/XOptionalSignature'
+      operationId: getNodeNetworks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Local node networks.
           content:
@@ -504,7 +564,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostNodeNetworkBody'
+      operationId: postNodeNetworks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Network added.
           content:
@@ -530,7 +593,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: deleteNodeNetworksByNetworkId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Network deleted.
           content:
@@ -557,7 +623,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutNodeOwnerBody'
+      operationId: putNodeOwner
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Node owner set.
           content:
@@ -582,7 +651,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutNodeRegistrationBody'
+      operationId: putNodeRegistration
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Registration mode set.
           content:
@@ -609,7 +681,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostNodeRegistrationCodeBody'
+      operationId: postNodeRegistrationCodes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '201':
           description: 'Registration code issued. Sent with `Cache-Control: no-store`.'
           content:
@@ -629,7 +704,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNodeRegistrationCodes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Registration codes.
           content:
@@ -654,7 +732,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: deleteNodeRegistrationCodesByCodeId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Registration code revoked.
         '403':
@@ -667,7 +748,10 @@ paths:
         - nodes
       summary: Get active peers
       description: Returns nodes seen through heartbeat events, live IPFS transport peers, and per-store OrbitDB convergence against currently known replication peers. Network private keys are never included. Convergence is not a global percentage because future or disconnected peers are unknowable.
+      operationId: getPeers
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Active peers.
           content:
