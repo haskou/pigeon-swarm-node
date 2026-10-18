@@ -6053,10 +6053,10 @@ Body:
 ### List sticker packs
 
 ```http
-GET /stickers/packs?ownerIdentityId=<identityId>
+GET /stickers/packs?ownerIdentityId=<identityId>&limit=50&cursor=<cursor>
 ```
 
-`ownerIdentityId` is optional. Without it, the endpoint returns known packs.
+`ownerIdentityId` is optional. Without it, the endpoint returns known packs. Packs are ordered by `updatedAt` newest first, then pack id. Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Responds `{ "results": [...], "nextCursor": "<cursor or null>" }`; pass `nextCursor` as `cursor` to read the next page. `nextCursor` is `null` on a short page; a full last page returns a cursor, so the next read may be empty. A malformed cursor, or one from another list, returns `400` with code `400110`.
 
 ### Get sticker pack
 
@@ -6067,15 +6067,23 @@ GET /stickers/packs/{packId}
 ### Get my sticker library
 
 ```http
-GET /stickers/library
+GET /stickers/library?savedPacksLimit=50&savedPacksCursor=<cursor>&favoriteStickersLimit=50&favoriteStickersCursor=<cursor>
 ```
 
 Requires signed HTTP headers. Returns the authenticated identity sticker
-library:
+library. `savedPacks` and `favoriteStickers` are paged independently, each with
+its own `limit` (1..100, default 50) and `cursor`
+(`savedPacksLimit`/`savedPacksCursor`, `favoriteStickersLimit`/`favoriteStickersCursor`),
+and each returns its own `savedPacksNextCursor` / `favoriteStickersNextCursor`
+(`null` on the last page). Saved packs are ordered by pack `updatedAt` newest
+first, then pack id. Favorite stickers are ordered by `favoritedAt` newest
+first, then pack id and sticker id. A malformed cursor, or one issued for
+another list, returns `400` with code `400110`. Recent stickers are not paged.
 
 ```json
 {
   "savedPacks": [],
+  "savedPacksNextCursor": null,
   "favoriteStickers": [
     {
       "packId": "01J...",
@@ -6094,6 +6102,7 @@ library:
       }
     }
   ],
+  "favoriteStickersNextCursor": null,
   "recentStickers": [
     {
       "packId": "01J...",
@@ -6114,6 +6123,10 @@ library:
   ]
 }
 ```
+
+The routes that also return the library (saving, favoriting and usage) answer
+with its first page at the default limits. Clients that need further pages
+must call `GET /stickers/library` with the cursors.
 
 `recentStickers` keeps the last 10 stickers explicitly reported by the client.
 The backend cannot infer recent stickers from encrypted message payloads, so the

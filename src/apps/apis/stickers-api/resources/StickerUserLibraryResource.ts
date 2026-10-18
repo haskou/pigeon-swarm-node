@@ -6,6 +6,8 @@ import {
 
 export interface StickerUserLibraryResource {
   favoriteStickers: FavoriteStickerResource[];
+  favoriteStickersNextCursor: string | null;
   recentStickers: RecentStickerResource[];
   savedPacks: StickerPackResource[];
+  savedPacksNextCursor: string | null;
 }

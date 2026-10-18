@@ -7,6 +7,7 @@ import StickerPacksFinder from '@app/contexts/stickers/application/find-packs/St
 import { StickerPackNotFoundError } from '@app/contexts/stickers/domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '@app/contexts/stickers/domain/repositories/StickerPackRepository';
 import StickerUserLibraryRepository from '@app/contexts/stickers/domain/repositories/StickerUserLibraryRepository';
+import { StickerPack } from '@app/contexts/stickers/domain/StickerPack';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { mock } from 'jest-mock-extended';
 
@@ -45,11 +46,15 @@ describe('Sticker application queries', () => {
 
     repository.findByOwner.mockResolvedValue(packs);
 
-    await expect(
-      new StickerPacksFinder(repository).find(
-        new StickerPacksFindMessage(StickerPackMother.ownerIdentityId),
+    const page = await new StickerPacksFinder(repository).find(
+      new StickerPacksFindMessage(
+        StickerPackMother.ownerIdentityId,
+        50,
+        undefined,
       ),
-    ).resolves.toBe(packs);
+    );
+
+    expect(page.items).toEqual(packs);
     expect(repository.findAll).not.toHaveBeenCalled();
   });
 
@@ -59,10 +64,37 @@ describe('Sticker application queries', () => {
 
     repository.findAll.mockResolvedValue(packs);
 
-    await expect(
-      new StickerPacksFinder(repository).find(new StickerPacksFindMessage()),
-    ).resolves.toBe(packs);
+    const page = await new StickerPacksFinder(repository).find(
+      new StickerPacksFindMessage(undefined, 50, undefined),
+    );
+
+    expect(page.items).toEqual(packs);
     expect(repository.findByOwner).not.toHaveBeenCalled();
+  });
+
+  it('StickerPacksFinder pages packs, most recently updated first', async () => {
+    const repository = mock<StickerPackRepository>();
+    const older = StickerPackMother.create();
+    const newer = StickerPack.fromPrimitives({
+      ...older.toPrimitives(),
+      id: 'sticker-pack-2',
+      updatedAt: 1780000000005,
+    });
+
+    repository.findAll.mockResolvedValue([older, newer]);
+
+    const first = await new StickerPacksFinder(repository).find(
+      new StickerPacksFindMessage(undefined, 1, undefined),
+    );
+
+    expect(first.items).toEqual([newer]);
+    expect(first.nextPosition).toBeDefined();
+
+    const second = await new StickerPacksFinder(repository).find(
+      new StickerPacksFindMessage(undefined, 1, first.nextPosition),
+    );
+
+    expect(second.items).toEqual([older]);
   });
 
   it('StickerUserLibraryFinder returns an existing library', async () => {
@@ -74,9 +106,7 @@ describe('Sticker application queries', () => {
 
     await expect(
       new StickerUserLibraryFinder(repository).find(
-        new StickerUserLibraryFindMessage(
-          StickerPackMother.ownerIdentityId,
-        ),
+        new StickerUserLibraryFindMessage(StickerPackMother.ownerIdentityId),
       ),
     ).resolves.toBe(library);
   });
@@ -92,7 +122,9 @@ describe('Sticker application queries', () => {
 
     expect(library).toBeInstanceOf(StickerUserLibrary);
     expect(library.pullDomainEvents()).toEqual([
-      expect.objectContaining({ aggregateId: StickerPackMother.ownerIdentityId }),
+      expect.objectContaining({
+        aggregateId: StickerPackMother.ownerIdentityId,
+      }),
     ]);
   });
 });

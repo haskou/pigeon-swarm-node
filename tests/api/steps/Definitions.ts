@@ -7438,6 +7438,13 @@ export default class Definitions {
     expect(nextCursor).to.equal(null);
   }
 
+  @then('response next cursor is present')
+  public responseNextCursorIsPresent(): void {
+    const { nextCursor } = this.response.data as { nextCursor: unknown };
+
+    expect(nextCursor).to.be.a('string');
+  }
+
   @when('I GET the current community invitation preview with the {word} key')
   public async iGETTheCurrentCommunityInvitationPreviewWithTheKey(
     which: string,
@@ -8453,6 +8460,66 @@ export default class Definitions {
     }
 
     this.pageNextCursor = cursor;
+  }
+
+  @then('I remember the response {word} page cursor')
+  public iRememberTheResponseNamedPageCursor(name: string): void {
+    const cursor = (this.response?.data as Record<string, unknown> | undefined)?.[
+      `${name}NextCursor`
+    ];
+
+    if (typeof cursor !== 'string') {
+      throw new Error(`Response ${name} next cursor not found.`);
+    }
+
+    this.pageNextCursor = cursor;
+  }
+
+  @then('the response {word} page cursor is null')
+  public responseNamedPageCursorIsNull(name: string): void {
+    const cursor = (this.response.data as Record<string, unknown>)[
+      `${name}NextCursor`
+    ];
+
+    expect(cursor).to.equal(null);
+  }
+
+  @when('I GET {string} with the forged {string} cursor at position {string}')
+  public async iGETWithTheForgedCursorAtPosition(
+    path: string,
+    resource: string,
+    position: string,
+  ): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(PageCursor.encode({ position, resource })),
+      ),
+      this.headers,
+    );
+  }
+
+  @then('response lists {int} sticker packs')
+  public responseListsStickerPacks(count: number): void {
+    const { results } = this.response.data as { results: unknown[] };
+
+    expect(results).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} saved packs')
+  public responseListsSavedPacks(count: number): void {
+    const { savedPacks } = this.response.data as { savedPacks: unknown[] };
+
+    expect(savedPacks).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} favorite stickers')
+  public responseListsFavoriteStickers(count: number): void {
+    const { favoriteStickers } = this.response.data as {
+      favoriteStickers: unknown[];
+    };
+
+    expect(favoriteStickers).to.have.lengthOf(count);
   }
 
   @when('I search messages from the current community text channel')

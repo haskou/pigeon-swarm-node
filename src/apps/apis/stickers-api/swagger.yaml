@@ -17,6 +17,18 @@ paths:
           required: false
           schema:
             type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getStickersPacks
       responses:
         default:
@@ -64,12 +76,36 @@ paths:
       tags:
         - stickers
       summary: Get authenticated sticker library
-      description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity.
+      description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity. Saved packs and favorite stickers are paged independently, most recent first; recent stickers are not paged.
       security:
         - signedRequest: []
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
+        - in: query
+          name: savedPacksLimit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: savedPacksCursor
+          schema:
+            type: string
+          description: Opaque cursor returned as savedPacksNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+        - in: query
+          name: favoriteStickersLimit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: favoriteStickersCursor
+          schema:
+            type: string
+          description: Opaque cursor returned as favoriteStickersNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getStickersLibrary
       responses:
         default:
@@ -640,7 +676,12 @@ components:
       type: object
       required:
         - results
+        - nextCursor
       properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
         results:
           type: array
           items:
@@ -681,13 +722,23 @@ components:
       type: object
       required:
         - savedPacks
+        - savedPacksNextCursor
         - favoriteStickers
+        - favoriteStickersNextCursor
         - recentStickers
       properties:
+        savedPacksNextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page of saved packs; null unless the page is full.
         savedPacks:
           type: array
           items:
             $ref: '#/components/schemas/StickerPackResource'
+        favoriteStickersNextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page of favorite stickers; null unless the page is full.
         favoriteStickers:
           type: array
           items:

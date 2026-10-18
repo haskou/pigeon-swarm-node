@@ -1,11 +1,11 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { StickerPacksFindMessage } from '@app/contexts/stickers/application/find-packs/messages/StickerPacksFindMessage';
 import StickerPacksFinder from '@app/contexts/stickers/application/find-packs/StickerPacksFinder';
 import { StickerUserLibrary } from '@app/contexts/stickers/domain/StickerUserLibrary';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Request } from 'express';
 
+import { StickerLibraryPageRequest } from '../requests/StickerLibraryPageRequest';
 import { StickerUserLibraryResource } from '../resources/StickerUserLibraryResource';
 import { StickerUserLibraryViewModel } from '../view-model/StickerUserLibraryViewModel';
 
@@ -20,11 +20,13 @@ export abstract class StickerRouteSupport extends Route {
     return this.signedRequestAuthenticator.authenticate(request);
   }
 
+  /** The library with its first page of each paged array, unless `page` says otherwise. */
   protected async libraryResource(
     library: StickerUserLibrary,
+    page: StickerLibraryPageRequest = StickerLibraryPageRequest.first(),
   ): Promise<StickerUserLibraryResource> {
-    const packs = await this.packsFinder.find(new StickerPacksFindMessage());
+    const packs = await this.packsFinder.findAll();
 
-    return new StickerUserLibraryViewModel(library, packs).toResource();
+    return new StickerUserLibraryViewModel(library, packs, page).toResource();
   }
 }
