@@ -1,4 +1,5 @@
 import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { generateKeyPairSync } from 'node:crypto';
@@ -216,5 +217,41 @@ describe('OrbitDBStickerUserLibraryRepository', () => {
     });
 
     await expect(repository.hasByIdentityId(identity)).resolves.toBe(false);
+  });
+
+  it('skips stored records with ids this build cannot construct', async () => {
+    const badFavoriteId = `favorite:${id}:pack.with.dots:sticker-1`;
+
+    registry.cacheHeadLocally(`sticker-user-library:${id}`, {
+      id: `sticker-user-library:${id}`,
+      identityId: id,
+      stickerUserLibraries: [
+        PublicMutationRecord.withProof(
+          {
+            favoritedAt: 9,
+            id: badFavoriteId,
+            identityId: id,
+            packId: 'pack.with.dots',
+            scopeType: 'sticker_favorite',
+            stickerId: 'sticker-1',
+          },
+          await proof(badFavoriteId, 'put', 1),
+        ),
+      ],
+      updatedAt: Date.now(),
+    });
+
+    await repository.favorite(
+      identity,
+      packId,
+      stickerId,
+      new Timestamp(10),
+      await proof(favoriteId, 'put', 1),
+    );
+
+    expect(
+      (await repository.requireByIdentityId(identity)).toPrimitives()
+        .favoriteStickers,
+    ).toEqual([{ favoritedAt: 10, packId: 'pack-1', stickerId: 'sticker-1' }]);
   });
 });

@@ -6106,6 +6106,11 @@ page; a full last page returns a cursor, so the next read may be empty. A cursor
 is opaque and grants no access. A malformed, non-canonical, oversized or foreign
 cursor (one issued for another list) returns `400` with code `400110`.
 
+A stored pack this build cannot construct is skipped, not failed: its pack id or
+any sticker id does not parse, or its name or timestamps are refused by the
+domain. One bad sticker id therefore hides its whole pack from this list and
+from `GET /stickers/packs/{packId}` (`404`); the other packs still list.
+
 Breaking change: this route used to return every pack in one response. Without
 `limit` it now returns the first 50 packs.
 

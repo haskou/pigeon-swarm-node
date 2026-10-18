@@ -13,8 +13,9 @@ import { OrbitDBStickerPackDocument } from './documents/OrbitDBStickerPackDocume
 
 /**
  * Stored records written before the id rule, or by a peer, may carry ids this
- * build cannot construct. Such packs are skipped on read, never thrown on, so
- * one bad record cannot break the listing.
+ * build cannot construct, or names and timestamps the domain refuses. Such
+ * packs are skipped on read, never thrown on, so one bad record cannot break
+ * the listing or hide the packs beside it.
  */
 function hasValidStickerId(sticker: unknown): boolean {
   return (
@@ -71,6 +72,17 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     return `${OrbitDBStickerPackRepository.HEAD_PREFIX}${id.valueOf()}`;
   }
 
+  /** The pack the domain can build from a stored document, or undefined. */
+  private toPack(
+    document: OrbitDBStickerPackDocument,
+  ): StickerPack | undefined {
+    try {
+      return StickerPack.fromPrimitives(document);
+    } catch {
+      return undefined;
+    }
+  }
+
   public findAll(): Promise<StickerPack[]> {
     return Promise.resolve(
       this.packIndex
@@ -80,7 +92,11 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
           ),
         )
         .sort((left, right) => right.updatedAt - left.updatedAt)
-        .map((document) => StickerPack.fromPrimitives(document)),
+        .flatMap((document) => {
+          const pack = this.toPack(document);
+
+          return pack ? [pack] : [];
+        }),
     );
   }
 
@@ -89,9 +105,11 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
       (candidate) => candidate.id === id.valueOf(),
     );
 
-    if (!document) throw new StickerPackNotFoundError();
+    const pack = document && this.toPack(document);
 
-    return StickerPack.fromPrimitives(document);
+    if (!pack) throw new StickerPackNotFoundError();
+
+    return pack;
   }
 
   public async findByOwner(
