@@ -102,7 +102,9 @@ describe('NonCanonicalIdentityIdsPurger', () => {
     const node = storedNode(IdentityIdMother.reencoded(a));
     const source = await adopted([a, IdentityIdMother.aliasPrefix(a)]);
 
-    nodes.loadLocalNode.mockResolvedValue(node);
+    nodes.loadLocalNode.mockResolvedValue(
+      storedNode(IdentityIdMother.reencoded(a)),
+    );
     nodes.updateLocalNode.mockImplementation(async (change) => {
       await change(node);
 
