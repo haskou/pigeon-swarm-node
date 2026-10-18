@@ -1,6 +1,7 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import { randomUUID } from 'crypto';
 import { createReadStream, createWriteStream } from 'fs';
-import { mkdir, readdir, rename, rm } from 'fs/promises';
+import { mkdir, readdir, rename, rm, writeFile } from 'fs/promises';
 import path from 'path';
 import { Readable, Transform } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -10,6 +11,7 @@ import { PrivateBlobByteRange } from '../../domain/PrivateBlobByteRange';
 import PrivateBlobBytesStore from '../../domain/repositories/PrivateBlobBytesStore';
 import { PrivateBlobId } from '../../domain/value-objects/PrivateBlobId';
 import { PrivateBlobSize } from '../../domain/value-objects/PrivateBlobSize';
+import { PrivateBlobStorageNotWritableError } from './PrivateBlobStorageNotWritableError';
 
 /**
  * Blob bytes on the local filesystem, never in IPFS, OrbitDB or any
@@ -53,6 +55,26 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
     });
 
     return { counter, received: () => received };
+  }
+
+  /**
+   * Proves at startup that uploads can be written: creates the folder, then
+   * writes and removes a probe. Throws with only the errno code, because the
+   * OS message would carry the resolved path.
+   */
+  public async ensureWritable(): Promise<void> {
+    const directory = this.directory();
+    const probe = path.join(directory, `.writable-${randomUUID()}`);
+
+    try {
+      await mkdir(directory, { mode: 0o700, recursive: true });
+      await writeFile(probe, '', { flag: 'wx', mode: 0o600 });
+      await rm(probe, { force: true });
+    } catch (error: unknown) {
+      throw new PrivateBlobStorageNotWritableError(
+        (error as NodeJS.ErrnoException).code ?? 'UNKNOWN',
+      );
+    }
   }
 
   public async delete(id: PrivateBlobId): Promise<void> {
