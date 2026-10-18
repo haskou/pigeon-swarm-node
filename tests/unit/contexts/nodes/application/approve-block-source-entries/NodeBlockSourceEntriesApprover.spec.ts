@@ -1,6 +1,7 @@
 import { NodeBlockSourceEntriesApproverMessage } from '@app/contexts/nodes/application/approve-block-source-entries/messages/NodeBlockSourceEntriesApproverMessage';
 import NodeBlockSourceEntriesApprover from '@app/contexts/nodes/application/approve-block-source-entries/NodeBlockSourceEntriesApprover';
 import NodeOwnerWriteHolder from '@app/contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder';
+import { NodeOwnerWriteHolderMessage } from '@app/contexts/nodes/application/hold-owner-write/messages/NodeOwnerWriteHolderMessage';
 import { InvalidNodeBlockSourceApprovalError } from '@app/contexts/nodes/domain/errors/InvalidNodeBlockSourceApprovalError';
 import { NodeBlockSourceVersionHasChangedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceVersionHasChangedError';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
@@ -25,6 +26,7 @@ describe('NodeBlockSourceEntriesApprover', () => {
   let source: NodeBlockSource;
   let repository: MockProxy<NodeBlockSourceRepository>;
   let policy: MockProxy<NodeBlockPolicy>;
+  let ownerWrites: MockProxy<NodeOwnerWriteHolder>;
   let approver: NodeBlockSourceEntriesApprover;
 
   const message = (
@@ -69,7 +71,7 @@ describe('NodeBlockSourceEntriesApprover', () => {
     repository = mock<NodeBlockSourceRepository>();
     repository.find.mockResolvedValue(source);
     policy = mock<NodeBlockPolicy>();
-    const ownerWrites = mock<NodeOwnerWriteHolder>();
+    ownerWrites = mock<NodeOwnerWriteHolder>();
 
     ownerWrites.hold.mockImplementation(async (_message, write) => write());
     approver = new NodeBlockSourceEntriesApprover(
@@ -128,5 +130,46 @@ describe('NodeBlockSourceEntriesApprover', () => {
     expect(() =>
       message({ all: true, blockedIdentityIds: [a.valueOf()] }),
     ).toThrow(InvalidNodeBlockSourceApprovalError);
+  });
+
+  it('should hold the write under the authenticated owner id', async () => {
+    await approver.approve(message({ all: true }));
+
+    expect(ownerWrites.hold).toHaveBeenCalledWith(
+      new NodeOwnerWriteHolderMessage(publisher.toPrimitives().publicKey),
+      expect.any(Function),
+    );
+  });
+
+  it('should save nothing and reapply nothing when the hold refuses', async () => {
+    ownerWrites.hold.mockRejectedValue(new Error('refused'));
+
+    await expect(approver.approve(message({ all: true }))).rejects.toThrow(
+      'refused',
+    );
+    expect(repository.save).not.toHaveBeenCalled();
+    expect(policy.reapply).not.toHaveBeenCalled();
+  });
+
+  it('should reapply only after the save and the hold release', async () => {
+    const order: string[] = [];
+
+    repository.save.mockImplementation(async () => {
+      order.push('saved');
+    });
+    ownerWrites.hold.mockImplementation(async (_message, write) => {
+      const result = await write();
+
+      order.push('released');
+
+      return result;
+    });
+    policy.reapply.mockImplementation(async () => {
+      order.push('reapplied');
+    });
+
+    await approver.approve(message({ all: true }));
+
+    expect(order).toEqual(['saved', 'released', 'reapplied']);
   });
 });
