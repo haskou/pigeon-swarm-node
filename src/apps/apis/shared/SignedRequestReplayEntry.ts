@@ -1,9 +1,11 @@
 /**
- * One signature the replay guard accepted: when it expires, who signed it and,
- * for a signer the node does not serve, the client address it is charged to.
+ * One signature the replay guard accepted: when it expires, who signed it, the
+ * client address it is charged to and whether the signer is one this node does
+ * not serve.
  */
 export interface SignedRequestReplayEntry {
   expiration: number;
   signer: string;
-  strangerSource?: string;
+  source: string;
+  stranger: boolean;
 }

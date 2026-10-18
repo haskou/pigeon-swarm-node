@@ -52,9 +52,17 @@ export class DeviceAuthorizationRequestAuthenticator {
   }
 
   /** Admits a verified proof of an authorized signer only once. */
-  private acceptOnce(signer: PublicKey, signature: Signature): void {
+  private acceptOnce(
+    request: Request,
+    signer: PublicKey,
+    signature: Signature,
+  ): void {
     assert(
-      signedRequestReplayGuard.accept(signer, signature),
+      signedRequestReplayGuard.accept(
+        signer,
+        signature,
+        request.ip ?? 'unknown',
+      ),
       new InvalidSignedRequestError(),
     );
   }
@@ -148,7 +156,7 @@ export class DeviceAuthorizationRequestAuthenticator {
           authorization.isAuthorized(signer),
         new InvalidSignedRequestError(),
       );
-      this.acceptOnce(signer, signature);
+      this.acceptOnce(request, signer, signature);
     } catch {
       throw new InvalidSignedRequestError();
     }
@@ -172,7 +180,7 @@ export class DeviceAuthorizationRequestAuthenticator {
       );
 
       if (log.records(signer)) {
-        this.acceptOnce(signer, signature);
+        this.acceptOnce(request, signer, signature);
       }
 
       return signer;
@@ -201,7 +209,7 @@ export class DeviceAuthorizationRequestAuthenticator {
         authorization.isAuthorized(credential),
         new InvalidSignedRequestError(),
       );
-      this.acceptOnce(credential, signature);
+      this.acceptOnce(request, credential, signature);
 
       return credential;
     } catch {

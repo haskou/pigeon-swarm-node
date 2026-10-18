@@ -10,16 +10,24 @@ import { SignedRequestReplayEntry } from './SignedRequestReplayEntry';
 /**
  * The signatures this node accepted inside their validity window, kept in
  * memory only: another node, or this node after a restart, does not know them.
- * Every signer holds at most SLOTS_PER_SIGNER live entries and signers this
- * node does not serve share STRANGER_SLOTS, of which one client address (an
- * IPv6 /64 counting as one) holds at most STRANGER_SLOTS_PER_SOURCE. So
- * neither one signer nor a crowd of self-made keys can fill the guard for the
- * identities and devices it serves, and one source cannot fill the stranger
- * share for every other source.
+ * Every signer holds at most SLOTS_PER_SIGNER live entries. Each client address
+ * (an IPv6 /64 counting as one) holds at most SERVED_SLOTS_PER_SOURCE entries of
+ * the signers this node serves, and of the STRANGER_SLOTS shared by signers it
+ * does not serve, at most STRANGER_SLOTS_PER_SOURCE. So neither one signer nor
+ * one source can fill the guard for the identities and devices it serves, and
+ * one source cannot fill the stranger share for every other source. Sources
+ * spread over many addresses can still fill MAX_ENTRIES: that residual is
+ * accepted, as the guard fails closed rather than evicting live entries.
  */
 export class SignedRequestReplayGuard {
   private static readonly MAX_ENTRIES = 100_000;
   private static readonly SLOTS_PER_SIGNER = 1_000;
+  /**
+   * A fortieth of the entries, so filling them with served signers takes 40
+   * client addresses (or IPv6 /64s), as it does for strangers, while one
+   * address still has room for two and a half signers at their full share.
+   */
+  private static readonly SERVED_SLOTS_PER_SOURCE = 2_500;
   private static readonly STRANGER_SLOTS = 10_000;
   /**
    * A fortieth of the stranger share, so filling it takes 40 client addresses
@@ -35,6 +43,7 @@ export class SignedRequestReplayGuard {
   >();
 
   private readonly slotsBySigner = new Map<string, number>();
+  private readonly servedSlotsBySource = new Map<string, number>();
   private readonly strangerSlotsBySource = new Map<string, number>();
   private strangerSlots = 0;
 
@@ -66,37 +75,47 @@ export class SignedRequestReplayGuard {
   private release(entry: SignedRequestReplayEntry): void {
     SignedRequestReplayGuard.give(this.slotsBySigner, entry.signer);
 
-    if (entry.strangerSource !== undefined) {
-      SignedRequestReplayGuard.give(
-        this.strangerSlotsBySource,
-        entry.strangerSource,
-      );
+    if (entry.stranger) {
+      SignedRequestReplayGuard.give(this.strangerSlotsBySource, entry.source);
       this.strangerSlots -= 1;
+    } else {
+      SignedRequestReplayGuard.give(this.servedSlotsBySource, entry.source);
     }
   }
 
-  private hasRoomForStranger(source: string | undefined): boolean {
-    return (
-      source === undefined ||
-      (this.strangerSlots < SignedRequestReplayGuard.STRANGER_SLOTS &&
-        (this.strangerSlotsBySource.get(source) ?? 0) <
-          SignedRequestReplayGuard.STRANGER_SLOTS_PER_SOURCE)
-    );
-  }
-
-  private hasRoomFor(signer: string, strangerSource?: string): boolean {
+  private hasRoomFor(
+    signer: string,
+    source: string,
+    stranger: boolean,
+  ): boolean {
     return (
       this.entryBySignature.size < SignedRequestReplayGuard.MAX_ENTRIES &&
       (this.slotsBySigner.get(signer) ?? 0) <
         SignedRequestReplayGuard.SLOTS_PER_SIGNER &&
-      this.hasRoomForStranger(strangerSource)
+      this.hasRoomForSource(source, stranger)
+    );
+  }
+
+  private hasRoomForSource(source: string, stranger: boolean): boolean {
+    if (!stranger) {
+      return (
+        (this.servedSlotsBySource.get(source) ?? 0) <
+        SignedRequestReplayGuard.SERVED_SLOTS_PER_SOURCE
+      );
+    }
+
+    return (
+      this.strangerSlots < SignedRequestReplayGuard.STRANGER_SLOTS &&
+      (this.strangerSlotsBySource.get(source) ?? 0) <
+        SignedRequestReplayGuard.STRANGER_SLOTS_PER_SOURCE
     );
   }
 
   private record(
     signer: PublicKey,
     signature: Signature,
-    strangerSource?: string,
+    source: string,
+    stranger: boolean,
   ): boolean {
     const now = Date.now();
     let signerKey: string;
@@ -113,7 +132,7 @@ export class SignedRequestReplayGuard {
 
     if (
       this.entryBySignature.has(key) ||
-      !this.hasRoomFor(signerKey, strangerSource)
+      !this.hasRoomFor(signerKey, source, stranger)
     ) {
       return false;
     }
@@ -121,13 +140,16 @@ export class SignedRequestReplayGuard {
     this.entryBySignature.set(key, {
       expiration: now + SignedHttpRequestSignature.REPLAY_WINDOW_MS,
       signer: signerKey,
-      strangerSource,
+      source,
+      stranger,
     });
     SignedRequestReplayGuard.take(this.slotsBySigner, signerKey);
 
-    if (strangerSource !== undefined) {
-      SignedRequestReplayGuard.take(this.strangerSlotsBySource, strangerSource);
+    if (stranger) {
+      SignedRequestReplayGuard.take(this.strangerSlotsBySource, source);
       this.strangerSlots += 1;
+    } else {
+      SignedRequestReplayGuard.take(this.servedSlotsBySource, source);
     }
 
     return true;
@@ -136,18 +158,23 @@ export class SignedRequestReplayGuard {
   /**
    * Records a signature of a signer this node serves (an identity it holds,
    * an authorized device or the recovery authority of an identity) that
-   * already passed signature and freshness checks. Returns false when the
-   * same signature was accepted before inside its validity window, i.e. the
-   * request is a replay. The entry is keyed by the raw bytes of the signing
-   * key, whichever role it signed in, so a re-encoded key or a key that signs
-   * as both identity and device gets no fresh slot. A signer that is not one
-   * canonical key is refused outright. When the signer or the guard is full
-   * it fails closed and rejects new signatures: live entries are never
-   * evicted, so an attacker cannot flush an intercepted signature out of the
-   * guard to replay it.
+   * already passed signature and freshness checks, charged to `clientAddress`
+   * against SERVED_SLOTS_PER_SOURCE. Returns false when the same signature was
+   * accepted before inside its validity window, i.e. the request is a replay.
+   * The entry is keyed by the raw bytes of the signing key, whichever role it
+   * signed in, so a re-encoded key or a key that signs as both identity and
+   * device gets no fresh slot. A signer that is not one canonical key is
+   * refused outright. When the signer, its source or the guard is full it
+   * fails closed and rejects new signatures: live entries are never evicted,
+   * so an attacker cannot flush an intercepted signature out of the guard to
+   * replay it.
    */
-  public accept(signer: PublicKey, signature: Signature): boolean {
-    return this.record(signer, signature);
+  public accept(
+    signer: PublicKey,
+    signature: Signature,
+    clientAddress: string,
+  ): boolean {
+    return this.record(signer, signature, clientRateKey(clientAddress), false);
   }
 
   /**
@@ -163,7 +190,7 @@ export class SignedRequestReplayGuard {
     signature: Signature,
     clientAddress: string,
   ): boolean {
-    return this.record(signer, signature, clientRateKey(clientAddress));
+    return this.record(signer, signature, clientRateKey(clientAddress), true);
   }
 }
 

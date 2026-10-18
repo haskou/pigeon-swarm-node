@@ -106,9 +106,9 @@ describe('SignedRequestReplayGuard', () => {
     );
 
     expect(accepted).toHaveLength(SLOTS_PER_SIGNER);
-    expect(
-      guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER), SOURCE),
-    ).toBe(false);
+    expect(guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER), SOURCE)).toBe(
+      false,
+    );
     expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
   });
 
@@ -121,9 +121,9 @@ describe('SignedRequestReplayGuard', () => {
     );
     now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
 
-    expect(
-      guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER), SOURCE),
-    ).toBe(true);
+    expect(guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER), SOURCE)).toBe(
+      true,
+    );
 
     now.mockRestore();
   });
@@ -131,11 +131,13 @@ describe('SignedRequestReplayGuard', () => {
   it('refuses a client address past its part of the served slots without touching other addresses', () => {
     const guard = new SignedRequestReplayGuard();
 
-    const accepted = fillers.slice(0, 3).flatMap((filler) =>
-      Array.from({ length: SLOTS_PER_SIGNER }).filter((_, index) =>
-        guard.accept(filler, signatureOf(index), '192.0.2.1'),
-      ),
-    );
+    const accepted = fillers
+      .slice(0, 3)
+      .flatMap((filler) =>
+        Array.from({ length: SLOTS_PER_SIGNER }).filter((_, index) =>
+          guard.accept(filler, signatureOf(index), '192.0.2.1'),
+        ),
+      );
 
     expect(accepted).toHaveLength(SERVED_SLOTS_PER_SOURCE);
     expect(guard.accept(identity, signatureOf(0), '192.0.2.1')).toBe(false);
