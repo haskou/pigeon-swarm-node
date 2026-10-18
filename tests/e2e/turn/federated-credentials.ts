@@ -483,7 +483,16 @@ async function main(): Promise<void> {
       requester
         .getHeliaCore()
         .libp2p.getConnections()
-        .map((connection) => connection.close()),
+        .map((connection) =>
+          connection.close().catch((error: unknown) => {
+            // libp2p rejects close() with a non-Error StreamCloseEvent when a stream
+            // closes while close() waits for pending writes; abort so the disconnect
+            // still completes instead of failing the test with a generic message.
+            connection.abort(
+              new Error('Relay disconnect close rejected', { cause: error }),
+            );
+          }),
+        ),
     );
     assert.equal(
       (await service.get()).length,
