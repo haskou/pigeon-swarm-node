@@ -8,6 +8,7 @@ export class CommunityInvitationsViewModel {
   constructor(
     private readonly community: Community,
     private readonly invitations: CommunityInvitation[],
+    private readonly nextCursor: string | null,
   ) {}
 
   public toResource(): CommunityInvitationsResource {
@@ -18,6 +19,7 @@ export class CommunityInvitationsViewModel {
           invitation,
         ).toResource(),
       ),
+      nextCursor: this.nextCursor,
     };
   }
 }

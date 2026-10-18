@@ -4,4 +4,5 @@ export { CommunityDiscoveryItemResource } from './CommunityDiscoveryItemResource
 
 export interface CommunityDiscoveryResource {
   communities: CommunityDiscoveryItemResource[];
+  nextCursor: string | null;
 }

@@ -1,7 +1,8 @@
-import { Community } from '../../domain/Community';
 import { CommunityInvitation } from '../../domain/entities/invitations/CommunityInvitation';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
+import { PageSlice } from '../pagination/PageSlice';
+import { CommunityInvitationsPage } from './CommunityInvitationsPage';
 import { CommunityInvitationsFindMessage } from './messages/CommunityInvitationsFindMessage';
 
 /**
@@ -14,19 +15,26 @@ export default class CommunityInvitationsFinder {
     private readonly communityRepository: CommunityRepository,
   ) {}
 
-  public async find(message: CommunityInvitationsFindMessage): Promise<{
-    community: Community;
-    invitations: CommunityInvitation[];
-  }> {
+  public async find(
+    message: CommunityInvitationsFindMessage,
+  ): Promise<CommunityInvitationsPage> {
     const community = await this.communityFinder.findById(message.communityId);
 
     community.viewAsMember(message.identityId);
 
-    return {
+    const invitations = (
+      await this.communityRepository.findInvitations(message.communityId)
+    ).list();
+
+    return new CommunityInvitationsPage(
       community,
-      invitations: (
-        await this.communityRepository.findInvitations(message.communityId)
-      ).list(),
-    };
+      PageSlice.of<CommunityInvitation>({
+        after: message.after,
+        items: invitations,
+        limit: message.limit,
+        order: 'asc',
+        position: (invitation) => invitation.getId(),
+      }),
+    );
   }
 }

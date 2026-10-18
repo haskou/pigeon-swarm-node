@@ -81,3 +81,85 @@ Feature: Community roles API
     When I DELETE the current community role
     Then response code is equal to 200
     And response body should not contain "administrator"
+
+  Scenario: A member pages the roles and follows the cursor to the end
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-role-paging-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community administrator role body
+    And I sign the current community role request
+    When I POST a role to the current community
+    Then response code is equal to 200
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?limit=1"
+    Then response code is equal to 200
+    And response lists 1 roles
+    And I remember the response next cursor
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 1 roles
+    And I remember the response next cursor
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 0 roles
+    And the response next cursor is null
+
+  Scenario: A short last page has a null next cursor and a garbage or forged roles cursor is refused
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-role-cursor-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?limit=500"
+    Then response code is equal to 200
+    And response lists 1 roles
+    And the response next cursor is null
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current community roles request
+    When I GET the current community roles with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current community roles request
+    When I GET the current community roles with a cursor whose position is not a role id
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario: A non-member cannot list the roles
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-roles-non-member-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given the community member signs the current community roles request
+    When I GET the current community roles with query "?limit=1"
+    Then response code is equal to 409
+
+  Scenario: A non-member presenting a valid roles cursor gets the same 409
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-roles-non-member-cursor-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given I sign the current community roles request
+    When I GET the current community roles with query "?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given the community member signs the current community roles request
+    When I GET the current community roles with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 409

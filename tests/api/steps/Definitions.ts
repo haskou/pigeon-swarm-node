@@ -196,6 +196,8 @@ export default class Definitions {
   private readonly callProofs = new Map<string, PublicMutationProof>();
   private communityChannelId: string | undefined;
   private communityChannelMessageId: string | undefined;
+  private communityPinCount = 0;
+  private communityDraftCount = 0;
   private pageNextCursor: string | undefined;
   private communityThreadRootMessageId: string | undefined;
   private communityMessageCreatedAt = 0;
@@ -3582,13 +3584,24 @@ export default class Definitions {
 
   @given('the community member signs the current community join request')
   public async theCommunityMemberSignsTheCurrentCommunityJoinRequest(): Promise<void> {
+    await this.signCommunityJoinRequest(Date.now());
+  }
+
+  @given(
+    'the community member signs the current community join request with a far-future createdAt',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityJoinRequestWithAFarFutureCreatedAt(): Promise<void> {
+    // The largest millisecond timestamp still inside the Timestamp range.
+    await this.signCommunityJoinRequest(Date.UTC(275000, 0, 1));
+  }
+
+  private async signCommunityJoinRequest(createdAt: number): Promise<void> {
     if (!this.communityId) {
       throw new Error('Community must be created first.');
     }
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
     const identityId = String(this.otherIdentityId?.valueOf());
-    const createdAt = Date.now();
     const payload = this.communityRequestPayload(
       identityId,
       identityId,
@@ -3610,6 +3623,74 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       '/community-membership-requests',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current community members request')
+  public async theCommunityMemberSignsTheCurrentCommunityMembersRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('members'));
+  }
+
+  @given('the community member signs the current community roles request')
+  public async theCommunityMemberSignsTheCurrentCommunityRolesRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('roles'));
+  }
+
+  @given('the community member signs the current community channels request')
+  public async theCommunityMemberSignsTheCurrentCommunityChannelsRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('channels'));
+  }
+
+  @given('the community member signs the current community invitations request')
+  public async theCommunityMemberSignsTheCurrentCommunityInvitationsRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('invitations'));
+  }
+
+  @given(
+    'the community member signs the current community invitation claims request',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityInvitationClaimsRequest(): Promise<void> {
+    await this.signOtherIdentityGet(
+      this.currentCommunityPath('invitation-claims'),
+    );
+  }
+
+  @given(
+    'the community member signs the current community channel pins request',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityChannelPinsRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    await this.signOtherIdentityGet(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
+    );
+  }
+
+  @given('the community member signs the current community drafts request')
+  public async theCommunityMemberSignsTheCurrentCommunityDraftsRequest(): Promise<void> {
+    await this.signOtherIdentityGet('/community-drafts');
+  }
+
+  private currentCommunityPath(suffix: string): string {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    return `/communities/${this.communityId}/${suffix}`;
+  }
+
+  private async signOtherIdentityGet(path: string): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      path,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -6498,6 +6579,82 @@ export default class Definitions {
     this.communityChannelMessageId = this.response.data.id;
   }
 
+  @given('I have pinned the current community channel message')
+  public async iHavePinnedTheCurrentCommunityChannelMessage(): Promise<void> {
+    if (
+      !this.communityId ||
+      !this.communityChannelId ||
+      !this.communityChannelMessageId
+    ) {
+      throw new Error('Community, channel and message must be created first.');
+    }
+
+    const keyPair = await this.ensureIdentityKeyPair();
+    const identityId = keyPair.toPrimitives().publicKey;
+    const createdAt = 1_780_000_000_000 + this.communityPinCount * 1000;
+    this.communityPinCount += 1;
+    const payload = {
+      channelId: this.communityChannelId,
+      communityId: this.communityId,
+      createdAt,
+      id: `community:${this.communityId}:${this.communityChannelId}:${this.communityChannelMessageId}`,
+      messageId: this.communityChannelMessageId,
+      pinnedByIdentityId: identityId,
+      scopeType: 'community_channel',
+    };
+    this.body = JSON.stringify({
+      createdAt,
+      mutation: this.signCommunityRecord(
+        payload,
+        keyPair,
+        undefined,
+        'pins',
+        await this.communityFrontier(this.communityId),
+      ),
+    });
+
+    const path = `/communities/${this.communityId}/channels/${this.communityChannelId}/messages/${this.communityChannelMessageId}/pin`;
+
+    await this.signCurrentRequest('POST', path);
+
+    this.response = await this.restClient.post(path, JSON.parse(this.body), {
+      headers: this.headers,
+    });
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not pin community channel message: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+  }
+
+  @given('I have saved the current community channel draft')
+  public async iHaveSavedTheCurrentCommunityChannelDraft(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.communityDraftCount += 1;
+    this.body = JSON.stringify({
+      encryptedPayload: `encrypted-draft-payload-${this.communityDraftCount}`,
+      updatedAt: 1_780_000_000_000 + this.communityDraftCount * 1000,
+    });
+
+    const path = `/communities/${this.communityId}/channels/${this.communityChannelId}/draft`;
+
+    await this.signCurrentRequest('PUT', path);
+
+    this.response = await this.restClient.put(path, JSON.parse(this.body), {
+      headers: this.headers,
+    });
+
+    if (this.response.status !== 200) {
+      throw new Error(
+        `Could not save community channel draft: ${JSON.stringify(this.response.data)}`,
+      );
+    }
+  }
+
   @given('I have reacted to the current community channel message')
   public async iHaveReactedToTheCurrentCommunityChannelMessage(): Promise<void> {
     this.response = await this.restClient.post(
@@ -7152,6 +7309,135 @@ export default class Definitions {
     );
   }
 
+  @when('I GET the current community invitations with query {string}')
+  public async iGETTheCurrentCommunityInvitationsWithQuery(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitations${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community invitations with a cursor for another list',
+  )
+  public async iGETTheCurrentCommunityInvitationsWithACursorForAnotherList(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'A'.repeat(43),
+      resource: `communities/${this.communityId}/invitation-claims`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitations?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community invitations with a cursor whose position is not an invitation id',
+  )
+  public async iGETTheCurrentCommunityInvitationsWithANonInvitationIdCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'not-a-digest',
+      resource: `communities/${this.communityId}/invitations`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitations?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the current community invitation claims with query {string}')
+  public async iGETTheCurrentCommunityInvitationClaimsWithQuery(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitation-claims${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community invitation claims with a cursor for another list',
+  )
+  public async iGETTheCurrentCommunityInvitationClaimsWithACursorForAnotherList(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'A'.repeat(43),
+      resource: `communities/${this.communityId}/invitations`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitation-claims?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community invitation claims with a cursor whose position is not a claim id',
+  )
+  public async iGETTheCurrentCommunityInvitationClaimsWithANonClaimIdCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'forged-claim-id-0123456789',
+      resource: `communities/${this.communityId}/invitation-claims`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitation-claims?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @then('response lists {int} invitations')
+  public responseListsInvitations(count: number): void {
+    const { invitations } = this.response.data as { invitations: unknown[] };
+
+    expect(invitations).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} claims')
+  public responseListsClaims(count: number): void {
+    const { claims } = this.response.data as { claims: unknown[] };
+
+    expect(claims).to.have.lengthOf(count);
+  }
+
+  @then('the response next cursor is null')
+  public responseNextCursorIsNull(): void {
+    const { nextCursor } = this.response.data as { nextCursor: unknown };
+
+    expect(nextCursor).to.equal(null);
+  }
+
   @when('I GET the current community invitation preview with the {word} key')
   public async iGETTheCurrentCommunityInvitationPreviewWithTheKey(
     which: string,
@@ -7297,6 +7583,95 @@ export default class Definitions {
       `/communities/${this.communityId}/members/me`,
       this.body && JSON.parse(this.body),
       { headers: this.headers },
+    );
+  }
+
+  @given('I sign the current communities request')
+  public async iSignTheCurrentCommunitiesRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/communities');
+  }
+
+  @when('I GET current communities with query {string}')
+  public async iGETCurrentCommunitiesWithQuery(query: string): Promise<void> {
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET current communities with a cursor for another list')
+  public async iGETCurrentCommunitiesWithAnotherListCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: this.communityId,
+      resource: 'discoverable-communities',
+    });
+
+    this.response = await this.restClient.get(
+      `/communities?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET discoverable communities with query {string}')
+  public async iGETDiscoverableCommunitiesWithQuery(
+    query: string,
+  ): Promise<void> {
+    const params = query
+      .replace('CURSOR', this.pageNextCursor ?? '')
+      .replace(/^\?/, '');
+
+    this.response = await this.restClient.get(
+      `/discoverable-communities?query=API&networkId=${this.currentNetworkId}${params ? `&${params}` : ''}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET discoverable communities with a cursor for another list')
+  public async iGETDiscoverableCommunitiesWithAnotherListCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: this.communityId,
+      resource: 'communities',
+    });
+
+    this.response = await this.restClient.get(
+      `/discoverable-communities?query=API&networkId=${this.currentNetworkId}&cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET community membership requests with query {string}')
+  public async iGETCommunityMembershipRequestsWithQuery(
+    query: string,
+  ): Promise<void> {
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/community-membership-requests${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET community membership requests with a cursor for another list')
+  public async iGETCommunityMembershipRequestsWithAnotherListCursor(): Promise<void> {
+    const cursor = PageCursor.encode({
+      position: '08640000000000000|foreignrequest',
+      resource: 'communities',
+    });
+
+    this.response = await this.restClient.get(
+      `/community-membership-requests?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
     );
   }
 
@@ -7613,6 +7988,144 @@ export default class Definitions {
     expect(logs).to.have.lengthOf(count);
   }
 
+  @given('I sign the current community channel pins request')
+  public async iSignTheCurrentCommunityChannelPinsRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
+    );
+  }
+
+  @when('I GET pins from the current community channel with query {string}')
+  public async iGETPinsFromTheCurrentCommunityChannelWithQuery(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET pins from the current community channel with a cursor for another list',
+  )
+  public async iGETPinsFromTheCurrentCommunityChannelWithAnotherListCursor(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: '08640000000000000|community-message:foreign',
+      resource: 'community-drafts',
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET pins from the current community channel with a well-formed forged cursor',
+  )
+  public async iGETPinsWithAWellFormedForgedCursor(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: '08640000000000000|forged-message',
+      resource: `communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET pins from the current community channel with a garbage cursor')
+  public async iGETPinsFromTheCurrentCommunityChannelWithAGarbageCursor(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=not-a-cursor`,
+      this.headers,
+    );
+  }
+
+  @given('I sign the current community drafts request')
+  public async iSignTheCurrentCommunityDraftsRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/community-drafts');
+  }
+
+  @when('I GET the community drafts with query {string}')
+  public async iGETTheCommunityDraftsWithQuery(query: string): Promise<void> {
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/community-drafts${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the community drafts with a cursor for another list')
+  public async iGETTheCommunityDraftsWithAnotherListCursor(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: JSON.stringify([
+        '08640000000000000',
+        this.communityId,
+        this.communityChannelId,
+      ]),
+      resource: `communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
+    });
+
+    this.response = await this.restClient.get(
+      `/community-drafts?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the community drafts with a garbage cursor')
+  public async iGETTheCommunityDraftsWithAGarbageCursor(): Promise<void> {
+    this.response = await this.restClient.get(
+      '/community-drafts?cursor=not-a-cursor',
+      this.headers,
+    );
+  }
+
+  @then('response lists {int} pins')
+  public responseListsPins(count: number): void {
+    const { pins } = this.response.data as { pins: unknown[] };
+
+    expect(pins).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} drafts')
+  public responseListsDrafts(count: number): void {
+    const { drafts } = this.response.data as { drafts: unknown[] };
+
+    expect(drafts).to.have.lengthOf(count);
+  }
+
   @when('I POST a text channel to the current community')
   public async iPOSTATextChannelToTheCurrentCommunity(): Promise<void> {
     if (!this.communityId) {
@@ -7647,6 +8160,179 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/communities/${this.communityId}/channels`,
+      this.headers,
+    );
+  }
+
+  @when('I GET channels from the current community with query {string}')
+  public async iGETChannelsFromTheCurrentCommunityWithQuery(
+    query: string,
+  ): Promise<void> {
+    await this.getCurrentCommunityListWithQuery('channels', query);
+  }
+
+  @when(
+    'I GET channels from the current community with a cursor for another list',
+  )
+  public async iGETChannelsWithACursorForAnotherList(): Promise<void> {
+    await this.getCurrentCommunityListWithCursor(
+      'channels',
+      `text|${'A'.repeat(24)}`,
+      'roles',
+    );
+  }
+
+  @when(
+    'I GET channels from the current community with a cursor whose position is not a channel id',
+  )
+  public async iGETChannelsWithANonChannelIdCursor(): Promise<void> {
+    await this.getCurrentCommunityListWithCursor(
+      'channels',
+      'text|not-a-channel',
+      'channels',
+    );
+  }
+
+  @given('I sign the current community members request')
+  public async iSignTheCurrentCommunityMembersRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/members`,
+    );
+  }
+
+  @given('I sign the current community roles request')
+  public async iSignTheCurrentCommunityRolesRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/roles`,
+    );
+  }
+
+  @when('I GET the current community members with query {string}')
+  public async iGETTheCurrentCommunityMembersWithQuery(
+    query: string,
+  ): Promise<void> {
+    await this.getCurrentCommunityListWithQuery('members', query);
+  }
+
+  @when('I GET the current community members with a cursor for another list')
+  public async iGETTheCurrentCommunityMembersWithACursorForAnotherList(): Promise<void> {
+    await this.getCurrentCommunityListWithCursor(
+      'members',
+      'everyone',
+      'roles',
+    );
+  }
+
+  @when(
+    'I GET the current community members with a cursor whose position is not an identity id',
+  )
+  public async iGETTheCurrentCommunityMembersWithANonIdentityIdCursor(): Promise<void> {
+    await this.getCurrentCommunityListWithCursor(
+      'members',
+      'not-an-identity',
+      'members',
+    );
+  }
+
+  @when('I GET the current community roles with query {string}')
+  public async iGETTheCurrentCommunityRolesWithQuery(
+    query: string,
+  ): Promise<void> {
+    await this.getCurrentCommunityListWithQuery('roles', query);
+  }
+
+  @when('I GET the current community roles with a cursor for another list')
+  public async iGETTheCurrentCommunityRolesWithACursorForAnotherList(): Promise<void> {
+    await this.getCurrentCommunityListWithCursor(
+      'roles',
+      'everyone',
+      'members',
+    );
+  }
+
+  @when(
+    'I GET the current community roles with a cursor whose position is not a role id',
+  )
+  public async iGETTheCurrentCommunityRolesWithANonRoleIdCursor(): Promise<void> {
+    await this.getCurrentCommunityListWithCursor(
+      'roles',
+      'not-a-role',
+      'roles',
+    );
+  }
+
+  @then('response lists {int} members')
+  public responseListsMembers(count: number): void {
+    const { memberIds } = this.response.data as { memberIds: unknown[] };
+
+    expect(memberIds).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} roles')
+  public responseListsRoles(count: number): void {
+    const { roles } = this.response.data as { roles: unknown[] };
+
+    expect(roles).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} requests')
+  public responseListsRequests(count: number): void {
+    const { requests } = this.response.data as { requests: unknown[] };
+
+    expect(requests).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} communities')
+  public responseListsCommunities(count: number): void {
+    const { communities } = this.response.data as { communities: unknown[] };
+
+    expect(communities).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} channels')
+  public responseListsChannels(count: number): void {
+    const { channels } = this.response.data as { channels: unknown[] };
+
+    expect(channels).to.have.lengthOf(count);
+  }
+
+  private async getCurrentCommunityListWithQuery(
+    list: 'channels' | 'members' | 'roles',
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/${list}${resolved}`,
+      this.headers,
+    );
+  }
+
+  /** Requests a list with a cursor issued for `resource`, so a mismatch is a foreign or forged cursor. */
+  private async getCurrentCommunityListWithCursor(
+    list: 'channels' | 'members' | 'roles',
+    position: string,
+    resource: 'channels' | 'members' | 'roles',
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position,
+      resource: `communities/${this.communityId}/${resource}`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/${list}?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
   }
@@ -8129,6 +8815,28 @@ export default class Definitions {
   @then('response body should not contain {string}')
   public responseBodyShouldnotContain(textToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.not.contain(textToContain);
+  }
+
+  @then('response body should contain the current community channel id')
+  public responseBodyShouldContainTheCurrentCommunityChannelId(): void {
+    if (!this.communityChannelId) {
+      throw new Error('Community channel must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.contain(
+      this.communityChannelId,
+    );
+  }
+
+  @then('response body should not contain the current community channel id')
+  public responseBodyShouldNotContainTheCurrentCommunityChannelId(): void {
+    if (!this.communityChannelId) {
+      throw new Error('Community channel must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.communityChannelId,
+    );
   }
 
   @then('response body should not contain the other identity id')

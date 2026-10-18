@@ -4,13 +4,17 @@ import { CommunitiesResource } from '../resources/CommunitiesResource';
 import { CommunityViewModel } from './CommunityViewModel';
 
 export class CommunitiesViewModel {
-  constructor(private readonly communities: Community[]) {}
+  constructor(
+    private readonly communities: Community[],
+    private readonly nextCursor: string | null,
+  ) {}
 
   public toResource(): CommunitiesResource {
     return {
       communities: this.communities.map((community) =>
         new CommunityViewModel(community).toResource(),
       ),
+      nextCursor: this.nextCursor,
     };
   }
 }

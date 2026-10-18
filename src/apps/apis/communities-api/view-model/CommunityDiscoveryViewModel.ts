@@ -13,6 +13,7 @@ export class CommunityDiscoveryViewModel {
     private readonly communities: Community[],
     private readonly identityId: IdentityId,
     private readonly requests: CommunityMembershipRequest[],
+    private readonly nextCursor: string | null,
   ) {}
 
   private findPendingRequest(
@@ -66,6 +67,7 @@ export class CommunityDiscoveryViewModel {
       communities: this.communities.map((community) =>
         this.communityToResource(community),
       ),
+      nextCursor: this.nextCursor,
     };
   }
 }

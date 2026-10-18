@@ -802,6 +802,10 @@ services:
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityRepository'
+  contexts/communities/application/find-members/CommunityMembersFinder:
+    class: /contexts/communities/application/find-members/CommunityMembersFinder
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
   contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder:
     class: >-
       /contexts/communities/application/find-membership-requests/CommunityMembershipRequestsFinder
@@ -827,6 +831,10 @@ services:
     arguments:
       - '@contexts/communities/application/find-community/CommunityFinder'
       - '@contexts/communities/domain/repositories/CommunityRepository'
+  contexts/communities/application/find-roles/CommunityRolesFinder:
+    class: /contexts/communities/application/find-roles/CommunityRolesFinder
+    arguments:
+      - '@contexts/communities/application/find-community/CommunityFinder'
   contexts/communities/application/kick-member/CommunityMemberKicker:
     class: /contexts/communities/application/kick-member/CommunityMemberKicker
     arguments:

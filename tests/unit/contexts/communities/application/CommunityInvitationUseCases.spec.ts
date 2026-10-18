@@ -285,19 +285,46 @@ describe('Community invitation use cases', () => {
 
     it('lists the invitations to a member', async () => {
       const result = await finderOf().find(
-        new CommunityInvitationsFindMessage(COMMUNITY_ID, alice.valueOf()),
+        new CommunityInvitationsFindMessage(COMMUNITY_ID, alice.valueOf(), 50),
       );
 
-      expect(result.community).toBe(community);
-      expect(result.invitations.map((found) => found.getId())).toEqual([
+      expect(result.getCommunity()).toBe(community);
+      expect(result.getInvitations().map((found) => found.getId())).toEqual([
         operations.invited.operation.getHash(),
       ]);
+      expect(result.getNextPosition()).toBeUndefined();
+    });
+
+    it('pages the invitations by id after the cursor position', async () => {
+      const first = await finderOf().find(
+        new CommunityInvitationsFindMessage(COMMUNITY_ID, alice.valueOf(), 1),
+      );
+
+      expect(first.getNextPosition()).toBe(
+        operations.invited.operation.getHash(),
+      );
+
+      const second = await finderOf().find(
+        new CommunityInvitationsFindMessage(
+          COMMUNITY_ID,
+          alice.valueOf(),
+          1,
+          first.getNextPosition(),
+        ),
+      );
+
+      expect(second.getInvitations()).toEqual([]);
+      expect(second.getNextPosition()).toBeUndefined();
     });
 
     it('denies a non-member before reading any invitation', async () => {
       await expect(
         finderOf().find(
-          new CommunityInvitationsFindMessage(COMMUNITY_ID, mallory.valueOf()),
+          new CommunityInvitationsFindMessage(
+            COMMUNITY_ID,
+            mallory.valueOf(),
+            50,
+          ),
         ),
       ).rejects.toThrow(CommunityMemberNotFoundError);
       expect(communityRepository.findInvitations).not.toHaveBeenCalled();
@@ -404,7 +431,7 @@ describe('Community invitation use cases', () => {
   });
 
   describe(CommunityInvitationClaimsFinder.name, () => {
-    const claimsOf = (identityId: IdentityId) =>
+    const claimsOf = (identityId: IdentityId, limit = 50, after?: string) =>
       new CommunityInvitationClaimsFinder(
         communityFinder,
         communityRepository,
@@ -413,7 +440,14 @@ describe('Community invitation use cases', () => {
         new CommunityInvitationClaimsFindMessage(
           COMMUNITY_ID,
           identityId.valueOf(),
+          limit,
+          after,
         ),
+      );
+    const claimIdOf = (claim: CommunityInvitationClaim): string =>
+      CommunityInvitationClaim.idOf(
+        claim.getInvitationId(),
+        claim.getIdentityId(),
       );
 
     it('lists only the claims a manager may still admit', async () => {
@@ -426,18 +460,42 @@ describe('Community invitation use cases', () => {
         claimOf(alice),
       ]);
 
-      const claims = await claimsOf(owner);
+      const page = await claimsOf(owner);
 
-      expect(claims.map((claim) => claim.getIdentityId().valueOf())).toEqual([
-        bob.valueOf(),
+      expect(
+        page.getClaims().map((claim) => claim.getIdentityId().valueOf()),
+      ).toEqual([bob.valueOf()]);
+      expect(page.getNextPosition()).toBeUndefined();
+    });
+
+    it('filters before paging so a page is never short of pending claims', async () => {
+      foldOf(
+        admission([operations.invited.operation], operations.invited, mallory),
+      );
+      claimRepository.findByCommunity.mockResolvedValue([
+        claimOf(mallory),
+        claimOf(bob),
+        claimOf(alice),
       ]);
+
+      const first = await claimsOf(owner, 1);
+
+      expect(first.getClaims().map(claimIdOf)).toEqual([
+        claimIdOf(claimOf(bob)),
+      ]);
+      expect(first.getNextPosition()).toBe(claimIdOf(claimOf(bob)));
+
+      const second = await claimsOf(owner, 1, first.getNextPosition());
+
+      expect(second.getClaims()).toEqual([]);
+      expect(second.getNextPosition()).toBeUndefined();
     });
 
     it('lists nothing once the invitation expired', async () => {
       jest.spyOn(Date, 'now').mockReturnValue(9 * DAY);
       claimRepository.findByCommunity.mockResolvedValue([claimOf(bob)]);
 
-      await expect(claimsOf(owner)).resolves.toEqual([]);
+      expect((await claimsOf(owner)).getClaims()).toEqual([]);
     });
 
     it('denies a member without manage_members', async () => {

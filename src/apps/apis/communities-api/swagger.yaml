@@ -12,6 +12,18 @@ paths:
         - communities
       summary: List communities for the authenticated member
       parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -72,6 +84,18 @@ paths:
           required: false
           schema:
             type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -92,6 +116,18 @@ paths:
       summary: List community invitations and join requests
       description: Returns requests created by the authenticated identity, targeting the authenticated identity, or belonging to communities owned by the authenticated identity.
       parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -311,9 +347,21 @@ paths:
       tags:
         - communities
       summary: List community invitations
-      description: Members only. Every invitation of the community as its folded operations state it, with uses, revocation and liveness.
+      description: Members only. Every invitation of the community as its folded operations state it, with uses, revocation and liveness. Sorted by invitation id ascending. Read the next page with cursor = nextCursor while a page is full.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -322,11 +370,13 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
-          description: Community invitations.
+          description: One page of community invitations.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityInvitationsResource'
+        '400':
+          description: limit is not an integer from 1 to 100, or the cursor is malformed or issued for another list (codes 400060 and 400110).
         '401':
           description: Missing or invalid request signature.
         '409':
@@ -529,9 +579,21 @@ paths:
       tags:
         - communities
       summary: List private community members
-      description: Only community members can list members.
+      description: Only community members can list members. Members are ordered by identity id ascending. Read the next page with cursor = nextCursor while a page is full.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -645,9 +707,21 @@ paths:
       tags:
         - communities
       summary: List community roles and member assignments
-      description: Only community members can list roles.
+      description: Only community members can list roles. Roles are paged, ordered by role id ascending; memberRoles is returned in full on every page. Read the next page with cursor = nextCursor while a page is full.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -821,9 +895,21 @@ paths:
       tags:
         - communities
       summary: List private community channels
-      description: Only community members can list text and voice channel metadata. Channels hidden from the authenticated member by role visibility are omitted.
+      description: Only community members can list text and voice channel metadata. Channels hidden from the authenticated member by role visibility are omitted. Text channels come first, then voice, each ordered by channel id ascending. Read the next page with cursor = nextCursor while a page is full.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -973,8 +1059,20 @@ paths:
       tags:
         - communities
       summary: List authenticated identity community channel drafts
-      description: Drafts are local embedded DB opaque encrypted payloads owned by the authenticated identity.
+      description: Drafts are local embedded DB opaque encrypted payloads owned by the authenticated identity. Newest first. Read the next page with cursor = nextCursor while a page is full.
       parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -1044,6 +1142,7 @@ paths:
       tags:
         - communities
       summary: List pinned messages for a community text channel
+      description: Newest first. Read the next page with cursor = nextCursor while a page is full.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -1051,6 +1150,18 @@ paths:
           required: true
           schema:
             type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -1684,6 +1795,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     CommunityModerationLogsResource:
       type: object
       required:
@@ -1770,6 +1885,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityDiscoveryItemResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     CommunityDiscoveryItemResource:
       type: object
       required:
@@ -1887,6 +2006,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityMembershipRequestResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     CommunityMembersResource:
       type: object
       required:
@@ -1896,12 +2019,20 @@ components:
           type: array
           items:
             type: string
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     CommunityRolesResource:
       type: object
       required:
         - roles
         - memberRoles
       properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
         roles:
           type: array
           items:
@@ -1955,6 +2086,10 @@ components:
       required:
         - channels
       properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
         channels:
           type: array
           items:
@@ -2077,6 +2212,10 @@ components:
       required:
         - drafts
       properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
         drafts:
           type: array
           items:
@@ -2179,6 +2318,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CommunityChannelMessagePinResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     CommunityMessageSearchResource:
       type: object
       required:

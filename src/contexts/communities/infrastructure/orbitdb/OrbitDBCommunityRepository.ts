@@ -23,7 +23,6 @@ import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorage
  */
 export default class OrbitDBCommunityRepository extends CommunityRepository {
   private static readonly HEAD_PREFIX = 'community-operation-index:';
-  private static readonly MAX_DISCOVERABLE = 50;
   private static readonly MAX_FOLDED_COMMUNITIES = 2_048;
   private static readonly REGEX_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 
@@ -357,19 +356,17 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const excluded = new Set(excludedIds.map((id) => id.valueOf()));
 
     return Promise.resolve(
-      this.cachedCommunities()
-        .filter((community) => {
-          const { description, discoverable, id, name, networkId } =
-            community.toPrimitives();
+      this.cachedCommunities().filter((community) => {
+        const { description, discoverable, id, name, networkId } =
+          community.toPrimitives();
 
-          return (
-            discoverable &&
-            !excluded.has(id) &&
-            (!options.networkId || networkId === options.networkId) &&
-            (!regex || regex.test(name) || regex.test(description))
-          );
-        })
-        .slice(0, OrbitDBCommunityRepository.MAX_DISCOVERABLE),
+        return (
+          discoverable &&
+          !excluded.has(id) &&
+          (!options.networkId || networkId === options.networkId) &&
+          (!regex || regex.test(name) || regex.test(description))
+        );
+      }),
     );
   }
 

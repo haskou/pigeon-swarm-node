@@ -2,6 +2,7 @@ import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityChannelThreadSummary } from '@app/contexts/communities/domain/CommunityChannelThreadSummary';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
+import { CommunityChannelResource } from '../resources/CommunityChannelResource';
 import { CommunityChannelsResource } from '../resources/CommunityChannelsResource';
 
 export class CommunityChannelsViewModel {
@@ -16,29 +17,52 @@ export class CommunityChannelsViewModel {
       string,
       CommunityChannelThreadSummary[]
     > = new Map(),
+    private readonly pageChannelIds: string[] = [],
+    private readonly nextCursor: string | null = null,
   ) {}
 
   public toResource(): CommunityChannelsResource {
-    const primitives = this.community.visibleChannelsFor(this.viewerIdentityId);
+    const visible = this.community.visibleChannelsFor(this.viewerIdentityId);
+    const textChannelsById = new Map(
+      visible.textChannels.map((channel) => [channel.id, channel]),
+    );
+    const voiceChannelsById = new Map(
+      (visible.voiceChannels ?? []).map((channel) => [channel.id, channel]),
+    );
 
     return {
-      channels: [
-        ...primitives.textChannels.map((channel) => {
-          const threads = this.threadSummariesByChannelId.get(channel.id) || [];
+      channels: this.pageChannelIds.flatMap(
+        (channelId): CommunityChannelResource[] => {
+          const textChannel = textChannelsById.get(channelId);
 
-          return threads.length > 0
-            ? {
-                ...channel,
-                threads: threads.map((thread) => thread.toPrimitives()),
-              }
-            : channel;
-        }),
-        ...primitives.voiceChannels.map((channel) => ({
-          ...channel,
-          connectedIdentityIds:
-            this.connectedIdentityIdsByChannelId.get(channel.id) || [],
-        })),
-      ],
+          if (textChannel) {
+            const threads =
+              this.threadSummariesByChannelId.get(channelId) || [];
+
+            return [
+              threads.length > 0
+                ? {
+                    ...textChannel,
+                    threads: threads.map((thread) => thread.toPrimitives()),
+                  }
+                : textChannel,
+            ];
+          }
+
+          const voiceChannel = voiceChannelsById.get(channelId);
+
+          return voiceChannel
+            ? [
+                {
+                  ...voiceChannel,
+                  connectedIdentityIds:
+                    this.connectedIdentityIdsByChannelId.get(channelId) || [],
+                },
+              ]
+            : [];
+        },
+      ),
+      nextCursor: this.nextCursor,
     };
   }
 }

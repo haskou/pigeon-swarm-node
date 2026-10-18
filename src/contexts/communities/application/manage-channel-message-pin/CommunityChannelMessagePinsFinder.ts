@@ -2,10 +2,20 @@ import { CommunityChannelMessageNotFoundError } from '../../domain/errors/Commun
 import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { PageSlice } from '../pagination/PageSlice';
+import { PageTimestamp } from '../pagination/PageTimestamp';
 import { CommunityChannelMessagePinDetails } from './CommunityChannelMessagePinDetails';
+import { CommunityChannelMessagePinsPage } from './CommunityChannelMessagePinsPage';
 import { CommunityChannelMessagePinsFindMessage } from './messages/CommunityChannelMessagePinsFindMessage';
 
 export default class CommunityChannelMessagePinsFinder {
+  /** `${createdAt fixed-width timestamp}|${messageId}`: the pin order, unique per pin in a channel. */
+  public static position(details: CommunityChannelMessagePinDetails): string {
+    const pin = details.getPin();
+
+    return `${PageTimestamp.of(pin.getCreatedAt().valueOf())}|${pin.getMessageId().valueOf()}`;
+  }
+
   constructor(
     private readonly communityRepository: CommunityRepository,
     private readonly messageRepository: CommunityChannelMessageRepository,
@@ -14,7 +24,7 @@ export default class CommunityChannelMessagePinsFinder {
 
   public async find(
     message: CommunityChannelMessagePinsFindMessage,
-  ): Promise<CommunityChannelMessagePinDetails[]> {
+  ): Promise<CommunityChannelMessagePinsPage> {
     const community = await this.communityRepository.requireById(
       message.communityId,
     );
@@ -42,6 +52,14 @@ export default class CommunityChannelMessagePinsFinder {
       }
     }
 
-    return details;
+    const page = PageSlice.of({
+      after: message.after,
+      items: details,
+      limit: message.limit,
+      order: 'desc',
+      position: CommunityChannelMessagePinsFinder.position,
+    });
+
+    return new CommunityChannelMessagePinsPage(page.items, page.nextPosition);
   }
 }
