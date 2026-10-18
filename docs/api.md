@@ -3643,6 +3643,8 @@ Implemented:
 POST /communities
 ```
 
+Returns `201 Created` with `Location: /communities/{communityId}`.
+
 Request:
 
 ```json
@@ -5931,6 +5933,8 @@ Current limits:
 POST /stickers/packs
 ```
 
+Returns `201 Created` with `Location: /stickers/packs/{packId}`.
+
 Requires signed HTTP headers. The authenticated identity becomes the pack owner.
 The created pack is automatically added to the authenticated identity sticker
 library as a saved pack.
@@ -6171,6 +6175,8 @@ member list.
 ```http
 POST /polls
 ```
+
+Returns `201 Created` with `Location: /polls/{pollId}`.
 
 Requires signed HTTP headers. Polls are public replicated records (store
 `polls`), so the client signs the mutation: the body also carries `pollId`

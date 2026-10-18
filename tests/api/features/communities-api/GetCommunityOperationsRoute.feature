@@ -5,7 +5,7 @@ Feature: Get community operations
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I set a community text channel body
     And I sign the current community text channel request
@@ -27,7 +27,7 @@ Feature: Get community operations
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I sign the current community operations request
     When I GET the current community operations with query "?limit=501"
@@ -43,7 +43,7 @@ Feature: Get community operations
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And the community member signs the current community operations request
     When I GET the current community operations with query ""

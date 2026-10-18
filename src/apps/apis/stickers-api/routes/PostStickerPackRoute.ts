@@ -30,8 +30,11 @@ export class PostStickerPackRoute extends StickerRouteSupport {
       ),
     );
 
+    const resource = new StickerPackViewModel(pack).toResource();
+
     return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new StickerPackViewModel(pack).toResource());
+      .status(HttpRouteStatusEnum.CREATED)
+      .location(`/stickers/packs/${encodeURIComponent(resource.id)}`)
+      .send(resource);
   }
 }

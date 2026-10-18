@@ -11,7 +11,7 @@ Feature: Get sticker pack route
     And I set a sticker pack body
     And I sign the current sticker pack creation request
     When I POST to "/stickers/packs"
-    Then response code is equal to 200
+    Then response code is equal to 201
     Given I remember the current sticker pack
     And I sign the current sticker pack request
     When I GET the current sticker pack

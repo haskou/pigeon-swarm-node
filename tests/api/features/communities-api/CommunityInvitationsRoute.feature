@@ -9,7 +9,7 @@ Feature: Community invitations API
     And I set a private community body
     And I sign the current community creation request
     When I POST to "/communities"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current community
     And I set a community invitation body with 1 uses
     And I sign the current community invitation request
