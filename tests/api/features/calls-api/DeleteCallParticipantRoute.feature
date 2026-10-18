@@ -9,7 +9,7 @@ Feature: Leave call participant
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And the other identity signs the current call leave request
     When I DELETE the current call participant
@@ -24,7 +24,7 @@ Feature: Leave call participant
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And I present the group call capability
     And the other identity signs the current call join request
@@ -51,7 +51,7 @@ Feature: Leave call participant
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And the other identity signs the current call join request
     When I POST a participant join to the current call
@@ -74,7 +74,7 @@ Feature: Leave call participant
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And call requests are sent without a mutation
     And the other identity signs the current call leave request

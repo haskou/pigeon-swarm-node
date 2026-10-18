@@ -7897,8 +7897,9 @@ export default class Definitions {
   public bothConcurrentCallResponsesAreForTheSameCall(): void {
     const [firstResponse, secondResponse] = this.concurrentCallResponses;
 
-    expect(firstResponse.status).to.equal(200);
-    expect(secondResponse.status).to.equal(200);
+    const statuses = [firstResponse.status, secondResponse.status].sort();
+
+    expect(statuses).to.deep.equal([200, 201]);
     expect(secondResponse.data.id).to.equal(firstResponse.data.id);
   }
 

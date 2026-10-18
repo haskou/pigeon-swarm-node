@@ -9,7 +9,7 @@ Feature: Send call signal
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And I set a call signal body for the other identity
     And I sign the current call signal request
@@ -23,7 +23,7 @@ Feature: Send call signal
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And I set a call signal body for an unrelated identity
     And I sign the current call signal request

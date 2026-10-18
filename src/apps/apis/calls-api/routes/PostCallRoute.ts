@@ -18,7 +18,7 @@ export class PostCallRoute extends CallRouteSupport {
     @Res() response: Response,
   ): Promise<Response> {
     const creatorIdentityId = await this.authenticate(request);
-    const call = await this.starter.start(
+    const result = await this.starter.start(
       new CallStartMessage(
         creatorIdentityId.valueOf(),
         {
@@ -37,8 +37,15 @@ export class PostCallRoute extends CallRouteSupport {
       this.chargeRecordTo(creatorIdentityId),
     );
 
+    const resource = await this.presentCall(result.call);
+
+    if (!result.created) {
+      return response.status(HttpRouteStatusEnum.OK).send(resource);
+    }
+
     return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(await this.presentCall(call));
+      .status(HttpRouteStatusEnum.CREATED)
+      .location(`/calls/${encodeURIComponent(resource.id)}`)
+      .send(resource);
   }
 }

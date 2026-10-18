@@ -9,7 +9,7 @@ Feature: Start calls
     And I set a conversation call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | status     | active       |
       | scope.type | conversation |
@@ -20,7 +20,7 @@ Feature: Start calls
     And I set a group capability call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | status     | active           |
       | scope.type | group_capability |
@@ -41,7 +41,7 @@ Feature: Start calls
     And I set a community channel call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | status     | active            |
       | scope.type | community_channel |
@@ -65,7 +65,7 @@ Feature: Start calls
     And I set a community channel call body with an outside invitee
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And response contains a valid resource with the following fields
       | status     | active            |
       | scope.type | community_channel |
@@ -94,7 +94,7 @@ Feature: Start calls
     And I set a community channel call body
     And I sign the current call start request
     When I POST to "/calls"
-    Then response code is equal to 200
+    Then response code is equal to 201
     And I remember the current call
     And the community member signs the current call start request
     When I POST to "/calls"

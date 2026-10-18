@@ -4,6 +4,7 @@ import { Call } from '../../domain/Call';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallParticipantLeaseRenewer from '../renew-participant-lease/CallParticipantLeaseRenewer';
 import CallScopeResolver from './CallScopeResolver';
+import { CallStartResult } from './CallStartResult';
 import CommunityChannelCallStartCoordinator from './CommunityChannelCallStartCoordinator';
 import { CallStartMessage } from './messages/CallStartMessage';
 import { ResolvedCallScope } from './ResolvedCallScope';
@@ -21,7 +22,7 @@ export default class CallStarter {
     message: CallStartMessage,
     resolvedScope: ResolvedCallScope,
     onRecordAccepted?: () => Promise<void>,
-  ): Promise<Call> {
+  ): Promise<CallStartResult> {
     if (message.scopeType.isCommunityChannel()) {
       // One live call per channel: the caller signs a join instead of a start.
       const communityId = message.getCommunityId();
@@ -32,10 +33,12 @@ export default class CallStarter {
       );
 
       if (hasActiveCall) {
-        return this.repository.requireActiveByCommunityChannel(
+        const active = await this.repository.requireActiveByCommunityChannel(
           communityId,
           channelId,
         );
+
+        return new CallStartResult(active, false);
       }
     }
 
@@ -60,7 +63,7 @@ export default class CallStarter {
       ...lease.pullDomainEvents(),
     ]);
 
-    return call;
+    return new CallStartResult(call, true);
   }
 
   /**
@@ -71,7 +74,7 @@ export default class CallStarter {
   public async start(
     message: CallStartMessage,
     onRecordAccepted?: () => Promise<void>,
-  ): Promise<Call> {
+  ): Promise<CallStartResult> {
     const resolvedScope = await this.scopeResolver.resolve(message);
 
     if (!message.scopeType.isCommunityChannel()) {
