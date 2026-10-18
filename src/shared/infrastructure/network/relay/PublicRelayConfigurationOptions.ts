@@ -7,5 +7,5 @@ export type PublicRelayConfigurationOptions = {
   relayDiscoveryEnabled: boolean;
   relayEnabled: boolean;
   relayPort: number;
-  relayRecordTtlSeconds: number;
+  relayRecordTtlMs: number;
 };

@@ -226,7 +226,7 @@ installed `web-push` module path.
 | `PRIVATE_BLOB_STORAGE_PATH` | `./private_blobs` | No | Local folder for private blob bytes. Never replicated: back it up together with `PIGEON_LOCAL_DB_PATH` (see [private blob store design](design/private-blob-store.md)). |
 | `PRIVATE_BLOB_UPLOAD_WINDOW_MS` | `3600000` | No | How long a reservation waits for its upload before it is cleaned up (1 hour). |
 | `REALTIME_ALLOWED_ORIGINS` | empty | No | Comma-separated browser origins (for example `https://chat.example.com`) allowed to open the realtime WebSocket. Empty means no Origin restriction. Requests without an `Origin` header (non-browser clients) are never refused by this setting; they still need a valid ticket. Refused upgrades get `403`. |
-| `PIGEON_RELAY_RECORD_TTL_MS` | `7200000` | No | Private relay record lifetime. Defaults to 2 hours. |
+| `PIGEON_RELAY_RECORD_TTL_MS` | `7200000` | No | Lifetime of signed relay records, in milliseconds: private network relay records and public relay records. Defaults to 2 hours. |
 | `PIGEON_RELAY_RECORD_DISCOVERY_INTERVAL_MS` | `60000` | No | Fallback interval for requesting a private relay record over gossipsub. The initial request is immediate. |
 | `PIGEON_RELAY_RECORD_PUBLIC_PEER_WAIT_MS` | `8000` | No | Maximum time to wait for public IPFS peers before publishing or requesting private relay records. Values above 10 seconds are capped. |
 | `PIGEON_RELAY_RECORD_PUBLICATION_INTERVAL_MS` | `3600000` | No | How often private relay nodes refresh their public relay record publication after the initial publish. |
@@ -337,9 +337,11 @@ Operational rules:
 ### Calls TURN/coturn setup
 
 Calls use WebRTC ICE, not the libp2p/IPFS circuit relay. The backend does not
-embed a TURN server. The `haskou/pigeon-swarm` image runs coturn inside the app
-container by default (`PIGEON_TURN_MODE=embedded`). Its opt-in `external-turn`
-Compose profile runs coturn as a sidecar sharing the backend network namespace.
+embed a TURN server and reads no TURN mode variable. The `haskou/pigeon-swarm`
+image runs coturn inside the app container by default. Its opt-in
+`external-turn` Compose profile, defined in that image's Compose file rather
+than in this repository, runs coturn as a sidecar sharing the backend network
+namespace.
 
 The same host-level port range can be reused operationally when the protocols do
 not collide. The existing private IPFS relay range is TCP. TURN media relay
