@@ -7,6 +7,7 @@ import { assert } from '@haskou/value-objects';
 
 export class NodeBlockSourceEntriesApproverMessage {
   public readonly ownerIdentityId: IdentityId;
+  public readonly authenticatedIdentityId: IdentityId;
   public readonly version: NodeBlockListVersion;
   /** Undefined approves every pending entry of `version`. */
   public readonly entries: NodeBlockEntries | undefined;
@@ -16,6 +17,7 @@ export class NodeBlockSourceEntriesApproverMessage {
     blockedIdentityIds: string[];
     blockedNodePeerIds: string[];
     ownerIdentityId: string;
+    authenticatedIdentityId: string;
     version: number;
   }) {
     const named = new NodeBlockEntries(
@@ -29,6 +31,9 @@ export class NodeBlockSourceEntriesApproverMessage {
     );
 
     this.ownerIdentityId = new IdentityId(params.ownerIdentityId);
+    this.authenticatedIdentityId = new IdentityId(
+      params.authenticatedIdentityId,
+    );
     this.version = new NodeBlockListVersion(params.version);
     this.entries = params.all ? undefined : named;
   }

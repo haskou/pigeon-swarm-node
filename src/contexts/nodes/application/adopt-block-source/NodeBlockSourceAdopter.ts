@@ -1,6 +1,8 @@
 import { NodeBlockSource } from '../../domain/NodeBlockSource';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
+import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
+import { NodeOwnerWriteHolderMessage } from '../hold-owner-write/messages/NodeOwnerWriteHolderMessage';
 import { NodeBlockSourceAdopterMessage } from './messages/NodeBlockSourceAdopterMessage';
 
 /**
@@ -13,6 +15,7 @@ export default class NodeBlockSourceAdopter {
   constructor(
     private readonly repository: NodeBlockSourceRepository,
     private readonly policy: NodeBlockPolicy,
+    private readonly ownerWrites: NodeOwnerWriteHolder,
   ) {}
 
   private async adoptOrReconfigure(
@@ -42,6 +45,15 @@ export default class NodeBlockSourceAdopter {
   public async adopt(
     message: NodeBlockSourceAdopterMessage,
   ): Promise<NodeBlockSource> {
-    return this.policy.change(() => this.adoptOrReconfigure(message));
+    const adopted = await this.ownerWrites.hold(
+      new NodeOwnerWriteHolderMessage(
+        message.authenticatedIdentityId.valueOf(),
+      ),
+      () => this.adoptOrReconfigure(message),
+    );
+
+    await this.policy.reapply();
+
+    return adopted;
   }
 }

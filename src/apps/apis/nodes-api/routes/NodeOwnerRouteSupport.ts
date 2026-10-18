@@ -111,4 +111,25 @@ export abstract class NodeOwnerRouteSupport extends Route {
       ),
     );
   }
+
+  /**
+   * Runs `prepare` for the authenticated owner outside the node hold, then the
+   * write of its result while the node is held for that owner. A handover
+   * while `prepare` runs refuses the write as a non-owner.
+   */
+  protected async prepareThenWriteAsNodeOwner<P, T>(
+    request: Request,
+    prepare: (authenticatedIdentityId: IdentityId) => Promise<P>,
+    write: (authenticatedIdentityId: IdentityId, prepared: P) => Promise<T>,
+  ): Promise<T> {
+    const owner = await this.authenticateNodeOwner(request);
+    const prepared = await prepare(owner);
+
+    return this.asOwner(
+      this.ownerWriteHolder.hold(
+        new NodeOwnerWriteHolderMessage(owner.valueOf()),
+        () => write(owner, prepared),
+      ),
+    );
+  }
 }

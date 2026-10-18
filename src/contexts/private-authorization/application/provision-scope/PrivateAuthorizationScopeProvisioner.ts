@@ -10,6 +10,10 @@ import { PrivateAuthorizationScopeProvisionStatus } from './PrivateAuthorization
 import { PrivateGenesisAuthenticator } from './PrivateGenesisAuthenticator';
 import { PrivateGenesisProjectionAuthorizer } from './PrivateGenesisProjectionAuthorizer';
 
+type PrivateAuthorizationScopeGenesisCommit = Parameters<
+  PrivateOperationUnitOfWork['commitGenesis']
+>[0];
+
 export default class PrivateAuthorizationScopeProvisioner {
   public constructor(
     private readonly genesisAuthenticator: PrivateGenesisAuthenticator,
@@ -19,9 +23,13 @@ export default class PrivateAuthorizationScopeProvisioner {
     private readonly unitOfWork: PrivateOperationUnitOfWork,
   ) {}
 
-  public async provision(
+  /**
+   * Checks the scope and builds what to store. Slow, so the route runs it
+   * before holding the node; `commit` stores it under the hold.
+   */
+  public async verify(
     message: PrivateAuthorizationScopeProvisionMessage,
-  ): Promise<PrivateAuthorizationScopeProvisionStatus> {
+  ): Promise<PrivateAuthorizationScopeGenesisCommit> {
     await this.deviceAuthorization.assertAuthorized(
       message.authenticatedIdentityId,
       this.credentialCodec.toCredential(message.ownerDeviceKey),
@@ -46,7 +54,8 @@ export default class PrivateAuthorizationScopeProvisioner {
       message.authenticatedIdentityId,
       message.projection.toPrimitives(),
     );
-    const result = await this.unitOfWork.commitGenesis({
+
+    return {
       ownerIdentityId: message.authenticatedIdentityId,
       projection,
       protectedMlsState: message.protectedMlsState.valueOf(),
@@ -55,7 +64,14 @@ export default class PrivateAuthorizationScopeProvisioner {
         genesis.genesisHash,
         message.ownerDeviceKey,
       ),
-    });
+    };
+  }
+
+  /** Stores a verified scope; the caller holds the node for its owner. */
+  public async commit(
+    commit: PrivateAuthorizationScopeGenesisCommit,
+  ): Promise<PrivateAuthorizationScopeProvisionStatus> {
+    const result = await this.unitOfWork.commitGenesis(commit);
 
     return result === 'committed'
       ? PrivateAuthorizationScopeProvisionStatus.ACCEPTED

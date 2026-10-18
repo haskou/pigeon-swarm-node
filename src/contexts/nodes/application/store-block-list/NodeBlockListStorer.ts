@@ -45,8 +45,10 @@ export default class NodeBlockListStorer {
     message: NodeBlockListStorerMessage,
   ): Promise<NodeBlockList> {
     await this.nodes.holdLocalNode((node) =>
-      this.policy.change(() => this.storeChecked(node, message.blockList)),
+      this.storeChecked(node, message.blockList),
     );
+
+    await this.policy.reapply();
 
     return message.blockList;
   }

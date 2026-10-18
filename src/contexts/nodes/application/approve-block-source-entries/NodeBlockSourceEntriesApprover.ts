@@ -1,6 +1,8 @@
 import { NodeBlockSource } from '../../domain/NodeBlockSource';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
+import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
+import { NodeOwnerWriteHolderMessage } from '../hold-owner-write/messages/NodeOwnerWriteHolderMessage';
 import { NodeBlockSourceEntriesApproverMessage } from './messages/NodeBlockSourceEntriesApproverMessage';
 
 /**
@@ -12,6 +14,7 @@ export default class NodeBlockSourceEntriesApprover {
   constructor(
     private readonly repository: NodeBlockSourceRepository,
     private readonly policy: NodeBlockPolicy,
+    private readonly ownerWrites: NodeOwnerWriteHolder,
   ) {}
 
   private async approveReviewed(
@@ -33,6 +36,15 @@ export default class NodeBlockSourceEntriesApprover {
   public async approve(
     message: NodeBlockSourceEntriesApproverMessage,
   ): Promise<NodeBlockSource> {
-    return this.policy.change(() => this.approveReviewed(message));
+    const approved = await this.ownerWrites.hold(
+      new NodeOwnerWriteHolderMessage(
+        message.authenticatedIdentityId.valueOf(),
+      ),
+      () => this.approveReviewed(message),
+    );
+
+    await this.policy.reapply();
+
+    return approved;
   }
 }
