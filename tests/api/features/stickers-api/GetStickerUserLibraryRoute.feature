@@ -82,7 +82,7 @@ Feature: Get sticker user library route
     And I sign the current sticker creation request
     When I POST to the current sticker pack stickers
     Then response code is equal to 200
-    Given I remember the current sticker
+    Given I remember the sticker I just created
     And I sign the current favorite sticker request
     When I PUT the current sticker as favorite
     Then response code is equal to 200
@@ -230,7 +230,7 @@ Feature: Get sticker user library route
     When I PUT the current sticker as favorite
     Then response code is equal to 200
     Given I sign the current sticker library request
-    When I GET "/stickers/library?favoriteStickersLimit=1&favoriteStickersCursor=CURSOR" with the forged "stickers.library.favoriteStickers" cursor at position "99999999999999999|pack-x|sticker-x"
+    When I GET "/stickers/library?favoriteStickersLimit=1&favoriteStickersCursor=CURSOR" with the forged "stickers.library.favoriteStickers" cursor at position "17280000000000000|pack-x|sticker-x"
     Then response code is equal to 200
     And response lists 1 favorite stickers
 

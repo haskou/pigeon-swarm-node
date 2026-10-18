@@ -54,7 +54,7 @@ Feature: Get sticker packs route
     When I POST to "/stickers/packs"
     Then response code is equal to 201
     Given I sign the current sticker packs request
-    When I GET "/stickers/packs?limit=1&cursor=CURSOR" with the forged "stickers.packs" cursor at position "99999999999999999|pack-x"
+    When I GET "/stickers/packs?limit=1&cursor=CURSOR" with the forged "stickers.packs" cursor at position "17280000000000000|pack-x"
     Then response code is equal to 200
     And response lists 1 sticker packs
 
@@ -84,7 +84,7 @@ Feature: Get sticker packs route
 
   Scenario: Refuse a sticker pack cursor with an oversized position
     Given I am an anonymous user
-    When I GET "/stickers/packs?limit=1" with a "stickers.packs" cursor holding a 257 character position
+    When I GET "/stickers/packs?limit=1&cursor=CURSOR" with a "stickers.packs" cursor holding a 257 character position
     Then response code is equal to 400
     And response body should contain "400110"
 

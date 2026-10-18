@@ -6097,6 +6097,19 @@ export default class Definitions {
     this.stickerId = sticker.id;
   }
 
+  @given('I remember the sticker I just created')
+  public iRememberTheStickerIJustCreated(): void {
+    const { stickerId } = JSON.parse(this.body || '{}') as {
+      stickerId?: unknown;
+    };
+
+    if (typeof stickerId !== 'string') {
+      throw new Error('Signed sticker body has no sticker id.');
+    }
+
+    this.stickerId = stickerId;
+  }
+
   @given('I set a static sticker body')
   public iSetAStaticStickerBody(): void {
     this.body = JSON.stringify({
