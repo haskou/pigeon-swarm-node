@@ -3,10 +3,17 @@ import { CommunityInvitationCreateMessage } from '@app/contexts/communities/appl
 import CommunityFinder from '@app/contexts/communities/application/find-community/CommunityFinder';
 import CommunityModerationLogRecorder from '@app/contexts/communities/application/record-moderation-log/CommunityModerationLogRecorder';
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityModerationTarget } from '@app/contexts/communities/domain/entities/moderation/CommunityModerationTarget';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
 import CommunityModerationLogRepository from '@app/contexts/communities/domain/repositories/CommunityModerationLogRepository';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
+import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
+import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
+import CommunityModerationLogMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityModerationLogMutationPolicy';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { readFileSync } from 'node:fs';
@@ -134,5 +141,71 @@ describe('Community invitation creator against shared vectors', () => {
       id: operation.digest,
       type: 'invitation',
     });
+  });
+
+  it('records a moderation log that the public mutation gate verifies', async () => {
+    const { derived: operation } = invitation;
+    const creator = new CommunityInvitationCreator(
+      communityFinder,
+      communityRepository,
+      eventPublisher,
+      new CommunityModerationLogRecorder(moderationLogRepository),
+    );
+    const message = new CommunityInvitationCreateMessage(
+      operation.payload.communityId,
+      operation.payload.authorIdentityId,
+      invitation.input.args as never,
+      log.derived.body as never,
+      operation.requestOperation as never,
+    );
+
+    await creator.create(message);
+
+    const [entry, proof] = moderationLogRepository.save.mock.calls[0];
+    const primitives = entry.toPrimitives();
+    const record = PublicMutationRecord.withProof(
+      { ...primitives, scopeType: 'community_moderation_log' },
+      proof,
+    );
+
+    expect(primitives.actorIdentityId).toBe(operation.payload.authorIdentityId);
+
+    const frontierCommunity = CommunityStateFold.fold([
+      CommunityOperation.fromPrimitives(genesis.derived.payload as never),
+    ]).community as Community;
+    const moderationLogPolicy = new CommunityModerationLogMutationPolicy({
+      requireAtFrontier: jest.fn(() => Promise.resolve(frontierCommunity)),
+    } as unknown as OrbitDBCommunityRepository);
+    const gate = new PublicMutationGate(
+      new PublicMutationVerifier({ isAuthorized: () => Promise.resolve(true) }),
+      [moderationLogPolicy],
+    );
+
+    await expect(gate.accepts('moderationLogs', record)).resolves.toBe(true);
+
+    const retargetedTarget = CommunityModerationTarget.fromPrimitives({
+      id: operation.payload.communityId,
+      type: 'invitation',
+    }).toPrimitives();
+    const retargeted = {
+      ...primitives,
+      id: CommunityModerationLogId.derive(
+        primitives.communityId,
+        primitives.actorIdentityId,
+        primitives.action,
+        retargetedTarget.type,
+        retargetedTarget.id,
+        primitives.createdAt,
+      ).valueOf(),
+      scopeType: 'community_moderation_log',
+      target: retargetedTarget,
+    };
+
+    await expect(
+      gate.accepts(
+        'moderationLogs',
+        PublicMutationRecord.withProof(retargeted, proof),
+      ),
+    ).resolves.toBe(false);
   });
 });
