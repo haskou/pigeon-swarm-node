@@ -17,6 +17,7 @@ export class CommunityChannelMessagesViewModel {
     private readonly reactions: CommunityChannelMessageReaction[] = [],
     private readonly polls: Poll[] = [],
     private readonly limit: number = 50,
+    private readonly pageCursor?: (position: string) => string,
   ) {}
 
   private reactionsFor(
@@ -50,6 +51,14 @@ export class CommunityChannelMessagesViewModel {
     return poll ? [new PollViewModel(poll).toResource()] : [];
   }
 
+  private nextCursorFor(oldestId: string | undefined): string | null {
+    if (oldestId === undefined || this.pageCursor === undefined) {
+      return null;
+    }
+
+    return this.pageCursor(oldestId);
+  }
+
   public toResource(): CommunityChannelMessagesResource {
     const messageResources = this.messages.flatMap((message) =>
       this.messageResource(message),
@@ -66,7 +75,10 @@ export class CommunityChannelMessagesViewModel {
       channelId: this.channelId,
       communityId: this.communityId,
       messages: timeline,
-      nextBeforeMessageId: timeline[0]?.id,
+      nextCursor:
+        this.pageCursor === undefined
+          ? undefined
+          : this.nextCursorFor(timeline[0]?.id),
     };
   }
 }

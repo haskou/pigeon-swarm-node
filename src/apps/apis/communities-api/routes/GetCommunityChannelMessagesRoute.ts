@@ -1,3 +1,4 @@
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import CommunityChannelMessagesFinder from '@app/contexts/communities/application/find-channel-messages/CommunityChannelMessagesFinder';
 import { CommunityChannelMessagesFindMessage } from '@app/contexts/communities/application/find-channel-messages/messages/CommunityChannelMessagesFindMessage';
 import { CommunityChannelThreadMessagesFindMessage } from '@app/contexts/communities/application/find-channel-messages/messages/CommunityChannelThreadMessagesFindMessage';
@@ -59,7 +60,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
     @Param('communityId') communityId: string,
     @Param('channelId') channelId: string,
     @QueryParam('limit') limit: number | undefined,
-    @QueryParam('beforeMessageId') beforeMessageId: string | undefined,
+    @QueryParam('cursor') cursor: string | undefined,
     @QueryParam('query') query: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
@@ -78,13 +79,15 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
       return response.status(HttpRouteStatusEnum.OK).send(found.toResource());
     }
 
+    const resource = `communities/${communityId}/channels/${channelId}/messages`;
+    const caller = actorIdentityId.valueOf();
     const page = await this.finder.find(
       new CommunityChannelMessagesFindMessage(
         communityId,
         channelId,
-        actorIdentityId.valueOf(),
+        caller,
         limit,
-        beforeMessageId,
+        cursor === undefined ? undefined : PageCursor.decode(cursor, resource),
       ),
     );
 
@@ -98,6 +101,7 @@ export class GetCommunityChannelMessagesRoute extends CommunityRouteSupport {
           page.getReactions(),
           page.getPolls(),
           page.getLimit(),
+          (position) => PageCursor.encode({ position, resource }),
         ).toResource(),
       );
   }
