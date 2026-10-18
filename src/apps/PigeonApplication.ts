@@ -1,3 +1,4 @@
+import { JsonBodyContentTypeGuard } from '@app/apps/apis/shared/JsonBodyContentTypeGuard';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
 import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import { Kernel } from '@haskou/ddd-kernel';
@@ -200,6 +201,9 @@ export default class PigeonApplication {
               app.use((request, _response, next) => {
                 HttpRequestContext.run(request, next);
               });
+              app.use(
+                new JsonBodyContentTypeGuard(routePrefixValue).middleware,
+              );
             },
             phase: 'beforeControllers',
           },

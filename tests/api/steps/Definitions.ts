@@ -2968,6 +2968,13 @@ export default class Definitions {
       this.response.data.keychainExternalIdentifier;
   }
 
+  @given('I set a non-JSON body with content type {string}')
+  public iSetANonJsonBodyWithContentType(contentType: string): void {
+    this.body = undefined;
+    this.binaryBody = Buffer.from('plain text body');
+    this.headers['content-type'] = contentType;
+  }
+
   @given('I set a one-to-one conversation body for a new participant')
   public async iSetAOneToOneConversationBodyForANewParticipant(): Promise<void> {
     if (!this.keychainExternalIdentifier) {

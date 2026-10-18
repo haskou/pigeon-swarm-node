@@ -372,6 +372,15 @@ community member, a poll vote or a sticker library. It returns `204` with no
 body only when there is nothing to return, as for resetting notification scope
 settings.
 
+### Request bodies
+
+A request that carries a body (a `Content-Length` above zero, or a chunked
+transfer) must declare `Content-Type: application/json`. Any other type is
+refused with `415` and `UnsupportedMediaTypeError` before routing. Bodyless
+requests are not affected. Raw-body routes (`POST /ipfs/contents`,
+`PUT /node/blocks` and `PUT /private-blobs/{blobId}`) read their bytes as sent
+and accept the types they declare.
+
 ### Operation ids
 
 Every operation has an `operationId`, unique across the API documents and
