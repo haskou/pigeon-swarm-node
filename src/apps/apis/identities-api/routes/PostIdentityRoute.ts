@@ -1,3 +1,4 @@
+import { NonCanonicalIdentityIdError } from '@app/apps/apis/shared/errors/NonCanonicalIdentityIdError';
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import IdentityCreationDetector from '@app/contexts/identities/application/detect-creation/IdentityCreationDetector';
 import { IdentityCreationDetectorMessage } from '@app/contexts/identities/application/detect-creation/messages/IdentityCreationDetectorMessage';
@@ -95,6 +96,14 @@ export class PostIdentityRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     this.sourceRateLimiter.consume(httpRequest.ip ?? 'unknown');
+
+    // A record under an id that is not the canonical encoding of a usable key
+    // cannot carry a valid signature, so it is refused (400080) before the
+    // signature is read.
+    if (!new IdentityId(body.id).isCanonicalKey()) {
+      throw new NonCanonicalIdentityIdError();
+    }
+
     // Building the message verifies the identity's signature.
     const message = new PostIdentityRequest(body).getIdentityPublishMessage();
 
