@@ -68,6 +68,16 @@ function parseCursor(value: string): CursorPayload {
     throw new InvalidPageCursorError();
   }
 
+  // Reject non-canonical JSON: key order must match what `encode` writes.
+  const canonical = JSON.stringify({
+    position: parsed.position,
+    resource: parsed.resource,
+  });
+
+  if (canonical !== json) {
+    throw new InvalidPageCursorError();
+  }
+
   return parsed;
 }
 

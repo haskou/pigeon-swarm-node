@@ -48,3 +48,8 @@ Feature: Get community members API
     When I GET the current community members with a cursor whose position is not an identity id
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A non-member cannot list the members
+    Given the community member signs the current community members request
+    When I GET the current community members with query "?limit=1"
+    Then response code is equal to 409

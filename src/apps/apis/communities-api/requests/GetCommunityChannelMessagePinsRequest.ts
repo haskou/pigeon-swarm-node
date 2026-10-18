@@ -2,12 +2,12 @@ import { InvalidPageCursorError } from '@app/apps/apis/shared/errors/InvalidPage
 import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import { PageLimit } from '@app/apps/apis/shared/pagination/PageLimit';
 import { CommunityChannelMessagePinsFindMessage } from '@app/contexts/communities/application/manage-channel-message-pin/messages/CommunityChannelMessagePinsFindMessage';
+import { PageTimestamp } from '@app/contexts/communities/application/pagination/PageTimestamp';
 import { CommunityChannelMessageId } from '@app/contexts/communities/domain/value-objects/CommunityChannelMessageId';
 
 /** One page of a channel's pins, read after the position of its cursor. */
 export class GetCommunityChannelMessagePinsRequest {
-  private static readonly POSITION_PATTERN =
-    /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z)\|(.+)$/;
+  private static readonly POSITION_PATTERN = /^(\d{17})\|(.+)$/;
 
   public constructor(
     private readonly communityId: string,
@@ -35,7 +35,7 @@ export class GetCommunityChannelMessagePinsRequest {
   private isValidPin(createdAt: string, messageId: string): boolean {
     try {
       return (
-        new Date(createdAt).toISOString() === createdAt &&
+        PageTimestamp.isValid(createdAt) &&
         new CommunityChannelMessageId(messageId).valueOf() === messageId
       );
     } catch {

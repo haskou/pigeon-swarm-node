@@ -1,5 +1,5 @@
-import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import { InvalidPageCursorError } from '@app/apps/apis/shared/errors/InvalidPageCursorError';
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 
 describe('PageCursor', () => {
   const resource = 'list-a';
@@ -29,6 +29,23 @@ describe('PageCursor', () => {
     );
   });
 
+  it('round-trips a position of exactly 256 characters', () => {
+    const position = 'p'.repeat(256);
+    const cursor = PageCursor.encode({ position, resource });
+
+    expect(PageCursor.decode(cursor, resource)).toEqual(position);
+  });
+
+  it('refuses a position longer than 256 characters', () => {
+    const cursor = Buffer.from(
+      JSON.stringify({ position: 'p'.repeat(257), resource }),
+    ).toString('base64url');
+
+    expect(() => PageCursor.decode(cursor, resource)).toThrow(
+      InvalidPageCursorError,
+    );
+  });
+
   it.each([
     '',
     '%%%',
@@ -40,6 +57,7 @@ describe('PageCursor', () => {
     Buffer.from('{"position":1,"resource":"list-a"}').toString('base64url'),
     Buffer.from('{"position":"m"}').toString('base64url'),
     `${Buffer.from('{"position":"m","resource":"list-a"}').toString('base64url')}=`,
+    Buffer.from('{"resource":"list-a","position":"m"}').toString('base64url'),
     'a'.repeat(513),
   ])('refuses a malformed cursor %p', (value) => {
     expect(() => PageCursor.decode(value, resource)).toThrow(

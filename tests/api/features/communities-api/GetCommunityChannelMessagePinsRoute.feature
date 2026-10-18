@@ -55,3 +55,11 @@ Feature: Get community channel message pins
     When I GET pins from the current community channel with a cursor for another list
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A non-member cannot list the pins of a private channel
+    Given I am an anonymous user
+    And I register a test IPFS network "community-channel-pins-non-member-network"
+    And I have created a private community text channel
+    Given the community member signs the current community channel pins request
+    When I GET pins from the current community channel with query "?limit=1"
+    Then response code is equal to 409

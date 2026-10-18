@@ -135,3 +135,15 @@ Feature: Community roles API
     When I GET the current community roles with a cursor whose position is not a role id
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A non-member cannot list the roles
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-roles-non-member-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given the community member signs the current community roles request
+    When I GET the current community roles with query "?limit=1"
+    Then response code is equal to 409

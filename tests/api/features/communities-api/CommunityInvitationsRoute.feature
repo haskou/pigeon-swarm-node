@@ -149,3 +149,18 @@ Feature: Community invitations API
     When I GET the current community invitation claims with query "?cursor=not-a-cursor"
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A non-member cannot list the invitations or the claims
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-invitations-non-member-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given the community member signs the current community invitations request
+    When I GET the current community invitations with query "?limit=1"
+    Then response code is equal to 409
+    Given the community member signs the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1"
+    Then response code is equal to 409

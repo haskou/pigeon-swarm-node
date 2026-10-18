@@ -3584,13 +3584,24 @@ export default class Definitions {
 
   @given('the community member signs the current community join request')
   public async theCommunityMemberSignsTheCurrentCommunityJoinRequest(): Promise<void> {
+    await this.signCommunityJoinRequest(Date.now());
+  }
+
+  @given(
+    'the community member signs the current community join request with a far-future createdAt',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityJoinRequestWithAFarFutureCreatedAt(): Promise<void> {
+    // The largest millisecond timestamp still inside the Timestamp range.
+    await this.signCommunityJoinRequest(Date.UTC(275000, 0, 1));
+  }
+
+  private async signCommunityJoinRequest(createdAt: number): Promise<void> {
     if (!this.communityId) {
       throw new Error('Community must be created first.');
     }
 
     const keyPair = await this.ensureOtherIdentityKeyPair();
     const identityId = String(this.otherIdentityId?.valueOf());
-    const createdAt = Date.now();
     const payload = this.communityRequestPayload(
       identityId,
       identityId,
@@ -3612,6 +3623,74 @@ export default class Definitions {
     await this.signCurrentRequest(
       'POST',
       '/community-membership-requests',
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
+  @given('the community member signs the current community members request')
+  public async theCommunityMemberSignsTheCurrentCommunityMembersRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('members'));
+  }
+
+  @given('the community member signs the current community roles request')
+  public async theCommunityMemberSignsTheCurrentCommunityRolesRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('roles'));
+  }
+
+  @given('the community member signs the current community channels request')
+  public async theCommunityMemberSignsTheCurrentCommunityChannelsRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('channels'));
+  }
+
+  @given('the community member signs the current community invitations request')
+  public async theCommunityMemberSignsTheCurrentCommunityInvitationsRequest(): Promise<void> {
+    await this.signOtherIdentityGet(this.currentCommunityPath('invitations'));
+  }
+
+  @given(
+    'the community member signs the current community invitation claims request',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityInvitationClaimsRequest(): Promise<void> {
+    await this.signOtherIdentityGet(
+      this.currentCommunityPath('invitation-claims'),
+    );
+  }
+
+  @given(
+    'the community member signs the current community channel pins request',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityChannelPinsRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    await this.signOtherIdentityGet(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
+    );
+  }
+
+  @given('the community member signs the current community drafts request')
+  public async theCommunityMemberSignsTheCurrentCommunityDraftsRequest(): Promise<void> {
+    await this.signOtherIdentityGet('/community-drafts');
+  }
+
+  private currentCommunityPath(suffix: string): string {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    return `/communities/${this.communityId}/${suffix}`;
+  }
+
+  private async signOtherIdentityGet(path: string): Promise<void> {
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      path,
       String(Date.now()),
       keyPair,
       this.otherIdentityId,
@@ -7507,6 +7586,95 @@ export default class Definitions {
     );
   }
 
+  @given('I sign the current communities request')
+  public async iSignTheCurrentCommunitiesRequest(): Promise<void> {
+    this.body = undefined;
+    await this.signCurrentRequest('GET', '/communities');
+  }
+
+  @when('I GET current communities with query {string}')
+  public async iGETCurrentCommunitiesWithQuery(query: string): Promise<void> {
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/communities${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET current communities with a cursor for another list')
+  public async iGETCurrentCommunitiesWithAnotherListCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: this.communityId,
+      resource: 'discoverable-communities',
+    });
+
+    this.response = await this.restClient.get(
+      `/communities?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET discoverable communities with query {string}')
+  public async iGETDiscoverableCommunitiesWithQuery(
+    query: string,
+  ): Promise<void> {
+    const params = query
+      .replace('CURSOR', this.pageNextCursor ?? '')
+      .replace(/^\?/, '');
+
+    this.response = await this.restClient.get(
+      `/discoverable-communities?query=API&networkId=${this.currentNetworkId}${params ? `&${params}` : ''}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET discoverable communities with a cursor for another list')
+  public async iGETDiscoverableCommunitiesWithAnotherListCursor(): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: this.communityId,
+      resource: 'communities',
+    });
+
+    this.response = await this.restClient.get(
+      `/discoverable-communities?query=API&networkId=${this.currentNetworkId}&cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET community membership requests with query {string}')
+  public async iGETCommunityMembershipRequestsWithQuery(
+    query: string,
+  ): Promise<void> {
+    const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
+
+    this.response = await this.restClient.get(
+      `/community-membership-requests${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET community membership requests with a cursor for another list')
+  public async iGETCommunityMembershipRequestsWithAnotherListCursor(): Promise<void> {
+    const cursor = PageCursor.encode({
+      position: '08640000000000000|foreignrequest',
+      resource: 'communities',
+    });
+
+    this.response = await this.restClient.get(
+      `/community-membership-requests?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
   @when('I GET current communities')
   public async iGETCurrentCommunities(): Promise<void> {
     this.response = await this.restClient.get('/communities', this.headers);
@@ -7858,8 +8026,27 @@ export default class Definitions {
     }
 
     const cursor = PageCursor.encode({
-      position: '2026-01-01T00:00:00.000Z|community-message:foreign',
+      position: '08640000000000000|community-message:foreign',
       resource: 'community-drafts',
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=${encodeURIComponent(cursor)}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET pins from the current community channel with a well-formed forged cursor',
+  )
+  public async iGETPinsWithAWellFormedForgedCursor(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: '08640000000000000|forged-message',
+      resource: `communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
     });
 
     this.response = await this.restClient.get(
@@ -7903,7 +8090,11 @@ export default class Definitions {
     }
 
     const cursor = PageCursor.encode({
-      position: '2026-01-01T00:00:00.000Z|community-message:foreign',
+      position: JSON.stringify([
+        '08640000000000000',
+        this.communityId,
+        this.communityChannelId,
+      ]),
       resource: `communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
     });
 
@@ -8086,6 +8277,20 @@ export default class Definitions {
     const { roles } = this.response.data as { roles: unknown[] };
 
     expect(roles).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} requests')
+  public responseListsRequests(count: number): void {
+    const { requests } = this.response.data as { requests: unknown[] };
+
+    expect(requests).to.have.lengthOf(count);
+  }
+
+  @then('response lists {int} communities')
+  public responseListsCommunities(count: number): void {
+    const { communities } = this.response.data as { communities: unknown[] };
+
+    expect(communities).to.have.lengthOf(count);
   }
 
   @then('response lists {int} channels')
@@ -8610,6 +8815,28 @@ export default class Definitions {
   @then('response body should not contain {string}')
   public responseBodyShouldnotContain(textToContain: string): void {
     expect(JSON.stringify(this.response.data)).to.not.contain(textToContain);
+  }
+
+  @then('response body should contain the current community channel id')
+  public responseBodyShouldContainTheCurrentCommunityChannelId(): void {
+    if (!this.communityChannelId) {
+      throw new Error('Community channel must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.contain(
+      this.communityChannelId,
+    );
+  }
+
+  @then('response body should not contain the current community channel id')
+  public responseBodyShouldNotContainTheCurrentCommunityChannelId(): void {
+    if (!this.communityChannelId) {
+      throw new Error('Community channel must be created first.');
+    }
+
+    expect(JSON.stringify(this.response.data)).to.not.contain(
+      this.communityChannelId,
+    );
   }
 
   @then('response body should not contain the other identity id')

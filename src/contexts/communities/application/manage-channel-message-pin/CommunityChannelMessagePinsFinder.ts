@@ -3,16 +3,17 @@ import CommunityChannelMessagePinRepository from '../../domain/repositories/Comm
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import { PageSlice } from '../pagination/PageSlice';
+import { PageTimestamp } from '../pagination/PageTimestamp';
 import { CommunityChannelMessagePinDetails } from './CommunityChannelMessagePinDetails';
 import { CommunityChannelMessagePinsPage } from './CommunityChannelMessagePinsPage';
 import { CommunityChannelMessagePinsFindMessage } from './messages/CommunityChannelMessagePinsFindMessage';
 
 export default class CommunityChannelMessagePinsFinder {
-  /** `${createdAt ISO-8601}|${messageId}`: the pin order, unique per pin in a channel. */
+  /** `${createdAt fixed-width timestamp}|${messageId}`: the pin order, unique per pin in a channel. */
   public static position(details: CommunityChannelMessagePinDetails): string {
     const pin = details.getPin();
 
-    return `${new Date(pin.getCreatedAt().valueOf()).toISOString()}|${pin.getMessageId().valueOf()}`;
+    return `${PageTimestamp.of(pin.getCreatedAt().valueOf())}|${pin.getMessageId().valueOf()}`;
   }
 
   constructor(

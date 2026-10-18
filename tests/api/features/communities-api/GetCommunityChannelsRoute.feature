@@ -146,3 +146,96 @@ Feature: Get community channels API
     When I GET channels from the current community with a cursor whose position is not a channel id
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A non-member cannot list the channels
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-channels-non-member-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    Given the community member signs the current community channels request
+    When I GET channels from the current community with query "?limit=1"
+    Then response code is equal to 409
+
+  Scenario: A member cannot list or read a text channel restricted to a role they lack
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-hidden-text-channel-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community administrator role body
+    And I sign the current community role request
+    When I POST a role to the current community
+    Then response code is equal to 200
+    And I remember the current community role
+    And I set a community text channel body
+    And I sign the current community text channel request
+    When I POST a text channel to the current community
+    Then response code is equal to 200
+    And I remember the current community text channel
+    And I set current community channel visible for the current role
+    And I sign the current community channel permissions request
+    When I PATCH permissions for the current community channel
+    Then response code is equal to 200
+    Given the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And I sign the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
+    Given I sign the current community channels request
+    When I GET channels from the current community with query "?limit=100"
+    Then response code is equal to 200
+    And response body should contain the current community channel id
+    Given the community member signs the current community channels request
+    When I GET channels from the current community with query "?limit=100"
+    Then response code is equal to 200
+    And response body should not contain the current community channel id
+    Given the community member signs the current community channel pins request
+    When I GET pins from the current community channel with query "?limit=1"
+    Then response code is equal to 409
+
+  Scenario: A member cannot list a voice channel restricted to a role they lack
+    Given I am an anonymous user
+    And I register a test IPFS network "communities-api-hidden-voice-channel-network"
+    And I set a private community body
+    And I sign the current community creation request
+    When I POST to "/communities"
+    Then response code is equal to 201
+    And I remember the current community
+    And I set a community administrator role body
+    And I sign the current community role request
+    When I POST a role to the current community
+    Then response code is equal to 200
+    And I remember the current community role
+    And I set a community voice channel body
+    And I sign the current community voice channel request
+    When I POST a voice channel to the current community
+    Then response code is equal to 200
+    And I remember the current community voice channel
+    And I set current community channel visible for the current role
+    And I sign the current community channel permissions request
+    When I PATCH permissions for the current community channel
+    Then response code is equal to 200
+    Given the community member signs the current community join request
+    When I POST to request joining the current community
+    Then response code is equal to 200
+    And I remember the current community membership request
+    And I set an accepted community membership request body
+    And I sign the current membership request update
+    When I PATCH the current community membership request
+    Then response code is equal to 200
+    Given I sign the current community channels request
+    When I GET channels from the current community with query "?limit=100"
+    Then response code is equal to 200
+    And response body should contain the current community channel id
+    Given the community member signs the current community channels request
+    When I GET channels from the current community with query "?limit=100"
+    Then response code is equal to 200
+    And response body should not contain the current community channel id
