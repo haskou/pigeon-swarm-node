@@ -84,7 +84,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
       body: undefined,
       header: (name: string) => headers[name.toLowerCase()],
       method: 'GET',
-      path,
+      originalUrl: path,
     } as Request;
 
     return { authorization, headers, request };
@@ -102,7 +102,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     const payload = SignedHttpRequestSignature.signingContent({
       body: source.request.body,
       method: source.request.method,
-      path: source.request.path,
+      path: source.request.originalUrl,
       timestamp: Number(source.headers['x-timestamp'] as string),
     });
     source.headers['x-device-credential'] = undefined;
@@ -264,7 +264,7 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
     const payload = SignedHttpRequestSignature.signingContent({
       body: source.request.body,
       method: source.request.method,
-      path: source.request.path,
+      path: source.request.originalUrl,
       timestamp: Number(timestamp),
     });
     source.headers['x-recovery-signature'] = recoveryAuthority

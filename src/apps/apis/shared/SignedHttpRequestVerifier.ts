@@ -27,7 +27,7 @@ export class SignedHttpRequestVerifier {
         {
           body,
           method: request.method,
-          path: request.path,
+          path: request.originalUrl,
           timestamp: Number(timestamp),
         },
         parsed,

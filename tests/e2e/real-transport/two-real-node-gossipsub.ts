@@ -994,9 +994,7 @@ async function request<T = unknown>(
       headers: {
         Connection: 'close',
         ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-        ...(signer
-          ? signHeaders(signer, method, canonicalPath, body ?? {})
-          : {}),
+        ...(signer ? signHeaders(signer, method, requestPath, body ?? {}) : {}),
       },
       method,
       signal: abortController.signal,

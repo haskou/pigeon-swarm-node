@@ -70,7 +70,7 @@ It adds no endpoint, flag or node-to-node protocol. The work is in the client. E
 
 ### Node facts this relies on
 
-- Signature checks need no lookup: `X-Identity-Id` is the identity's PEM public key. The signed payload is method, path, timestamp and body, with no host.
+- Signature checks need no lookup: `X-Identity-Id` is the identity's PEM public key. The signed payload is method, request target (path and query), timestamp and body, with no host.
 - A failed `PUT` leaves the reservation open. The same upload token can retry until the upload window ends. A stored blob is immutable: a second successful `PUT` returns `409`.
 - Cross-origin calls are allowed. `PigeonApplication` enables routing-controllers `cors: true`, which permits the methods and the `Authorization` and `Range` headers used here. This is read from the configuration; no browser test exists yet.
 

@@ -1246,7 +1246,7 @@ paths:
       tags:
         - communities
       summary: List or search community text channel messages
-      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `cursor` is ignored and `polls` is empty. Query string values are not part of the signed path.
+      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `cursor` is ignored and `polls` is empty. The signature covers the full request target, query string included.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -1323,7 +1323,7 @@ paths:
       tags:
         - communities
       summary: Search public community messages across visible text channels
-      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. Messages are listed per channel, so `query` is required here. The request is signed as GET /communities/{communityId}/messages; query string values are not part of the signed path.
+      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. Messages are listed per channel, so `query` is required here. The request is signed as GET /communities/{communityId}/messages?query=...; the signature covers the full request target, query string included.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query

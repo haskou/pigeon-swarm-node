@@ -60,7 +60,7 @@ X-Signature: <signature>
 
 Implemented:
 
-- canonical request payload: method, path, timestamp and body hash, built by
+- canonical request payload: method, request target (raw path and raw query string, as sent), timestamp and body hash, built by
   `SignedHttpRequestSignature` from `@haskou/pigeon-swarm-crypto`; the signed
   bytes are `utf8("pigeon:signed-http-request:v1\n")` followed by the RFC 8785
   canonical JSON of that payload
@@ -3686,8 +3686,8 @@ Implemented:
 GET /discoverable-communities?query=Pigeon&networkId=<networkId>
 ```
 
-The request is signed as `GET /discoverable-communities`; query string values are
-not part of the signed canonical path because Express verifies `request.path`.
+The request is signed as `GET /discoverable-communities?<query>`: the signature covers
+the full request target, query string included, exactly as sent.
 
 Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
 
@@ -5252,8 +5252,8 @@ GET /communities/{communityId}/channels/{channelId}/messages?query=pigeon&limit=
 ```
 
 Search is the channel message list filtered by `query`. The request is signed
-as `GET /communities/{communityId}/channels/{channelId}/messages`; query string
-values are not part of the signed path.
+as `GET /communities/{communityId}/channels/{channelId}/messages?<query>`; the
+signature covers the full request target, query string included.
 
 Implemented:
 
@@ -5275,8 +5275,8 @@ GET /communities/{communityId}/messages?query=pigeon&limit=20
 Community messages are listed per channel, so this collection is read only
 through a search: `query` is required, and a request without it is refused with
 `400` (code `400100`). The request is signed as
-`GET /communities/{communityId}/messages`; query string values are not part of
-the signed path.
+`GET /communities/{communityId}/messages?<query>`; the signature covers the full
+request target, query string included.
 
 Implemented:
 
@@ -6522,7 +6522,7 @@ creating a public identity-target lookup or cross-identity access relationship.
 An existing device additionally sends `X-Device-Credential` and
 `X-Device-Signature`. The credential uses the normalized public-key form used by
 identity identifiers, without PEM delimiters or whitespace. The device signature
-covers the same canonical method, path, timestamp and body hash as the stable
+covers the same canonical method, request target (path and query), timestamp and body hash as the stable
 identity signature. Total recovery sends `X-Recovery-Signature` over that same
 canonical payload instead. Exactly one complete proof is required. The node
 verifies the device against the current authorization checkpoint or the recovery
@@ -6598,8 +6598,8 @@ from the genesis.
 
 `after` (optional, default `0`) keeps only entries whose `revision` is greater
 than it. It must be a non-negative decimal safe integer without leading zeros;
-anything else returns `400` (`400050`). It is outside the signed canonical
-payload and can only narrow the response, so it serves incremental sync only.
+anything else returns `400` (`400050`). It is part of the signed request target, so
+changing it invalidates the signature; it can only narrow the response, so it serves incremental sync only.
 A client deciding whether it was removed fetches without `after`, verifies
 every entry with the shared replay rules and wipes only on positive signed
 evidence: a recovery in its own epoch targeting another credential, or a
