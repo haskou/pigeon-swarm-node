@@ -7,10 +7,9 @@ describe('GetPresenceListRequest', () => {
   it('accepts repeated identityIds query params', async () => {
     const firstIdentityId = await identityId();
     const secondIdentityId = await identityId();
-    const message = new GetPresenceListRequest('viewer-id', [
-      firstIdentityId,
-      secondIdentityId,
-    ]).getMessage();
+    const message = new GetPresenceListRequest('viewer-id', {
+      identityIds: [firstIdentityId, secondIdentityId],
+    }).getMessage();
 
     expect(message.identityIds).toEqual([firstIdentityId, secondIdentityId]);
   });
@@ -18,10 +17,9 @@ describe('GetPresenceListRequest', () => {
   it('accepts comma-separated identityIds query params', async () => {
     const firstIdentityId = await identityId();
     const secondIdentityId = await identityId();
-    const message = new GetPresenceListRequest(
-      'viewer-id',
-      `${firstIdentityId}, ${secondIdentityId}`,
-    ).getMessage();
+    const message = new GetPresenceListRequest('viewer-id', {
+      identityIds: `${firstIdentityId}, ${secondIdentityId}`,
+    }).getMessage();
 
     expect(message.identityIds).toEqual([firstIdentityId, secondIdentityId]);
   });
@@ -30,10 +28,9 @@ describe('GetPresenceListRequest', () => {
     const firstIdentityId = await identityId();
     const secondIdentityId = await identityId();
     const thirdIdentityId = await identityId();
-    const message = new GetPresenceListRequest('viewer-id', [
-      `${firstIdentityId}, ${secondIdentityId}`,
-      thirdIdentityId,
-    ]).getMessage();
+    const message = new GetPresenceListRequest('viewer-id', {
+      identityIds: [`${firstIdentityId}, ${secondIdentityId}`, thirdIdentityId],
+    }).getMessage();
 
     expect(message.identityIds).toEqual([
       firstIdentityId,
@@ -44,20 +41,18 @@ describe('GetPresenceListRequest', () => {
 
   it('accepts up to 100 distinct identityIds', async () => {
     const identityIds = await identityIdsOf(100);
-    const message = new GetPresenceListRequest(
-      'viewer-id',
-      identityIds.join(','),
-    ).getMessage();
+    const message = new GetPresenceListRequest('viewer-id', {
+      identityIds: identityIds.join(','),
+    }).getMessage();
 
     expect(message.identityIds).toEqual(identityIds);
   });
 
   it('counts repeated identityIds once toward the cap', async () => {
     const identityIds = await identityIdsOf(100);
-    const message = new GetPresenceListRequest('viewer-id', [
-      ...identityIds,
-      identityIds[0],
-    ]).getMessage();
+    const message = new GetPresenceListRequest('viewer-id', {
+      identityIds: [...identityIds, identityIds[0]],
+    }).getMessage();
 
     expect(message.identityIds).toEqual(identityIds);
   });
@@ -66,10 +61,9 @@ describe('GetPresenceListRequest', () => {
     const identityIds = await identityIdsOf(101);
 
     expect(() =>
-      new GetPresenceListRequest(
-        'viewer-id',
-        identityIds.join(','),
-      ).getMessage(),
+      new GetPresenceListRequest('viewer-id', {
+        identityIds: identityIds.join(','),
+      }).getMessage(),
     ).toThrow(InvalidPresenceIdentityIdsError);
   });
 
@@ -77,10 +71,9 @@ describe('GetPresenceListRequest', () => {
     const [validIdentityId] = await identityIdsOf(1);
 
     expect(() =>
-      new GetPresenceListRequest('viewer-id', [
-        validIdentityId,
-        'unknown',
-      ]).getMessage(),
+      new GetPresenceListRequest('viewer-id', {
+        identityIds: [validIdentityId, 'unknown'],
+      }).getMessage(),
     ).toThrow(InvalidPresenceIdentityIdsError);
   });
 
@@ -88,15 +81,34 @@ describe('GetPresenceListRequest', () => {
     const [identityId] = await identityIdsOf(1);
 
     expect(() =>
-      new GetPresenceListRequest('viewer-id', `${identityId},`).getMessage(),
+      new GetPresenceListRequest('viewer-id', {
+        identityIds: `${identityId},`,
+      }).getMessage(),
     ).toThrow(InvalidPresenceIdentityIdsError);
     expect(() =>
-      new GetPresenceListRequest('viewer-id', '').getMessage(),
+      new GetPresenceListRequest('viewer-id', {
+        identityIds: '',
+      }).getMessage(),
+    ).toThrow(InvalidPresenceIdentityIdsError);
+  });
+
+  it('refuses an object-form identityIds query param instead of reading it as absent', async () => {
+    const [identityId] = await identityIdsOf(1);
+
+    expect(() =>
+      new GetPresenceListRequest('viewer-id', {
+        [`identityIds[${identityId}]`]: 'unknown',
+      }).getMessage(),
+    ).toThrow(InvalidPresenceIdentityIdsError);
+    expect(() =>
+      new GetPresenceListRequest('viewer-id', {
+        identityIds: { [identityId]: 'unknown' },
+      }).getMessage(),
     ).toThrow(InvalidPresenceIdentityIdsError);
   });
 
   it('answers no identities when identityIds is absent', () => {
-    const message = new GetPresenceListRequest('viewer-id').getMessage();
+    const message = new GetPresenceListRequest('viewer-id', {}).getMessage();
 
     expect(message.identityIds).toEqual([]);
   });

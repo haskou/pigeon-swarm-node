@@ -19,26 +19,42 @@ export class GetPresenceListRequest {
 
   constructor(
     private readonly viewerIdentityId: string,
-    private readonly identityIds?: string | string[],
+    private readonly query: Record<string, unknown> = {},
   ) {}
 
   /**
    * Absent means no ids. Otherwise the distinct ids asked for, in request
-   * order: 1 to 100 canonical ids, comma-separated or repeated. A blank item,
-   * a non-canonical id or a count over the cap is refused, not dropped.
+   * order: 1 to 100 canonical ids, comma-separated or repeated. An object-form
+   * parameter (`identityIds[x]=`, however the query parser reads it), a
+   * non-string value, a blank item, a non-canonical id or a count over the cap
+   * is refused, not dropped.
    */
   private getIdentityIds(): string[] {
-    if (this.identityIds === undefined) {
+    assert(
+      !Object.keys(this.query).some((key) => key.startsWith('identityIds[')),
+      new InvalidPresenceIdentityIdsError(),
+    );
+
+    const value = this.query.identityIds;
+
+    if (value === undefined) {
       return [];
     }
 
-    const values = Array.isArray(this.identityIds)
-      ? this.identityIds
-      : [this.identityIds];
+    const values: unknown[] = Array.isArray(value) ? value : [value];
+    const strings = values.filter(
+      (item): item is string => typeof item === 'string',
+    );
+
+    assert(
+      strings.length === values.length,
+      new InvalidPresenceIdentityIdsError(),
+    );
+
     const identityIds = [
       ...new Set(
-        values
-          .flatMap((value) => value.split(','))
+        strings
+          .flatMap((item) => item.split(','))
           .map((identityId) => identityId.trim()),
       ),
     ];

@@ -34,6 +34,31 @@ Feature: GET /presence
     When I GET the presence list with identityIds "unknown"
     Then response code is equal to 400
 
+  Scenario: Refuse more than one hundred distinct presence list identity ids
+    Given I sign the current presence list request
+    When I GET the presence list with 101 distinct identity ids
+    Then response code is equal to 400
+
+  Scenario: Refuse an empty presence list identity id value
+    Given I sign the current presence list request
+    When I GET the presence list with identityIds ""
+    Then response code is equal to 400
+
+  Scenario: Refuse an object-form presence list query
+    Given I sign the current presence list request
+    When I GET the presence list with raw query "identityIds[a]=unknown"
+    Then response code is equal to 400
+
+  Scenario: List no presences when the identityIds parameter is absent
+    Given I sign the current presence list request
+    When I GET the presence list with raw query ""
+    Then response code is equal to 200
+    And response body is an array with length of 0
+
+  Scenario: Refuse an unsigned malformed presence list request as unauthorised
+    When I GET the presence list with identityIds "unknown"
+    Then response code is equal to 401
+
   Scenario: Hide presence status from a viewer without a shared relationship
     Given I set json body
       """

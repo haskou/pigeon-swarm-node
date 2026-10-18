@@ -2773,10 +2773,11 @@ GET /presence/?identityIds=<idA>,<idB>
 
 `identityIds` is a comma-separated list, or repeated `identityIds` params. Each
 id inside the query string must be URL encoded by the client as part of the
-full URL. It is a bounded input: 1 to 100 distinct canonical identity ids, and
-a repeated id counts once. A blank item, a non-canonical id, an empty value or
-a count over 100 returns `400` with code `400120`; ids are refused, never
-silently dropped.
+full URL. An absent `identityIds` lists no ids and returns an empty list. When
+present it is a bounded input: 1 to 100 distinct canonical identity ids, and a
+repeated id counts once. A blank item, a non-canonical id, an empty value, an
+object-form `identityIds[x]` param or a count over 100 returns `400` with code
+`400120`; ids are refused, never silently dropped.
 
 ### Update my presence
 
