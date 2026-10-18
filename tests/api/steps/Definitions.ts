@@ -8955,6 +8955,18 @@ export default class Definitions {
     );
   }
 
+  @when('I GET the presence list with identityIds {string}')
+  public async iGETThePresenceListWithIdentityIds(
+    identityIds: string,
+  ): Promise<void> {
+    await this.ensureIdentityKeyPair();
+
+    this.response = await this.restClient.get(
+      `/presence?identityIds=${encodeURIComponent(identityIds)}`,
+      this.headers,
+    );
+  }
+
   @when('I GET the authenticated identity keychain')
   public async iGetTheAuthenticatedIdentityKeychain(): Promise<void> {
     if (!this.ownerIdentityId) {

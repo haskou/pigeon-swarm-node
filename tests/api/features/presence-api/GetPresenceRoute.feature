@@ -29,6 +29,11 @@ Feature: GET /presence
     Then response code is equal to 200
     And response body is an array with length of 1
 
+  Scenario: Refuse a malformed presence list identity id
+    Given I sign the current presence list request
+    When I GET the presence list with identityIds "unknown"
+    Then response code is equal to 400
+
   Scenario: Hide presence status from a viewer without a shared relationship
     Given I set json body
       """
