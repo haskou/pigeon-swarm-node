@@ -11,9 +11,11 @@ import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 
 const SIGNATURE_BYTES = 64;
 const SLOTS_PER_SIGNER = 1_000;
+const SERVED_SLOTS_PER_SOURCE = 2_500;
 const STRANGER_SIGNERS = 10;
 const STRANGER_SLOTS_PER_SOURCE = 250;
 const SIGNERS_AT_CAPACITY = 100;
+const SOURCE = '192.0.2.10';
 
 const signersOf = (count: number): Promise<IdentityId[]> =>
   Promise.all(
@@ -46,25 +48,29 @@ describe('SignedRequestReplayGuard', () => {
   it('rejects a repeated signature for the same identity', () => {
     const guard = new SignedRequestReplayGuard();
 
-    expect(guard.accept(identity, signatureOf(0))).toBe(true);
-    expect(guard.accept(identity, signatureOf(0))).toBe(false);
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(false);
   });
 
   it('accepts the same signature for another identity', () => {
     const guard = new SignedRequestReplayGuard();
 
-    guard.accept(identity, signatureOf(0));
+    guard.accept(identity, signatureOf(0), SOURCE);
 
-    expect(guard.accept(attacker, signatureOf(0))).toBe(true);
+    expect(guard.accept(attacker, signatureOf(0), SOURCE)).toBe(true);
   });
 
   it('rejects a repeated signature when the same key signs as a device', () => {
     const guard = new SignedRequestReplayGuard();
 
-    guard.accept(identity, signatureOf(0));
+    guard.accept(identity, signatureOf(0), SOURCE);
 
     expect(
-      guard.accept(DeviceCredential.fromIdentityId(identity), signatureOf(0)),
+      guard.accept(
+        DeviceCredential.fromIdentityId(identity),
+        signatureOf(0),
+        SOURCE,
+      ),
     ).toBe(false);
   });
 
@@ -73,9 +79,11 @@ describe('SignedRequestReplayGuard', () => {
     (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
       const guard = new SignedRequestReplayGuard();
 
-      guard.accept(identity, signatureOf(0));
+      guard.accept(identity, signatureOf(0), SOURCE);
 
-      expect(guard.accept(aliasOf(identity), signatureOf(0))).toBe(false);
+      expect(guard.accept(aliasOf(identity), signatureOf(0), SOURCE)).toBe(
+        false,
+      );
     },
   );
 
@@ -84,7 +92,9 @@ describe('SignedRequestReplayGuard', () => {
     (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
       const guard = new SignedRequestReplayGuard();
 
-      expect(guard.accept(aliasOf(identity), signatureOf(0))).toBe(false);
+      expect(guard.accept(aliasOf(identity), signatureOf(0), SOURCE)).toBe(
+        false,
+      );
     },
   );
 
@@ -92,12 +102,14 @@ describe('SignedRequestReplayGuard', () => {
     const guard = new SignedRequestReplayGuard();
 
     const accepted = Array.from({ length: SLOTS_PER_SIGNER }).filter(
-      (_, index) => guard.accept(attacker, signatureOf(index)),
+      (_, index) => guard.accept(attacker, signatureOf(index), SOURCE),
     );
 
     expect(accepted).toHaveLength(SLOTS_PER_SIGNER);
-    expect(guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER))).toBe(false);
-    expect(guard.accept(identity, signatureOf(0))).toBe(true);
+    expect(
+      guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER), SOURCE),
+    ).toBe(false);
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
   });
 
   it('frees the slots of a signer as its entries expire', () => {
@@ -105,11 +117,59 @@ describe('SignedRequestReplayGuard', () => {
     const guard = new SignedRequestReplayGuard();
 
     Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
-      guard.accept(attacker, signatureOf(index)),
+      guard.accept(attacker, signatureOf(index), SOURCE),
     );
     now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
 
-    expect(guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER))).toBe(true);
+    expect(
+      guard.accept(attacker, signatureOf(SLOTS_PER_SIGNER), SOURCE),
+    ).toBe(true);
+
+    now.mockRestore();
+  });
+
+  it('refuses a client address past its part of the served slots without touching other addresses', () => {
+    const guard = new SignedRequestReplayGuard();
+
+    const accepted = fillers.slice(0, 3).flatMap((filler) =>
+      Array.from({ length: SLOTS_PER_SIGNER }).filter((_, index) =>
+        guard.accept(filler, signatureOf(index), '192.0.2.1'),
+      ),
+    );
+
+    expect(accepted).toHaveLength(SERVED_SLOTS_PER_SOURCE);
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.1')).toBe(false);
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.2')).toBe(true);
+  });
+
+  it('keeps the guard open to other client addresses while held signers of one address flood it', () => {
+    const guard = new SignedRequestReplayGuard();
+
+    fillers.forEach((filler) =>
+      Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+        guard.accept(filler, signatureOf(index), '192.0.2.1'),
+      ),
+    );
+
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.2')).toBe(true);
+    expect(guard.accept(attacker, signatureOf(0), '192.0.2.2')).toBe(true);
+  });
+
+  it('frees the served slots of a client address as its entries expire', () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(0);
+    const guard = new SignedRequestReplayGuard();
+
+    Array.from({ length: SERVED_SLOTS_PER_SOURCE }).forEach((_, index) =>
+      guard.accept(
+        fillers[Math.floor(index / SLOTS_PER_SIGNER)],
+        signatureOf(index % SLOTS_PER_SIGNER),
+        '192.0.2.1',
+      ),
+    );
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.1')).toBe(false);
+    now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
+
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.1')).toBe(true);
 
     now.mockRestore();
   });
@@ -130,7 +190,7 @@ describe('SignedRequestReplayGuard', () => {
     expect(
       guard.acceptFromStranger(attacker, signatureOf(0), '192.0.2.1'),
     ).toBe(false);
-    expect(guard.accept(identity, signatureOf(0))).toBe(true);
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
   });
 
   it('refuses a client address past its part of the stranger share without touching other addresses', () => {
@@ -212,7 +272,7 @@ describe('SignedRequestReplayGuard', () => {
   it('refuses a stranger replaying a signature a known signer recorded', () => {
     const guard = new SignedRequestReplayGuard();
 
-    guard.accept(identity, signatureOf(0));
+    guard.accept(identity, signatureOf(0), SOURCE);
 
     expect(
       guard.acceptFromStranger(identity, signatureOf(0), '192.0.2.1'),
@@ -222,26 +282,26 @@ describe('SignedRequestReplayGuard', () => {
   it('keeps live entries and fails closed at capacity instead of evicting them', () => {
     const guard = new SignedRequestReplayGuard();
 
-    guard.accept(identity, signatureOf(0));
-    fillers.forEach((filler) =>
+    guard.accept(identity, signatureOf(0), SOURCE);
+    fillers.forEach((filler, signer) =>
       Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
-        guard.accept(filler, signatureOf(index)),
+        guard.accept(filler, signatureOf(index), `198.51.100.${signer}`),
       ),
     );
 
-    expect(guard.accept(identity, signatureOf(0))).toBe(false);
-    expect(guard.accept(identity, signatureOf(1))).toBe(false);
-    expect(guard.accept(attacker, signatureOf(0))).toBe(false);
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(false);
+    expect(guard.accept(identity, signatureOf(1), SOURCE)).toBe(false);
+    expect(guard.accept(attacker, signatureOf(0), SOURCE)).toBe(false);
   });
 
   it('accepts new signatures again once entries expire', () => {
     const now = jest.spyOn(Date, 'now').mockReturnValue(0);
     const guard = new SignedRequestReplayGuard();
 
-    guard.accept(identity, signatureOf(0));
+    guard.accept(identity, signatureOf(0), SOURCE);
     now.mockReturnValue(SignedHttpRequestSignature.REPLAY_WINDOW_MS + 1);
 
-    expect(guard.accept(identity, signatureOf(0))).toBe(true);
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
 
     now.mockRestore();
   });
