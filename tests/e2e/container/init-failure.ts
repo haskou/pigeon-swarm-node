@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import { readdir, readFile } from 'node:fs/promises';
 import net from 'node:net';
 import path from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 
 /**
  * Boots the compiled entry point with an initialization failure and asserts
@@ -13,12 +15,19 @@ import path from 'node:path';
  * API listens, an initializer that does not finish within
  * `NODE_INITIALIZER_TIMEOUT_MS`, which must not leave the port closed forever,
  * and a failure after the API has started listening, which must not keep the
- * process alive. Run `yarn build` first.
+ * process alive. Run `yarn build` first. A child still running at the timeout
+ * is sampled and asked for a diagnostic report before it is killed.
  */
 
 const REPOSITORY_ROOT = path.resolve(__dirname, '../../..');
 const ENTRY_POINT = path.join(REPOSITORY_ROOT, 'dist', 'index.js');
 const EXIT_TIMEOUT_MS = 30_000;
+const DIAGNOSTICS_PRELOAD = path.join(
+  __dirname,
+  'init-failure-diagnostics.cjs',
+);
+const HANG_SAMPLE_MS = 1_000;
+const HANG_DUMP_MS = 1_000;
 
 type Scenario = {
   name: string;
@@ -33,6 +42,7 @@ type ExitResult = {
   output: string;
   signal: NodeJS.Signals | null;
   timedOut: boolean;
+  evidence: string;
 };
 
 const scenarios: Scenario[] = [
@@ -110,29 +120,124 @@ async function occupyPort(port: number): Promise<net.Server> {
   return server;
 }
 
+type ThreadSample = {
+  name: string;
+  state: string;
+  wchan: string;
+  ticks: number;
+};
+
+// Linux only: each thread's name, state, kernel wait channel and CPU ticks.
+// A thread that exits while being read is skipped.
+async function readThreads(pid: number): Promise<Map<string, ThreadSample>> {
+  const samples = new Map<string, ThreadSample>();
+
+  if (process.platform !== 'linux') {
+    return samples;
+  }
+
+  for (const tid of await readdir(`/proc/${pid}/task`)) {
+    const base = `/proc/${pid}/task/${tid}`;
+
+    try {
+      const [name, stat, wchan] = await Promise.all([
+        readFile(`${base}/comm`, 'utf8'),
+        readFile(`${base}/stat`, 'utf8'),
+        readFile(`${base}/wchan`, 'utf8').catch(() => ''),
+      ]);
+      // Fields after the parenthesised name: state is field 3, utime 14, stime 15.
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+
+      samples.set(tid, {
+        name: name.trim(),
+        state: fields[0] ?? '?',
+        ticks: Number(fields[11]) + Number(fields[12]),
+        wchan: wchan.trim() || '-',
+      });
+    } catch {
+      // The thread exited between the directory listing and the read.
+    }
+  }
+
+  return samples;
+}
+
+function describeThreads(
+  pid: number,
+  before: Map<string, ThreadSample>,
+  after: Map<string, ThreadSample>,
+): string {
+  if (after.size === 0) {
+    return `thread sampling unavailable on ${process.platform}`;
+  }
+
+  const lines = [...after].map(([tid, sample]) => {
+    const previous = before.get(tid);
+    const cpuTicks = sample.ticks - (previous?.ticks ?? 0);
+    const role = tid === String(pid) ? 'main' : 'thread';
+
+    return `  ${role} ${sample.name} state=${sample.state} wchan=${sample.wchan} cpuTicks=${cpuTicks}`;
+  });
+
+  return [
+    `threads over ${HANG_SAMPLE_MS} ms (cpuTicks at USER_HZ, usually 100 per second):`,
+    ...lines,
+  ].join('\n');
+}
+
+// Runs only after EXIT_TIMEOUT_MS, so the child is still alive. The sampling
+// shows whether it is spinning, idle or blocked in the kernel. SIGUSR2 asks
+// the preload for event-loop resources, which only prints if the loop runs.
+async function collectHangEvidence(child: ChildProcess): Promise<string> {
+  try {
+    if (child.pid === undefined) {
+      return 'evidence unavailable: child has no pid';
+    }
+
+    const before = await readThreads(child.pid);
+    await sleep(HANG_SAMPLE_MS);
+    const after = await readThreads(child.pid);
+    child.kill('SIGUSR2');
+    await sleep(HANG_DUMP_MS);
+
+    return describeThreads(child.pid, before, after);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return `evidence unavailable: ${message}`;
+  } finally {
+    child.kill('SIGKILL');
+  }
+}
+
 function runUntilExit(
   environment: Record<string, string>,
 ): Promise<ExitResult> {
   const { promise, reject, resolve } = Promise.withResolvers<ExitResult>();
-  const child = spawn(process.execPath, [ENTRY_POINT], {
-    cwd: REPOSITORY_ROOT,
-    env: {
-      ...process.env,
-      CONTAINER_BUILD: 'true',
-      NODE_ENV: '',
-      TRANSPORT_DSN: 'in-memory://',
-      ...environment,
+  const child = spawn(
+    process.execPath,
+    ['--require', DIAGNOSTICS_PRELOAD, ENTRY_POINT],
+    {
+      cwd: REPOSITORY_ROOT,
+      env: {
+        ...process.env,
+        CONTAINER_BUILD: 'true',
+        NODE_ENV: '',
+        TRANSPORT_DSN: 'in-memory://',
+        ...environment,
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],
     },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  );
   let output = '';
   let timedOut = false;
+  let evidence: Promise<string> | undefined;
   const capture = (chunk: Buffer): void => {
     output += chunk.toString();
   };
   const deadline = setTimeout(() => {
     timedOut = true;
-    child.kill('SIGKILL');
+    evidence = collectHangEvidence(child);
   }, EXIT_TIMEOUT_MS);
 
   child.stdout.on('data', capture);
@@ -143,7 +248,9 @@ function runUntilExit(
   });
   child.once('close', (code, signal) => {
     clearTimeout(deadline);
-    resolve({ code, output, signal, timedOut });
+    void Promise.resolve(evidence).then((hangEvidence) => {
+      resolve({ code, evidence: hangEvidence ?? '', output, signal, timedOut });
+    });
   });
 
   return promise;
@@ -155,7 +262,8 @@ async function runScenario(scenario: Scenario): Promise<void> {
   const result = await runUntilExit(scenario.environment(port)).finally(() =>
     occupant?.close(),
   );
-  const context = `signal ${result.signal}; output:\n${result.output}`;
+  const evidence = result.evidence ? `${result.evidence}\n` : '';
+  const context = `signal ${result.signal};\n${evidence}output:\n${result.output}`;
 
   assert.equal(
     result.timedOut,
