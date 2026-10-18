@@ -8955,6 +8955,50 @@ export default class Definitions {
     );
   }
 
+  @when('I GET the presence list with identityIds {string}')
+  public async iGETThePresenceListWithIdentityIds(
+    identityIds: string,
+  ): Promise<void> {
+    await this.ensureIdentityKeyPair();
+
+    this.response = await this.restClient.get(
+      `/presence?identityIds=${encodeURIComponent(identityIds)}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the presence list with {int} distinct identity ids')
+  public async iGETThePresenceListWithDistinctIdentityIds(
+    count: number,
+  ): Promise<void> {
+    await this.ensureIdentityKeyPair();
+
+    const identityIds: string[] = [];
+
+    for (let index = 0; index < count; index += 1) {
+      const keyPair = await KeyPair.generate();
+
+      identityIds.push(
+        new IdentityId(keyPair.toPrimitives().publicKey).valueOf(),
+      );
+    }
+
+    this.response = await this.restClient.get(
+      `/presence?identityIds=${encodeURIComponent(identityIds.join(','))}`,
+      this.headers,
+    );
+  }
+
+  @when('I GET the presence list with raw query {string}')
+  public async iGETThePresenceListWithRawQuery(query: string): Promise<void> {
+    await this.ensureIdentityKeyPair();
+
+    this.response = await this.restClient.get(
+      `/presence?${query}`,
+      this.headers,
+    );
+  }
+
   @when('I GET the authenticated identity keychain')
   public async iGetTheAuthenticatedIdentityKeychain(): Promise<void> {
     if (!this.ownerIdentityId) {

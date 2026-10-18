@@ -24,16 +24,6 @@ export class GetPresenceRoute extends Route {
   private readonly clientMessageHandler =
     this.get<WebSocketClientMessageHandler>(WebSocketClientMessageHandler);
 
-  private identityIdsFrom(request: Request): string | string[] | undefined {
-    const { identityIds } = request.query;
-
-    if (Array.isArray(identityIds)) {
-      return identityIds.map(String);
-    }
-
-    return typeof identityIds === 'string' ? identityIds : undefined;
-  }
-
   /**
    * Identities that share a one-to-one conversation or community with the
    * viewer. Only they may read presence over HTTP, matching realtime identity
@@ -62,7 +52,7 @@ export class GetPresenceRoute extends Route {
     const presences = await this.finder.find(
       new GetPresenceListRequest(
         viewerIdentityId.valueOf(),
-        this.identityIdsFrom(request),
+        request.query,
       ).getMessage(),
     );
 

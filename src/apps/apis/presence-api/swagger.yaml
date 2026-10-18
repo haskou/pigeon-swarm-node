@@ -25,7 +25,7 @@ paths:
         - $ref: '#/components/parameters/XSignature'
         - in: query
           name: identityIds
-          required: true
+          required: false
           schema:
             oneOf:
               - type: string
@@ -34,11 +34,13 @@ paths:
                   type: string
           style: form
           explode: true
-          description: Comma-separated identity ids or repeated identityIds query params. Identity ids are public keys without PEM wrapping.
+          description: Comma-separated identity ids or repeated identityIds query params. Absent lists no ids and returns an empty list. Identity ids are public keys without PEM wrapping. Bounded input of 1 to 100 distinct canonical ids; duplicates count once. A non-string value (an object-form identityIds[x] param), a blank item or a non-canonical id is refused, not dropped.
       operationId: getPresence
       responses:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
+        '400':
+          description: Empty identityIds, more than 100 distinct ids, an object-form identityIds param, or a blank or non-canonical id (code 400120).
         '200':
           description: Presence states.
           content:
