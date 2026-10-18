@@ -310,6 +310,43 @@ Feature: Node block sharing
       | DELETE |                  |
       | GET    | /pending-entries |
 
+  Scenario: A non-owner adopting a source named by an alias is refused as a non-owner
+    Given the block source publisher is named by "an alias DER prefix" of its key
+    And I set json body
+      """
+      {"origin": "https://publisher.example", "autoApply": true}
+      """
+    And another identity signs a PUT request to the block source path ""
+    When I send the PUT to the block source path ""
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+  Scenario Outline: A non-owner approving entries of a source named by <encoding> of its key is refused as a non-owner
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I set a block approval body for version 1 choosing the other identity
+    And the block source publisher is named by "<encoding>" of its key
+    And another identity signs a POST request to the block source path "/approvals"
+    When I send the POST to the block source path "/approvals"
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
+  Scenario Outline: A non-owner excepting an identity under <encoding> of its key is refused as a non-owner
+    Given I set a block exceptions body excepting the other identity under "<encoding>" of its key
+    And another identity signs a PUT request to "/node/block-exceptions"
+    When I PUT "/node/block-exceptions"
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+    Examples:
+      | encoding                        |
+      | an alias DER prefix             |
+      | a non-canonical base64 encoding |
+
   Scenario Outline: A canonical id of a source the node does not follow is not found on <method> <suffix>
     Given I sign a <method> request to the block source path "<suffix>"
     When I send the <method> to the block source path "<suffix>"
