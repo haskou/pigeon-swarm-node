@@ -160,6 +160,8 @@ async function startApplication(
     OrbitDBReplicatedStateRuntime,
     OrbitDBCallProjectionRuntime,
   );
+  // Production marks the node started once runtimes are up; readiness reads it.
+  started.markStarted();
 
   return started;
 }

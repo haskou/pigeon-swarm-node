@@ -88,6 +88,7 @@ export async function init(application: PigeonApplication): Promise<void> {
     await application.runSchedulerNowAndSchedule(scheduler);
   }
   endTimer('Republish local routing records');
+  application.markStarted();
   logInfo('Ready!');
 }
 

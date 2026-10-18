@@ -264,6 +264,16 @@ export default class OrbitDBReplicatedStateRegistry {
     return stores[storeName];
   }
 
+  private isBootstrapDeferredAt(store: OrbitDBDatabase, now: number): boolean {
+    const deferred = this.deferredSubscriberBootstraps.get(store);
+
+    return (
+      !!deferred &&
+      now - deferred.since <
+        OrbitDBReplicatedStateRegistry.DEFERRED_BOOTSTRAP_NOT_READY_MS
+    );
+  }
+
   private async admitRecord(
     collection: string,
     record: Record<string, unknown>,
@@ -2464,14 +2474,27 @@ export default class OrbitDBReplicatedStateRegistry {
 
     return [...this.storesByNetworkId.values()].some((stores) => {
       const store = this.getStore(stores, storeName);
-      const deferred = store && this.deferredSubscriberBootstraps.get(store);
 
-      return (
-        !!deferred &&
-        now - deferred.since <
-          OrbitDBReplicatedStateRegistry.DEFERRED_BOOTSTRAP_NOT_READY_MS
-      );
+      return !!store && this.isBootstrapDeferredAt(store, now);
     });
+  }
+
+  /**
+   * Whether the replicated state is open to reads: a network is registered and
+   * no store still waits on a subscriber replay that a missing local block
+   * deferred. The deferral answer is bounded in time, so a store cannot hold
+   * the node not ready for long.
+   */
+  public isOpen(): boolean {
+    if (this.storesByNetworkId.size === 0) return false;
+
+    const now = Date.now();
+
+    return ![...this.storesByNetworkId.values()].some((stores) =>
+      stores
+        .getSynchronizationStores()
+        .some(({ database }) => this.isBootstrapDeferredAt(database, now)),
+    );
   }
 
   public async replicateDocumentInBackground(

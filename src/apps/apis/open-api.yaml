@@ -167,6 +167,8 @@ paths:
     $ref: './link-previews-api/swagger.yaml#/paths/~1link-previews'
   /node:
     $ref: './nodes-api/swagger.yaml#/paths/~1node'
+  /node/readiness:
+    $ref: './nodes-api/swagger.yaml#/paths/~1node~1readiness'
   /node/relay-configuration:
     $ref: './nodes-api/swagger.yaml#/paths/~1node~1relay-configuration'
   /node/blocks:

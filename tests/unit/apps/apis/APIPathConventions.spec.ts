@@ -43,6 +43,7 @@ const singularSegments: Record<string, true> = {
   'private-authorization': true,
   publication: true,
   push: true,
+  readiness: true,
   realtime: true,
   registration: true,
   'relay-configuration': true,

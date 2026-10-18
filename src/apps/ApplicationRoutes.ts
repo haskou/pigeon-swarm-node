@@ -95,6 +95,7 @@ import { GetNodeBlockSourcesRoute } from '@app/apps/apis/nodes-api/routes/GetNod
 import { GetNodeBlocksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeBlocksRoute';
 import { GetNodeDiagnosticsRoute } from '@app/apps/apis/nodes-api/routes/GetNodeDiagnosticsRoute';
 import { GetNodeNetworksRoute } from '@app/apps/apis/nodes-api/routes/GetNodeNetworksRoute';
+import { GetNodeReadinessRoute } from '@app/apps/apis/nodes-api/routes/GetNodeReadinessRoute';
 import { GetNodeRegistrationCodesRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRegistrationCodesRoute';
 import { GetNodeRelayConfigurationRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRelayConfigurationRoute';
 import { GetNodeRoute } from '@app/apps/apis/nodes-api/routes/GetNodeRoute';
@@ -202,6 +203,7 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   PostPublicIPFSContentRoute,
   GetClientContractRoute,
   GetNodeRoute,
+  GetNodeReadinessRoute,
   GetNodeNetworksRoute,
   DeleteNodeNetworkRoute,
   PostNodeNetworkRoute,

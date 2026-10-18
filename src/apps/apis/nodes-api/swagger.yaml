@@ -43,6 +43,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NodeResource'
+  /node/readiness:
+    get:
+      tags:
+        - nodes
+      summary: Get node readiness
+      description: Reports whether the node is ready to serve replicated state. It is ready once startup has finished and the replicated state is open. Liveness is a separate check, served by /health. Responses must not be cached.
+      security: []
+      operationId: getNodeReadiness
+      responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
+        '200':
+          description: The node is ready to serve replicated state.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeReadinessResource'
+        '503':
+          description: The node is not ready yet. Startup has not finished, or the replicated state is not open.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                enum: [no-store]
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeReadinessResource'
   /node/relay-configuration:
     get:
       tags:
@@ -1094,6 +1127,14 @@ components:
         apiVersion:
           type: integer
           enum: [2]
+    NodeReadinessResource:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
     NodeResource:
       type: object
       required:
