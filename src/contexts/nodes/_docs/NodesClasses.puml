@@ -453,7 +453,6 @@ package "nodes" {
     NodeBlockListStorer --> NodeRepository
     NodeBlockListStorer --> NodeBlockListRepository
     NodeBlockListStorer --> NodeBlockPolicy
-    NodeBlockListStorer --> NodeRepository
     NodeBlockListFinder --> NodeBlockListRepository
 
     class NodeBlockSourceAdopter {
