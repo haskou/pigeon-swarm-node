@@ -100,7 +100,7 @@ describe('PigeonApplication kernel-loaded environment', () => {
     ).not.toThrow();
   });
 
-  it.each([['0'], ['-1'], ['1.5'], ['many'], ['100001']])(
+  it.each([['0'], ['-1'], ['1.5'], ['100001']])(
     'should fail loading the environment when SERVED_SLOTS_PER_SOURCE is %s',
     (raw) => {
       process.env.SERVED_SLOTS_PER_SOURCE = raw;
@@ -110,6 +110,14 @@ describe('PigeonApplication kernel-loaded environment', () => {
       );
     },
   );
+
+  it('should fail loading the environment when SERVED_SLOTS_PER_SOURCE is not a number', () => {
+    process.env.SERVED_SLOTS_PER_SOURCE = 'many';
+
+    expect(() => new PigeonApplication().loadEnvironmentVariables()).toThrow(
+      'Environment variable "SERVED_SLOTS_PER_SOURCE" has invalid number value "many".',
+    );
+  });
 
   it('should load the environment when SERVED_SLOTS_PER_SOURCE is 100000', () => {
     process.env.SERVED_SLOTS_PER_SOURCE = '100000';
