@@ -1507,9 +1507,11 @@ export default class Definitions {
   }
 
   /**
-   * Sends a GET whose signature covers the exact target, query included. When
-   * a signer is set, the wire target is re-signed with that signer so a query
-   * the step added after signing is still authenticated.
+   * Sends a GET. A target carrying a query is re-signed with the last signer,
+   * so its signature covers the query this step sends. A bare target keeps the
+   * headers the scenario set, so a header it tampered with is sent as written.
+   * A signature over a different target than the one sent is only made by the
+   * explicit "using the headers signed without it" step.
    */
   private async getSignedTarget(
     target: string,
@@ -7480,6 +7482,22 @@ export default class Definitions {
 
     this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitations${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community invitations with query {string} using the headers signed without it',
+  )
+  public async iGETTheCurrentCommunityInvitationsWithQuerySignedWithoutIt(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitations${query}`,
       this.headers,
     );
   }

@@ -222,3 +222,11 @@ Feature: Community invitations API
     When I GET the current community invitation claims with query "?limit=1&cursor=CURSOR"
     Then response code is equal to 409
     And response body should contain "Community permission denied"
+
+  Scenario: A query altered after signing is refused as an invalid signature
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=1"
+    Then response code is equal to 200
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=2" using the headers signed without it
+    Then response code is equal to 401
