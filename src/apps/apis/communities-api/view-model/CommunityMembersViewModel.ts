@@ -1,13 +1,15 @@
-import { Community } from '@app/contexts/communities/domain/Community';
-
 import { CommunityMembersResource } from '../resources/CommunityMembersResource';
 
 export class CommunityMembersViewModel {
-  constructor(private readonly community: Community) {}
+  constructor(
+    private readonly memberIds: string[],
+    private readonly nextCursor: string | null,
+  ) {}
 
   public toResource(): CommunityMembersResource {
     return {
-      memberIds: this.community.toPrimitives().memberIds,
+      memberIds: this.memberIds,
+      nextCursor: this.nextCursor,
     };
   }
 }

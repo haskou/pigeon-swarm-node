@@ -1,9 +1,10 @@
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import CommunitiesFinder from '@app/contexts/communities/application/find-communities/CommunitiesFinder';
-import { CommunitiesFindMessage } from '@app/contexts/communities/application/find-communities/messages/CommunitiesFindMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Get, JsonController, Req, Res } from 'routing-controllers';
+import { Get, JsonController, QueryParam, Req, Res } from 'routing-controllers';
 
+import { GetCommunitiesRequest } from '../requests/GetCommunitiesRequest';
 import { CommunitiesViewModel } from '../view-model/CommunitiesViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -13,16 +14,30 @@ export class GetCommunitiesRoute extends CommunityRouteSupport {
 
   @Get()
   public async getCommunities(
+    @QueryParam('limit') limit: string | undefined,
+    @QueryParam('cursor') cursor: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const identityId = await this.authenticate(request);
-    const communities = await this.finder.find(
-      new CommunitiesFindMessage(identityId.valueOf()),
+    const pageRequest = new GetCommunitiesRequest(
+      identityId.valueOf(),
+      cursor,
+      limit,
     );
+    const page = await this.finder.find(pageRequest.getMessage());
+    const nextPosition = page.getNextPosition();
 
-    return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new CommunitiesViewModel(communities).toResource());
+    return response.status(HttpRouteStatusEnum.OK).send(
+      new CommunitiesViewModel(
+        page.getItems(),
+        nextPosition === undefined
+          ? null
+          : PageCursor.encode({
+              position: nextPosition,
+              resource: pageRequest.scope(),
+            }),
+      ).toResource(),
+    );
   }
 }

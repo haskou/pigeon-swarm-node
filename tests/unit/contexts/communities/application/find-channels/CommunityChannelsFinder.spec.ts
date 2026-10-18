@@ -61,7 +61,8 @@ describe('CommunityChannelsFinder voice presence', () => {
         owner,
         networkId,
         CallScope.communityChannel(community.getId(), channel.getId()),
-        [owner, member], ...callStartArgs(),
+        [owner, member],
+        ...callStartArgs(),
       );
     const connect = (
       call: Call,
@@ -79,6 +80,7 @@ describe('CommunityChannelsFinder voice presence', () => {
         new CommunityChannelsFindMessage(
           community.getId().valueOf(),
           owner.valueOf(),
+          50,
         ),
       );
       return (

@@ -4,4 +4,5 @@ export { CommunityChannelResource } from './CommunityChannelResource';
 
 export interface CommunityChannelsResource {
   channels: CommunityChannelResource[];
+  nextCursor: string | null;
 }

@@ -67,3 +67,85 @@ Feature: Community invitations API
     Given the other identity signs a claim of the current community invitation
     When the other identity POSTs the claim of the current community invitation
     Then response code is equal to 409
+
+  Scenario: A member pages the invitations by id and follows the cursor to the end
+    Given I set a community invitation body with 1 uses
+    And I sign the current community invitation request
+    When I POST an invitation to the current community
+    Then response code is equal to 200
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=1"
+    Then response code is equal to 200
+    And response lists 1 invitations
+    And I remember the response next cursor
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 1 invitations
+    And I remember the response next cursor
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 0 invitations
+    And the response next cursor is null
+
+  Scenario: A short last page has a null next cursor and the limit is clamped to 1..100
+    Given I set a community invitation body with 1 uses
+    And I sign the current community invitation request
+    When I POST an invitation to the current community
+    Then response code is equal to 200
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=0"
+    Then response code is equal to 200
+    And response lists 1 invitations
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?limit=500"
+    Then response code is equal to 200
+    And response lists 2 invitations
+    And the response next cursor is null
+
+  Scenario: A garbage, foreign, or forged invitations cursor is refused
+    Given I sign the current community invitations request
+    When I GET the current community invitations with query "?cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current community invitations request
+    When I GET the current community invitations with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current community invitations request
+    When I GET the current community invitations with a cursor whose position is not an invitation id
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario: A manager pages the pending claims and refuses a foreign or forged cursor
+    Given the other identity signs a claim of the current community invitation
+    When the other identity POSTs the claim of the current community invitation
+    Then response code is equal to 200
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1"
+    Then response code is equal to 200
+    And response lists 1 claims
+    And I remember the response next cursor
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=1&cursor=CURSOR"
+    Then response code is equal to 200
+    And response lists 0 claims
+    And the response next cursor is null
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with query "?limit=50"
+    Then response code is equal to 200
+    And response lists 1 claims
+    And the response next cursor is null
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with a cursor whose position is not a claim id
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign the current community invitation claims request
+    When I GET the current community invitation claims with query "?cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"

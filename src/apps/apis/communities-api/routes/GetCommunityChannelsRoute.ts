@@ -1,9 +1,17 @@
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import CommunityChannelsFinder from '@app/contexts/communities/application/find-channels/CommunityChannelsFinder';
-import { CommunityChannelsFindMessage } from '@app/contexts/communities/application/find-channels/messages/CommunityChannelsFindMessage';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
-import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
+import {
+  Get,
+  JsonController,
+  Param,
+  QueryParam,
+  Req,
+  Res,
+} from 'routing-controllers';
 
+import { GetCommunityChannelsRequest } from '../requests/GetCommunityChannelsRequest';
 import { CommunityChannelsViewModel } from '../view-model/CommunityChannelsViewModel';
 import { CommunityRouteSupport } from './CommunityRouteSupport';
 
@@ -16,23 +24,35 @@ export class GetCommunityChannelsRoute extends CommunityRouteSupport {
   @Get('/:communityId/channels')
   public async getChannels(
     @Param('communityId') communityId: string,
+    @QueryParam('limit') limit: string | undefined,
+    @QueryParam('cursor') cursor: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const actorIdentityId = await this.authenticate(request);
-    const details = await this.finder.find(
-      new CommunityChannelsFindMessage(communityId, actorIdentityId.valueOf()),
+    const pageRequest = new GetCommunityChannelsRequest(
+      communityId,
+      actorIdentityId.valueOf(),
+      cursor,
+      limit,
     );
+    const details = await this.finder.find(pageRequest.getMessage());
+    const nextPosition = details.getNextPosition();
 
-    return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(
-        new CommunityChannelsViewModel(
-          details.getCommunity(),
-          details.getActorIdentityId(),
-          details.getConnectedIdentityIdsByChannelId(),
-          details.getThreadSummariesByChannelId(),
-        ).toResource(),
-      );
+    return response.status(HttpRouteStatusEnum.OK).send(
+      new CommunityChannelsViewModel(
+        details.getCommunity(),
+        details.getActorIdentityId(),
+        details.getConnectedIdentityIdsByChannelId(),
+        details.getThreadSummariesByChannelId(),
+        details.getPageChannelIds(),
+        nextPosition === undefined
+          ? null
+          : PageCursor.encode({
+              position: nextPosition,
+              resource: pageRequest.scope(),
+            }),
+      ).toResource(),
+    );
   }
 }

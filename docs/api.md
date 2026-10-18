@@ -3570,6 +3570,8 @@ invitation proofs from `GET /communities/{communityId}/invitation-preview`.
 GET /communities
 ```
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
+
 Response:
 
 ```json
@@ -3607,7 +3609,8 @@ Response:
       "autoJoinEnabled": false,
       "createdAt": 1773848829055
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 
@@ -3625,6 +3628,8 @@ GET /discoverable-communities?query=Pigeon&networkId=<networkId>
 
 The request is signed as `GET /discoverable-communities`; query string values are
 not part of the signed canonical path because Express verifies `request.path`.
+
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
 
 Response:
 
@@ -3655,7 +3660,8 @@ Response:
       "discoverable": true,
       "autoJoinEnabled": false
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 
@@ -3862,11 +3868,18 @@ Implemented:
 GET /communities/{communityId}/members
 ```
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the
+previous page). Members are ordered by identity id ascending. Pass
+`nextCursor` as `cursor` to read the next page; `nextCursor` is null on the
+last page. A malformed cursor, or one from another list, returns 400 (code
+400110).
+
 Response:
 
 ```json
 {
-  "memberIds": ["<identityId>"]
+  "memberIds": ["<identityId>"],
+  "nextCursor": null
 }
 ```
 
@@ -3909,6 +3922,10 @@ Implemented:
 ```http
 GET /community-membership-requests
 ```
+
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Requests are ordered by `updatedAt` descending, then request id descending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
+
+Response: `{ "requests": [...], "nextCursor": "<cursor or null>" }`.
 
 Implemented:
 
@@ -4357,6 +4374,12 @@ message author or `manage_messages`.
 GET /communities/{communityId}/channels
 ```
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the
+previous page). Text channels come first, then voice, each ordered by channel
+id ascending. Pass `nextCursor` as `cursor` to read the next page; it is null
+on the last page. A malformed cursor, or one from another list, returns 400
+(code 400110).
+
 Response:
 
 ```json
@@ -4389,7 +4412,8 @@ Response:
       "createdAt": 1773848829055,
       "connectedIdentityIds": ["<identityId>"]
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 
@@ -4440,6 +4464,12 @@ Supported permission values:
 GET /communities/{communityId}/roles
 ```
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the
+previous page). Roles are ordered by role id ascending; `memberRoles` is
+returned in full on every page. Pass `nextCursor` as `cursor` to read the next
+page; it is null on the last page. A malformed cursor, or one from another
+list, returns 400 (code 400110).
+
 Returns:
 
 ```json
@@ -4457,7 +4487,8 @@ Returns:
       "identityId": "<identityId>",
       "roleIds": ["<roleId>"]
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 
@@ -5001,6 +5032,11 @@ Save request:
 }
 ```
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the
+previous page). Drafts are ordered by `updatedAt` descending. Pass
+`nextCursor` as `cursor` to read the next page; it is null on the last page.
+A malformed cursor, or one from another list, returns 400 (code 400110).
+
 List response:
 
 ```json
@@ -5012,7 +5048,8 @@ List response:
       "encryptedPayload": "<encryptedDraftPayload>",
       "updatedAt": 1773848829055
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 
@@ -5059,6 +5096,11 @@ one (higher `sequence`, then lower digest) fails with 409 `StalePublicMutationEr
 and `details: { sequence, digest }`. Replicated records without a valid proof are
 ignored by every node.
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the
+previous page). Pins are ordered newest first. Pass `nextCursor` as `cursor`
+to read the next page; it is null on the last page. A malformed cursor, or one
+from another list, returns 400 (code 400110).
+
 List response:
 
 ```json
@@ -5081,7 +5123,8 @@ List response:
         "type": "sent"
       }
     }
-  ]
+  ],
+  "nextCursor": null
 }
 ```
 

@@ -11,6 +11,8 @@ export class CommunityChannelsDetails {
       string,
       CommunityChannelThreadSummary[]
     >,
+    private readonly pageChannelIds: string[],
+    private readonly nextPosition: string | undefined,
   ) {}
 
   public getActorIdentityId(): IdentityId {
@@ -23,6 +25,16 @@ export class CommunityChannelsDetails {
 
   public getConnectedIdentityIdsByChannelId(): Map<string, string[]> {
     return new Map(this.connectedIdentityIdsByChannelId);
+  }
+
+  /** The ids of the channels on this page, text channels first. */
+  public getPageChannelIds(): string[] {
+    return [...this.pageChannelIds];
+  }
+
+  /** The position to read after next: set only when the page is full. */
+  public getNextPosition(): string | undefined {
+    return this.nextPosition;
   }
 
   public getThreadSummariesByChannelId(): Map<

@@ -1,6 +1,9 @@
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { PageSlice } from '../pagination/PageSlice';
+import { CommunityMembershipRequestPosition } from './CommunityMembershipRequestPosition';
+import { CommunityMembershipRequestsPage } from './CommunityMembershipRequestsPage';
 import { CommunityMembershipRequestsFindMessage } from './messages/CommunityMembershipRequestsFindMessage';
 
 export default class CommunityMembershipRequestsFinder {
@@ -11,7 +14,7 @@ export default class CommunityMembershipRequestsFinder {
 
   public async find(
     message: CommunityMembershipRequestsFindMessage,
-  ): Promise<CommunityMembershipRequest[]> {
+  ): Promise<CommunityMembershipRequestsPage> {
     const ownedCommunities = (
       await this.communityRepository.findByMember(message.identityId)
     ).filter((community) => community.isOwner(message.identityId));
@@ -36,7 +39,20 @@ export default class CommunityMembershipRequestsFinder {
         this.communityRepository.hasById(membershipRequest.getCommunityId()),
       ),
     );
+    const visible = requests.filter((_, index) => existence[index]);
 
-    return requests.filter((_, index) => existence[index]);
+    return new CommunityMembershipRequestsPage(
+      PageSlice.of<CommunityMembershipRequest>({
+        after: message.after,
+        items: visible,
+        limit: message.limit,
+        order: 'desc',
+        position: (membershipRequest) =>
+          CommunityMembershipRequestPosition.of(
+            membershipRequest.toPrimitives().updatedAt,
+            membershipRequest.getId().valueOf(),
+          ),
+      }),
+    );
   }
 }

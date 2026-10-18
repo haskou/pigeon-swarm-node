@@ -4,10 +4,14 @@ import { CommunityMembershipRequestsResource } from '../resources/CommunityMembe
 import { CommunityMembershipRequestViewModel } from './CommunityMembershipRequestViewModel';
 
 export class CommunityMembershipRequestsViewModel {
-  constructor(private readonly requests: CommunityMembershipRequest[]) {}
+  constructor(
+    private readonly requests: CommunityMembershipRequest[],
+    private readonly nextCursor: string | null,
+  ) {}
 
   public toResource(): CommunityMembershipRequestsResource {
     return {
+      nextCursor: this.nextCursor,
       requests: this.requests.map((request) =>
         new CommunityMembershipRequestViewModel(request).toResource(),
       ),

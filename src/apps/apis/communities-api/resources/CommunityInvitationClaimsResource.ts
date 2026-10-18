@@ -2,4 +2,5 @@ import { CommunityInvitationClaimResource } from './CommunityInvitationClaimReso
 
 export interface CommunityInvitationClaimsResource {
   claims: CommunityInvitationClaimResource[];
+  nextCursor: string | null;
 }

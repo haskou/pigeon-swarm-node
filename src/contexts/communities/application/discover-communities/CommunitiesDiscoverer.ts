@@ -1,5 +1,6 @@
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
+import { PageSlice } from '../pagination/PageSlice';
 import { CommunitiesDiscovery } from './CommunitiesDiscovery';
 import { CommunitiesDiscoverMessage } from './messages/CommunitiesDiscoverMessage';
 
@@ -20,6 +21,15 @@ export default class CommunitiesDiscoverer {
       this.requestRepository.findByIdentity(message.identityId),
     ]);
 
-    return new CommunitiesDiscovery(communities, membershipRequests);
+    return new CommunitiesDiscovery(
+      PageSlice.of({
+        after: message.after,
+        items: communities,
+        limit: message.limit,
+        order: 'asc',
+        position: (community) => community.getId().valueOf(),
+      }),
+      membershipRequests,
+    );
   }
 }

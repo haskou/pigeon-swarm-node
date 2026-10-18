@@ -4,8 +4,15 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import CommunityFinder from '../find-community/CommunityFinder';
+import { PageSlice } from '../pagination/PageSlice';
 import { CommunityChannelsDetails } from './CommunityChannelsDetails';
 import { CommunityChannelsFindMessage } from './messages/CommunityChannelsFindMessage';
+
+/** A channel the viewer can see, keyed by its kind so text channels sort first. */
+interface VisibleChannelRef {
+  id: string;
+  kind: 'text' | 'voice';
+}
 
 export default class CommunityChannelsFinder {
   private static readonly THREAD_SUMMARY_LIMIT_PER_CHANNEL = 2;
@@ -65,15 +72,33 @@ export default class CommunityChannelsFinder {
     const community = await this.communityFinder.findById(message.communityId);
 
     community.viewAsMember(message.actorIdentityId);
-    const visibleTextChannelIds = community
-      .visibleChannelsFor(message.actorIdentityId)
-      .textChannels.map((channel) => new CommunityChannelId(channel.id));
+
+    const visible = community.visibleChannelsFor(message.actorIdentityId);
+    const page = PageSlice.of<VisibleChannelRef>({
+      after: message.after,
+      items: [
+        ...visible.textChannels.map((channel) => ({
+          id: channel.id,
+          kind: 'text' as const,
+        })),
+        ...(visible.voiceChannels ?? []).map((channel) => ({
+          id: channel.id,
+          kind: 'voice' as const,
+        })),
+      ],
+      limit: message.limit,
+      order: 'asc',
+      position: (channel) => `${channel.kind}|${channel.id}`,
+    });
+    const pageTextChannelIds = page.items
+      .filter((channel) => channel.kind === 'text')
+      .map((channel) => new CommunityChannelId(channel.id));
     const [connectedIdentityIdsByChannelId, threadSummariesByChannelId] =
       await Promise.all([
         this.findConnectedIdentityIdsByChannelId(message),
         this.messageRepository.findThreadSummariesByChannel(
           message.communityId,
-          visibleTextChannelIds,
+          pageTextChannelIds,
           CommunityChannelsFinder.THREAD_SUMMARY_LIMIT_PER_CHANNEL,
         ),
       ]);
@@ -83,6 +108,8 @@ export default class CommunityChannelsFinder {
       message.actorIdentityId,
       connectedIdentityIdsByChannelId,
       threadSummariesByChannelId,
+      page.items.map((channel) => channel.id),
+      page.nextPosition,
     );
   }
 }

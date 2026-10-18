@@ -4,6 +4,8 @@ import { CommunityInvitations } from '../../domain/entities/invitations/Communit
 import CommunityInvitationClaimRepository from '../../domain/repositories/CommunityInvitationClaimRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
+import { PageSlice } from '../pagination/PageSlice';
+import { CommunityInvitationClaimsPage } from './CommunityInvitationClaimsPage';
 import { CommunityInvitationClaimsFindMessage } from './messages/CommunityInvitationClaimsFindMessage';
 
 /**
@@ -40,7 +42,7 @@ export default class CommunityInvitationClaimsFinder {
 
   public async find(
     message: CommunityInvitationClaimsFindMessage,
-  ): Promise<CommunityInvitationClaim[]> {
+  ): Promise<CommunityInvitationClaimsPage> {
     const community = await this.communityFinder.findById(message.communityId);
 
     community.viewInvitationClaims(message.identityId);
@@ -49,8 +51,7 @@ export default class CommunityInvitationClaimsFinder {
       message.communityId,
     );
     const now = Date.now();
-
-    return (
+    const pending = (
       await this.claimRepository.findByCommunity(message.communityId)
     ).filter((claim) =>
       CommunityInvitationClaimsFinder.isPending(
@@ -59,6 +60,20 @@ export default class CommunityInvitationClaimsFinder {
         claim,
         now,
       ),
+    );
+
+    return new CommunityInvitationClaimsPage(
+      PageSlice.of<CommunityInvitationClaim>({
+        after: message.after,
+        items: pending,
+        limit: message.limit,
+        order: 'asc',
+        position: (claim) =>
+          CommunityInvitationClaim.idOf(
+            claim.getInvitationId(),
+            claim.getIdentityId(),
+          ),
+      }),
     );
   }
 }
