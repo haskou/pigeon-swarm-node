@@ -397,3 +397,93 @@ Feature: Node block sharing
       | encoding                        |
       | an alias DER prefix             |
       | a non-canonical base64 encoding |
+
+  Scenario: The owner pages block sources with an opaque cursor
+    Given I set json body
+      """
+      {"origin": "https://publisher.example", "autoApply": false}
+      """
+    And I sign a PUT request to the block source path ""
+    When I send the PUT to the block source path ""
+    Then response code is equal to 200
+
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1"
+    Then response code is equal to 200
+    And response "sources" holds 1 items
+    And I remember the response next cursor
+
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 200
+    And response "sources" holds 0 items
+    And the response next cursor is null
+
+  Scenario: A garbage or foreign block source cursor is refused
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1&cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1&cursor=CURSOR" with the cursor for resource "registration-codes" at position "550e8400-e29b-41d4-a716-446655440031"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario Outline: A forged block source cursor is refused
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1" with a forged "block-sources" cursor at position "<position>"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+    Examples:
+      | position        |
+      | not-an-identity |
+      | not-a-key       |
+
+  Scenario: Pending entries page each array with its own opaque cursor
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1&blockedNodePeerIdsLimit=1"
+    Then response code is equal to 200
+    And response "blockedIdentityIds" holds 1 items
+    And response "blockedNodePeerIds" holds 0 items
+    And the response "blockedNodePeerIds" next cursor is null
+    And I remember the response "blockedIdentityIds" next cursor
+
+    Given I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1&blockedIdentityIdsCursor=CURSOR" with the remembered "blockedIdentityIds" page cursor
+    Then response code is equal to 200
+    And response "blockedIdentityIds" holds 0 items
+    And the response "blockedIdentityIds" next cursor is null
+
+  Scenario: A pending cursor from one array is refused in the other
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1"
+    Then response code is equal to 200
+    And I remember the response "blockedIdentityIds" next cursor
+
+    Given I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedNodePeerIdsLimit=1&blockedNodePeerIdsCursor=CURSOR" with the remembered "blockedIdentityIds" page cursor
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario Outline: A forged pending cursor is refused
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1&blockedIdentityIdsCursor=CURSOR" with the cursor for resource "block-source-identities" at position "<position>"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+    Examples:
+      | position                                  |
+      | not-an-identity                           |
+      | 12D3KooWD3eckifWpRJ5FeAexqhKVVaBmACPdBCeQ8oTdHxZBJaP |
+
+  Scenario: A forged pending node peer cursor is refused
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedNodePeerIdsLimit=1&blockedNodePeerIdsCursor=CURSOR" with the cursor for resource "block-source-node-peers" at position "not-a-peer-id"
+    Then response code is equal to 400
+    And response body should contain "400110"

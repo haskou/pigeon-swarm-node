@@ -238,6 +238,8 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
       operationId: getNodeBlockSources
       responses:
         default:
@@ -327,6 +329,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/BlockedIdentityIdsLimit'
+        - $ref: '#/components/parameters/BlockedIdentityIdsCursor'
+        - $ref: '#/components/parameters/BlockedNodePeerIdsLimit'
+        - $ref: '#/components/parameters/BlockedNodePeerIdsCursor'
         - $ref: '#/components/parameters/OwnerIdentityId'
       operationId: getNodeBlockSourcesByOwnerIdentityIdPendingEntries
       responses:
@@ -353,6 +359,14 @@ paths:
                     type: array
                     items:
                       type: string
+                  blockedIdentityIdsNextCursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for the next page of blockedIdentityIds; null unless the page is full.
+                  blockedNodePeerIdsNextCursor:
+                    type: string
+                    nullable: true
+                    description: Cursor for the next page of blockedNodePeerIds; null unless the page is full.
         '400':
           description: ownerIdentityId is not the canonical encoding of a usable key (code 400080), checked after the owner; no source is read.
         '403':
@@ -704,6 +718,8 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+        - $ref: '#/components/parameters/PageLimit'
+        - $ref: '#/components/parameters/PageCursor'
       operationId: getNodeRegistrationCodes
       responses:
         default:
@@ -748,6 +764,11 @@ paths:
         - nodes
       summary: Get active peers
       description: Returns nodes seen through heartbeat events, live IPFS transport peers, and per-store OrbitDB convergence against currently known replication peers. Network private keys are never included. Convergence is not a global percentage because future or disconnected peers are unknowable.
+      parameters:
+        - $ref: '#/components/parameters/PeersLimit'
+        - $ref: '#/components/parameters/PeersCursor'
+        - $ref: '#/components/parameters/IpfsPeersLimit'
+        - $ref: '#/components/parameters/IpfsPeersCursor'
       operationId: getPeers
       responses:
         default:
@@ -812,6 +833,91 @@ components:
       schema:
         type: string
         pattern: '^[0-9a-f]{64}$'
+    PageLimit:
+      in: query
+      name: limit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Page size, 1..100, default 50.
+    PageCursor:
+      in: query
+      name: cursor
+      required: false
+      schema:
+        type: string
+      description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+    PeersLimit:
+      in: query
+      name: peersLimit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Page size for peers, 1..100, default 50.
+    PeersCursor:
+      in: query
+      name: peersCursor
+      required: false
+      schema:
+        type: string
+      description: Opaque cursor returned as peersNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+    IpfsPeersLimit:
+      in: query
+      name: ipfsPeersLimit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Page size for ipfsPeers, 1..100, default 50.
+    IpfsPeersCursor:
+      in: query
+      name: ipfsPeersCursor
+      required: false
+      schema:
+        type: string
+      description: Opaque cursor returned as ipfsPeersNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+    BlockedIdentityIdsLimit:
+      in: query
+      name: blockedIdentityIdsLimit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Page size for blockedIdentityIds, 1..100, default 50.
+    BlockedIdentityIdsCursor:
+      in: query
+      name: blockedIdentityIdsCursor
+      required: false
+      schema:
+        type: string
+      description: Opaque cursor returned as blockedIdentityIdsNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+    BlockedNodePeerIdsLimit:
+      in: query
+      name: blockedNodePeerIdsLimit
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+      description: Page size for blockedNodePeerIds, 1..100, default 50.
+    BlockedNodePeerIdsCursor:
+      in: query
+      name: blockedNodePeerIdsCursor
+      required: false
+      schema:
+        type: string
+      description: Opaque cursor returned as blockedNodePeerIdsNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
   schemas:
     NodeBlockList:
       type: object
@@ -963,6 +1069,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NodeBlockSourceResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     ClientContractResource:
       type: object
       additionalProperties: false
@@ -1065,6 +1175,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NodeRegistrationCodeResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     NetworkResource:
       type: object
       required:
@@ -1413,6 +1527,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PeerResource'
+        peersNextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page of peers; null unless the page is full.
+        ipfsPeersNextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page of ipfsPeers; null unless the page is full.
     PostNodeNetworkBody:
       type: object
       required:
