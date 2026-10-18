@@ -487,3 +487,44 @@ Feature: Node block sharing
     When I send the GET to the block source path "/pending-entries?blockedNodePeerIdsLimit=1&blockedNodePeerIdsCursor=CURSOR" with the cursor for resource "block-source-node-peers" at position "not-a-peer-id"
     Then response code is equal to 400
     And response body should contain "400110"
+
+  Scenario: A non-owner is refused a valid or forged block source cursor as a non-owner
+    Given I set json body
+      """
+      {"origin": "https://publisher.example", "autoApply": false}
+      """
+    And I sign a PUT request to the block source path ""
+    When I send the PUT to the block source path ""
+    Then response code is equal to 200
+
+    Given I sign a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+
+    Given another identity signs a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+    Given another identity signs a GET request to "/node/block-sources"
+    When I GET "/node/block-sources?limit=1" with a forged "block-sources" cursor at position "not-a-key"
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+  Scenario: A non-owner is refused a valid or forged pending entries cursor as a non-owner
+    Given the node follows a block source whose version 1 blocks the other identity
+    And I sign a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1"
+    Then response code is equal to 200
+    And I remember the response "blockedIdentityIds" next cursor
+
+    Given another identity signs a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1&blockedIdentityIdsCursor=CURSOR" with the remembered "blockedIdentityIds" page cursor
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+    Given another identity signs a GET request to the block source path "/pending-entries"
+    When I send the GET to the block source path "/pending-entries?blockedIdentityIdsLimit=1&blockedIdentityIdsCursor=CURSOR" with the cursor for resource "block-source-identities" at position "not-an-identity"
+    Then response code is equal to 403
+    And response body should contain "403010"

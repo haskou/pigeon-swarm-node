@@ -93,6 +93,33 @@ Feature: Node registration codes
     Then response code is equal to 403
     And response body should contain "403010"
 
+  Scenario: A non-owner is refused a valid or forged registration code cursor as a non-owner
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner"
+    Then response code is equal to 200
+
+    Given another identity signs a GET request to "/node/registration-codes"
+    When I GET "/node/registration-codes?limit=1&cursor=CURSOR" with the cursor for resource "registration-codes" at position "ffffffff-ffff-4fff-bfff-ffffffffffff"
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+    Given another identity signs a GET request to "/node/registration-codes"
+    When I GET "/node/registration-codes?limit=1" with a forged "registration-codes" cursor at position "not-a-uuid"
+    Then response code is equal to 403
+    And response body should contain "403010"
+
+  Scenario: An oversized registration code cursor position is refused
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner"
+    Then response code is equal to 200
+
+    Given I sign a GET request to "/node/registration-codes"
+    When I GET "/node/registration-codes?limit=1&cursor=CURSOR" with the cursor for resource "registration-codes" at a position 257 characters long
+    Then response code is equal to 400
+    And response body should contain "400110"
+
   Scenario: Registration codes page with an opaque cursor and end with a null cursor
     Given the local node has no owner and no networks
     And I sign the current node owner request
