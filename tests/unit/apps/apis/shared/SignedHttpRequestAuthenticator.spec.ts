@@ -159,6 +159,36 @@ describe('SignedHttpRequestAuthenticator', () => {
     expect(acceptFromStranger).not.toHaveBeenCalled();
   });
 
+  it('charges a state-changing request to the client address it arrived from', async () => {
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+
+    await authenticator.authenticate(
+      await buildSignedRequest('POST', { value: 1 }),
+    );
+
+    expect(accept).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      CLIENT_ADDRESS,
+    );
+  });
+
+  it('charges a state-changing request with no client address to unknown', async () => {
+    const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
+    const request = await buildSignedRequest('POST', { value: 1 });
+
+    await authenticator.authenticate({
+      ...request,
+      ip: undefined,
+    } as unknown as Request);
+
+    expect(accept).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      'unknown',
+    );
+  });
+
   it('records a state-changing request from an identity this node does not hold in the stranger share', async () => {
     identityRepository.holds.mockResolvedValue(false);
     const accept = jest.spyOn(signedRequestReplayGuard, 'accept');

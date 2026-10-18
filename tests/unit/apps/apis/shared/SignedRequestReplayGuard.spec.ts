@@ -45,6 +45,20 @@ describe('SignedRequestReplayGuard', () => {
     fillers = await signersOf(SIGNERS_AT_CAPACITY);
   });
 
+  const fillServedSource = (
+    guard: SignedRequestReplayGuard,
+    source: string,
+  ): void => {
+    fillers.slice(0, 3).forEach((filler, signer) => {
+      const count =
+        signer < 2 ? SLOTS_PER_SIGNER : SERVED_SLOTS_PER_SOURCE - 2 * SLOTS_PER_SIGNER;
+
+      Array.from({ length: count }).forEach((_, index) =>
+        guard.accept(filler, signatureOf(index), source),
+      );
+    });
+  };
+
   it('rejects a repeated signature for the same identity', () => {
     const guard = new SignedRequestReplayGuard();
 
@@ -306,5 +320,89 @@ describe('SignedRequestReplayGuard', () => {
     expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
 
     now.mockRestore();
+  });
+
+  it('takes the served cap per address from SERVED_SLOTS_PER_SOURCE', () => {
+    const previous = process.env.SERVED_SLOTS_PER_SOURCE;
+    process.env.SERVED_SLOTS_PER_SOURCE = '3';
+
+    try {
+      const guard = new SignedRequestReplayGuard();
+
+      expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
+      expect(guard.accept(identity, signatureOf(1), SOURCE)).toBe(true);
+      expect(guard.accept(identity, signatureOf(2), SOURCE)).toBe(true);
+      expect(guard.accept(identity, signatureOf(3), SOURCE)).toBe(false);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SERVED_SLOTS_PER_SOURCE;
+      } else {
+        process.env.SERVED_SLOTS_PER_SOURCE = previous;
+      }
+    }
+  });
+
+  it('charges requests with no client address to one shared unknown bucket', () => {
+    const guard = new SignedRequestReplayGuard();
+    fillServedSource(guard, 'unknown');
+
+    expect(guard.accept(identity, signatureOf(0), 'unknown')).toBe(false);
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.1')).toBe(true);
+  });
+
+  it('charges every address in one IPv6 /64 to the same served cap', () => {
+    const guard = new SignedRequestReplayGuard();
+    fillServedSource(guard, '2001:db8:0:1::1');
+
+    expect(
+      guard.accept(identity, signatureOf(0), '2001:db8:0:1:ffff:ffff:ffff:ffff'),
+    ).toBe(false);
+    expect(guard.accept(identity, signatureOf(0), '2001:db8:0:2::1')).toBe(true);
+  });
+
+  it('charges an IPv4-mapped IPv6 address to its IPv4 address', () => {
+    const guard = new SignedRequestReplayGuard();
+    fillServedSource(guard, '::ffff:192.0.2.1');
+
+    expect(guard.accept(identity, signatureOf(0), '192.0.2.1')).toBe(false);
+  });
+
+  it('charges an identity key and a device key from one address to the same served cap', () => {
+    const guard = new SignedRequestReplayGuard();
+    const device = DeviceCredential.fromIdentityId(fillers[1]);
+
+    Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+      guard.accept(fillers[0], signatureOf(index), SOURCE),
+    );
+    Array.from({ length: SLOTS_PER_SIGNER }).forEach((_, index) =>
+      guard.accept(device, signatureOf(index), SOURCE),
+    );
+    Array.from({ length: SERVED_SLOTS_PER_SOURCE - 2 * SLOTS_PER_SIGNER }).forEach(
+      (_, index) => guard.accept(fillers[2], signatureOf(index), SOURCE),
+    );
+
+    expect(guard.accept(fillers[3], signatureOf(0), SOURCE)).toBe(false);
+    expect(guard.accept(fillers[3], signatureOf(0), '192.0.2.99')).toBe(true);
+  });
+
+  it('does not let a full served share refuse a stranger from the same address', () => {
+    const guard = new SignedRequestReplayGuard();
+    fillServedSource(guard, SOURCE);
+
+    expect(guard.acceptFromStranger(strangers[0], signatureOf(0), SOURCE)).toBe(
+      true,
+    );
+  });
+
+  it('does not let a full stranger share refuse an identity from the same address', () => {
+    const guard = new SignedRequestReplayGuard();
+    Array.from({ length: STRANGER_SLOTS_PER_SOURCE }).forEach((_, index) =>
+      guard.acceptFromStranger(strangers[0], signatureOf(index), SOURCE),
+    );
+
+    expect(guard.acceptFromStranger(strangers[1], signatureOf(0), SOURCE)).toBe(
+      false,
+    );
+    expect(guard.accept(identity, signatureOf(0), SOURCE)).toBe(true);
   });
 });

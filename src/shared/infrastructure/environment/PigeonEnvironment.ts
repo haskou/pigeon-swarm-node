@@ -180,6 +180,7 @@ export const pigeonEnvironmentSchema = {
   },
   REALTIME_ALLOWED_ORIGINS: { defaultValue: '', type: 'string' },
   ROUTE_PREFIX: { type: 'string' },
+  SERVED_SLOTS_PER_SOURCE: { defaultValue: 2_500, type: 'number' },
   SERVICE_NAME: { type: 'string' },
   TRANSPORT_DSN: { defaultValue: 'in-memory', type: 'string' },
 } as const;
@@ -192,6 +193,7 @@ export type PigeonEnvironment = KernelEnvironment<
 // numbers are finite. Kept beside the schema so the bounds sit with the names.
 export const pigeonEnvironmentIntegerRanges = {
   NODE_INITIALIZER_TIMEOUT_MS: { max: MAX_TIMER_DELAY_MS, min: 1 },
+  SERVED_SLOTS_PER_SOURCE: { max: 100_000, min: 1 },
 } as const;
 
 function parseEnvironmentValue(

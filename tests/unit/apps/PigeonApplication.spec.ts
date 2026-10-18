@@ -99,4 +99,23 @@ describe('PigeonApplication kernel-loaded environment', () => {
       new PigeonApplication().loadEnvironmentVariables(),
     ).not.toThrow();
   });
+
+  it.each([['0'], ['-1'], ['1.5'], ['many'], ['100001']])(
+    'should fail loading the environment when SERVED_SLOTS_PER_SOURCE is %s',
+    (raw) => {
+      process.env.SERVED_SLOTS_PER_SOURCE = raw;
+
+      expect(() => new PigeonApplication().loadEnvironmentVariables()).toThrow(
+        'Environment variable "SERVED_SLOTS_PER_SOURCE" must be an integer from 1 to 100000.',
+      );
+    },
+  );
+
+  it('should load the environment when SERVED_SLOTS_PER_SOURCE is 100000', () => {
+    process.env.SERVED_SLOTS_PER_SOURCE = '100000';
+
+    expect(() =>
+      new PigeonApplication().loadEnvironmentVariables(),
+    ).not.toThrow();
+  });
 });

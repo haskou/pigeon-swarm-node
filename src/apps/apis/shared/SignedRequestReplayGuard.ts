@@ -1,3 +1,4 @@
+import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import clientRateKey from '@app/shared/infrastructure/express/clientRateKey';
 import {
   PublicKey,
@@ -22,12 +23,6 @@ import { SignedRequestReplayEntry } from './SignedRequestReplayEntry';
 export class SignedRequestReplayGuard {
   private static readonly MAX_ENTRIES = 100_000;
   private static readonly SLOTS_PER_SIGNER = 1_000;
-  /**
-   * A fortieth of the entries, so filling them with served signers takes 40
-   * client addresses (or IPv6 /64s), as it does for strangers, while one
-   * address still has room for two and a half signers at their full share.
-   */
-  private static readonly SERVED_SLOTS_PER_SOURCE = 2_500;
   private static readonly STRANGER_SLOTS = 10_000;
   /**
    * A fortieth of the stranger share, so filling it takes 40 client addresses
@@ -46,6 +41,7 @@ export class SignedRequestReplayGuard {
   private readonly servedSlotsBySource = new Map<string, number>();
   private readonly strangerSlotsBySource = new Map<string, number>();
   private strangerSlots = 0;
+  private servedSlotsPerSourceLimit?: number;
 
   private static take(slots: Map<string, number>, key: string): void {
     slots.set(key, (slots.get(key) ?? 0) + 1);
@@ -83,6 +79,18 @@ export class SignedRequestReplayGuard {
     }
   }
 
+  /**
+   * The served cap per client address, from SERVED_SLOTS_PER_SOURCE. It is read
+   * on first use, because this singleton is built when the module loads, before
+   * the kernel has loaded the environment.
+   */
+  private servedSlotLimit(): number {
+    this.servedSlotsPerSourceLimit ??=
+      pigeonEnvironment().SERVED_SLOTS_PER_SOURCE;
+
+    return this.servedSlotsPerSourceLimit;
+  }
+
   private hasRoomFor(
     signer: string,
     source: string,
@@ -99,8 +107,7 @@ export class SignedRequestReplayGuard {
   private hasRoomForSource(source: string, stranger: boolean): boolean {
     if (!stranger) {
       return (
-        (this.servedSlotsBySource.get(source) ?? 0) <
-        SignedRequestReplayGuard.SERVED_SLOTS_PER_SOURCE
+        (this.servedSlotsBySource.get(source) ?? 0) < this.servedSlotLimit()
       );
     }
 
