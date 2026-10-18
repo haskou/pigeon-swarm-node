@@ -19,23 +19,26 @@ export class GetNotificationsRoute extends Route {
   @Get()
   public async getNotifications(
     @QueryParam('limit') limit: string | undefined,
-    @QueryParam('beforeNotificationId')
-    beforeNotificationId: string | undefined,
+    @QueryParam('cursor') cursor: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const recipientIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const notifications = await this.finder.find(
-      new GetNotificationsRequest(
-        recipientIdentityId,
-        limit,
-        beforeNotificationId,
-      ).getMessage(),
+    const pageRequest = new GetNotificationsRequest(
+      recipientIdentityId,
+      limit,
+      cursor,
     );
+    const page = await this.finder.find(pageRequest.getMessage());
 
     return response
       .status(HttpRouteStatusEnum.OK)
-      .send(new NotificationsViewModel(notifications).toResource());
+      .send(
+        new NotificationsViewModel(
+          page.items,
+          pageRequest.nextCursor(page.nextPosition),
+        ).toResource(),
+      );
   }
 }

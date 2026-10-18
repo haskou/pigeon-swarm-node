@@ -1,5 +1,6 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
-import { PageSlice } from '../pagination/PageSlice';
 import { CommunitiesPage } from './CommunitiesPage';
 import { CommunitiesFindMessage } from './messages/CommunitiesFindMessage';
 

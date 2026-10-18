@@ -1,10 +1,10 @@
 import CallParticipantLeaseRepository from '@app/contexts/calls/domain/repositories/CallParticipantLeaseRepository';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
 
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import { CommunityChannelId } from '../../domain/value-objects/CommunityChannelId';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { PageSlice } from '../pagination/PageSlice';
 import { CommunityChannelsDetails } from './CommunityChannelsDetails';
 import { CommunityChannelsFindMessage } from './messages/CommunityChannelsFindMessage';
 

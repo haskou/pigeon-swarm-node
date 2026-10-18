@@ -1,8 +1,8 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
 import { PrimitiveOf } from '@haskou/value-objects';
 
 import { Community } from '../../domain/Community';
 import { CommunityRole } from '../../domain/entities/membership/CommunityRole';
-import { PageSlice } from '../pagination/PageSlice';
 
 /** One page of a community's roles, ordered by role id ascending. */
 export class CommunityRolesPage {

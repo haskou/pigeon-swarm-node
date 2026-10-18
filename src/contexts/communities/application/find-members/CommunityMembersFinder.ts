@@ -1,5 +1,6 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import CommunityFinder from '../find-community/CommunityFinder';
-import { PageSlice } from '../pagination/PageSlice';
 import { CommunityMembersPage } from './CommunityMembersPage';
 import { CommunityMembersFindMessage } from './messages/CommunityMembersFindMessage';
 

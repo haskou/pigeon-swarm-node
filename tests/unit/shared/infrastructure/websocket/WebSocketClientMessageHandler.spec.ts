@@ -7,6 +7,7 @@ import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memor
 import { Community } from '@app/contexts/communities/domain/Community';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import { DatedConversation } from '@app/contexts/conversations/domain/DatedConversation';
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { Mailbox } from '@app/contexts/mailboxes/domain/Mailbox';
 import MailboxRepository from '@app/contexts/mailboxes/domain/repositories/MailboxRepository';
@@ -152,7 +153,9 @@ describe('WebSocketClientMessageHandler', () => {
       conversationRecipient,
       communityRecipient,
     ]);
-    conversationRepository.findByParticipant.mockResolvedValue([conversation]);
+    conversationRepository.findByParticipant.mockResolvedValue([
+      new DatedConversation(conversation, 0),
+    ]);
     communityRepository.findByMember.mockResolvedValue([community]);
 
     await expect(
@@ -163,20 +166,47 @@ describe('WebSocketClientMessageHandler', () => {
     ]);
   });
 
-  it('should read at most 500 conversations for identity update recipients', async () => {
+  it('should use only the 500 newest conversations for identity update recipients', async () => {
     const updatedIdentity = new IdentityId(
       'MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
     );
+    const newestRecipient = new IdentityId(
+      'MCowBQYDK2VwAyEBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=',
+    );
+    const oldestRecipient = new IdentityId(
+      'MCowBQYDK2VwAyECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC=',
+    );
+    const newest = mock<Conversation>();
+    const oldest = mock<Conversation>();
 
-    conversationRepository.findByParticipant.mockResolvedValue([]);
+    newest.getParticipantIds.mockReturnValue([
+      updatedIdentity,
+      newestRecipient,
+    ]);
+    oldest.getParticipantIds.mockReturnValue([
+      updatedIdentity,
+      oldestRecipient,
+    ]);
+    const middle = Array.from({ length: 499 }, () => {
+      const conversation = mock<Conversation>();
+
+      conversation.getParticipantIds.mockReturnValue([updatedIdentity]);
+
+      return conversation;
+    });
+
+    conversationRepository.findByParticipant.mockResolvedValue([
+      new DatedConversation(newest, 2),
+      ...middle.map((conversation) => new DatedConversation(conversation, 1)),
+      new DatedConversation(oldest, 0),
+    ]);
     communityRepository.findByMember.mockResolvedValue([]);
 
     await expect(
       handler.findIdentityUpdateRecipients(updatedIdentity.valueOf()),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual([newestRecipient.valueOf()]);
     expect(conversationRepository.findByParticipant).toHaveBeenCalledWith(
       updatedIdentity,
-      500,
     );
   });
 

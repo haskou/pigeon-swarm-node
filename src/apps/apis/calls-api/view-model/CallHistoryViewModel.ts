@@ -3,7 +3,10 @@ import { Call } from '@app/contexts/calls/domain/Call';
 import { CallsResource } from '../resources/CallsResource';
 
 export class CallHistoryViewModel {
-  constructor(private readonly calls: Call[]) {}
+  constructor(
+    private readonly calls: Call[],
+    private readonly nextCursor: string | null,
+  ) {}
 
   public toResource(): CallsResource {
     return {
@@ -14,6 +17,7 @@ export class CallHistoryViewModel {
           connected: false,
         })),
       })),
+      nextCursor: this.nextCursor,
     };
   }
 }

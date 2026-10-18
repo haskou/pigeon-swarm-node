@@ -1,7 +1,8 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { CommunityInvitation } from '../../domain/entities/invitations/CommunityInvitation';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { PageSlice } from '../pagination/PageSlice';
 import { CommunityInvitationsPage } from './CommunityInvitationsPage';
 import { CommunityInvitationsFindMessage } from './messages/CommunityInvitationsFindMessage';
 

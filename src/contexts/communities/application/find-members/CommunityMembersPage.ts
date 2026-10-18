@@ -1,4 +1,4 @@
-import { PageSlice } from '../pagination/PageSlice';
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
 
 /** One page of a community's member ids, ordered ascending. */
 export class CommunityMembersPage {

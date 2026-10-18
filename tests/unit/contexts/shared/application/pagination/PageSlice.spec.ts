@@ -1,4 +1,4 @@
-import { PageSlice } from '@app/contexts/communities/application/pagination/PageSlice';
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
 
 describe('PageSlice', () => {
   const items = ['d', 'b', 'a', 'c'];

@@ -23,10 +23,12 @@ describe('NotificationsFinder', () => {
   const descending = (ids: string[]): string[] =>
     Letters.ascending(ids).reverse();
 
-  const find = (limit: number, before?: string): Promise<Notification[]> =>
-    finder.find(
-      new NotificationsFindMessage(recipient.valueOf(), limit, before),
-    );
+  const find = async (limit: number, after?: string): Promise<Notification[]> =>
+    (
+      await finder.find(
+        new NotificationsFindMessage(recipient.valueOf(), limit, after),
+      )
+    ).items;
 
   beforeAll(async () => {
     [recipient, inviter] = await Letters.identities(2);
@@ -70,11 +72,12 @@ describe('NotificationsFinder', () => {
     expect(Letters.idsOf([...first, ...second])).toEqual(expected);
   });
 
-  it('treats a held-back letter as a cursor it does not know', async () => {
+  it('resumes after the position of a held-back letter', async () => {
     const heldBack = Letters.ascending(Letters.idsOf(held))[4];
-
-    expect(Letters.idsOf(await find(20, heldBack))).toEqual(
-      Letters.idsOf(await find(20)),
+    const expected = Letters.idsOf(await find(20)).filter(
+      (id) => id < heldBack,
     );
+
+    expect(Letters.idsOf(await find(20, heldBack))).toEqual(expected);
   });
 });

@@ -18,9 +18,8 @@ paths:
         NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_PAIR (default 4) per
         inviter and NOTIFICATIONS_MAX_PENDING_GROUP_INVITATIONS_PER_RECIPIENT
         (default 100) in total; the rest is held back, stays stored and can
-        still be updated by id. The caps apply before limit and
-        beforeNotificationId; a held-back beforeNotificationId restarts from
-        the first page.
+        still be updated by id. The caps apply before limit and cursor; the
+        cursor pages over the listed notifications only.
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
@@ -29,10 +28,14 @@ paths:
           name: limit
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
         - in: query
-          name: beforeNotificationId
+          name: cursor
           schema:
             type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getNotifications
       responses:
         default:
@@ -251,6 +254,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/NotificationResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     PostNotificationBody:
       oneOf:
         - allOf:

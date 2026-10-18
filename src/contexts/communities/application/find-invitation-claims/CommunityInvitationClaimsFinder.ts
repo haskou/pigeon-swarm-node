@@ -1,10 +1,11 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { Community } from '../../domain/Community';
 import { CommunityInvitationClaim } from '../../domain/entities/invitations/CommunityInvitationClaim';
 import { CommunityInvitations } from '../../domain/entities/invitations/CommunityInvitations';
 import CommunityInvitationClaimRepository from '../../domain/repositories/CommunityInvitationClaimRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
 import CommunityFinder from '../find-community/CommunityFinder';
-import { PageSlice } from '../pagination/PageSlice';
 import { CommunityInvitationClaimsPage } from './CommunityInvitationClaimsPage';
 import { CommunityInvitationClaimsFindMessage } from './messages/CommunityInvitationClaimsFindMessage';
 

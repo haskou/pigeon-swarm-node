@@ -1,9 +1,10 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+import { PageTimestamp } from '@app/contexts/shared/application/pagination/PageTimestamp';
+
 import { CommunityChannelMessageNotFoundError } from '../../domain/errors/CommunityChannelMessageNotFoundError';
 import CommunityChannelMessagePinRepository from '../../domain/repositories/CommunityChannelMessagePinRepository';
 import CommunityChannelMessageRepository from '../../domain/repositories/CommunityChannelMessageRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
-import { PageSlice } from '../pagination/PageSlice';
-import { PageTimestamp } from '../pagination/PageTimestamp';
 import { CommunityChannelMessagePinDetails } from './CommunityChannelMessagePinDetails';
 import { CommunityChannelMessagePinsPage } from './CommunityChannelMessagePinsPage';
 import { CommunityChannelMessagePinsFindMessage } from './messages/CommunityChannelMessagePinsFindMessage';

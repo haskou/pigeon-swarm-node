@@ -1,5 +1,6 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { Community } from '../../domain/Community';
-import { PageSlice } from '../pagination/PageSlice';
 
 /** One page of the communities a member belongs to, in community id order. */
 export class CommunitiesPage {

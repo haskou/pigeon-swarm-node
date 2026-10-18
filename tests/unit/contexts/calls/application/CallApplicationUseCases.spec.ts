@@ -48,33 +48,56 @@ describe('Call application use cases', () => {
   beforeEach(() => {
     authorizer.canAccess.mockResolvedValue(true);
   });
-  it('ActiveCallsFinder delegates the participant lookup', async () => {
-    const repository = mock<CallRepository>();
-    const calls = [mock<Call>()];
+  const laterCallId = '550e8400-e29b-41d4-a716-446655440002';
+  const callAt = (id: string, createdAt: number): Call => {
+    const call = mock<Call>();
 
-    repository.findActiveByParticipant.mockResolvedValue(calls);
-
-    await expect(
-      new ActiveCallsFinder(repository, authorizer).find(
-        new ActiveCallsFindMessage(participantIdentityId),
-      ),
-    ).resolves.toEqual(calls);
-  });
-
-  it('CallHistoryFinder delegates the participant history lookup', async () => {
-    const repository = mock<CallRepository>();
-    const calls = [mock<Call>()];
-
-    calls[0].getScope.mockReturnValue(
+    call.toPrimitives.mockReturnValue({ createdAt, id } as never);
+    call.getScope.mockReturnValue(
       CallScope.conversation(new ConversationId('conversation-1')),
     );
-    repository.findByParticipant.mockResolvedValue(calls);
 
-    await expect(
-      new CallHistoryFinder(repository, authorizer).find(
-        new CallHistoryFindMessage(participantIdentityId),
-      ),
-    ).resolves.toEqual(calls);
+    return call;
+  };
+
+  it('ActiveCallsFinder pages the participant lookup oldest first', async () => {
+    const repository = mock<CallRepository>();
+    const older = callAt(callId, 1_000);
+    const newer = callAt(laterCallId, 2_000);
+
+    repository.findActiveByParticipant.mockResolvedValue([newer, older]);
+
+    const finder = new ActiveCallsFinder(repository, authorizer);
+    const first = await finder.find(
+      new ActiveCallsFindMessage(participantIdentityId, 1),
+    );
+    const second = await finder.find(
+      new ActiveCallsFindMessage(participantIdentityId, 2, first.nextPosition),
+    );
+
+    expect(first.items).toEqual([older]);
+    expect(second.items).toEqual([newer]);
+    expect(second.nextPosition).toBeUndefined();
+  });
+
+  it('CallHistoryFinder pages the conversation history oldest first', async () => {
+    const repository = mock<CallRepository>();
+    const older = callAt(callId, 1_000);
+    const newer = callAt(laterCallId, 2_000);
+
+    repository.findByParticipant.mockResolvedValue([newer, older]);
+
+    const finder = new CallHistoryFinder(repository, authorizer);
+    const first = await finder.find(
+      new CallHistoryFindMessage(participantIdentityId, 1),
+    );
+    const second = await finder.find(
+      new CallHistoryFindMessage(participantIdentityId, 2, first.nextPosition),
+    );
+
+    expect(first.items).toEqual([older]);
+    expect(second.items).toEqual([newer]);
+    expect(second.nextPosition).toBeUndefined();
   });
 
   it('CallFinder returns a call visible to the requester', async () => {
@@ -132,14 +155,14 @@ describe('Call application use cases', () => {
     ).rejects.toBeInstanceOf(CallNotFoundError);
     await expect(
       new ActiveCallsFinder(repository, access).find(
-        new ActiveCallsFindMessage(participantIdentityId),
+        new ActiveCallsFindMessage(participantIdentityId, 50),
       ),
-    ).resolves.toEqual([]);
+    ).resolves.toMatchObject({ items: [] });
     await expect(
       new CallHistoryFinder(repository, access).find(
-        new CallHistoryFindMessage(participantIdentityId),
+        new CallHistoryFindMessage(participantIdentityId, 50),
       ),
-    ).resolves.toEqual([]);
+    ).resolves.toMatchObject({ items: [] });
     const events = mock<DomainEventPublisher>();
     const leases = mock<CallParticipantLeaseRenewer>();
     await expect(

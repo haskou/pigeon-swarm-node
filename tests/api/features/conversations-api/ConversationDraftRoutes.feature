@@ -37,7 +37,8 @@ Feature: Conversation drafts live under opaque keys
             "encryptedPayload": "sealed-draft-payload",
             "updatedAt": 1700000000000
           }
-        ]
+        ],
+        "nextCursor": null
       }
       """
     Given I sign a DELETE request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
@@ -54,7 +55,8 @@ Feature: Conversation drafts live under opaque keys
     Then response data should match exactly
       """
       {
-        "drafts": []
+        "drafts": [],
+        "nextCursor": null
       }
       """
 
@@ -76,7 +78,8 @@ Feature: Conversation drafts live under opaque keys
     And response data should match exactly
       """
       {
-        "drafts": []
+        "drafts": [],
+        "nextCursor": null
       }
       """
     Given I sign a GET request to "/conversation-drafts"
@@ -132,3 +135,14 @@ Feature: Conversation drafts live under opaque keys
       | method |
       | PUT    |
       | DELETE |
+
+  Scenario: A garbage or foreign draft cursor is refused
+    Given I am an anonymous user
+    And I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1&cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1" with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"

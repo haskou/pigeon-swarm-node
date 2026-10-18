@@ -58,11 +58,11 @@ describe('Conversation draft use cases', () => {
   });
 
   async function draftsOf(identityId: string) {
-    const drafts = await finder.find(
-      new ConversationDraftsFindMessage(identityId),
+    const page = await finder.find(
+      new ConversationDraftsFindMessage(identityId, 100),
     );
 
-    return drafts.map((draft) => ({
+    return page.items.map((draft) => ({
       draftKey: draft.getDraftKey().valueOf(),
       encryptedPayload: draft.getEncryptedPayload().valueOf(),
       updatedAt: draft.getUpdatedAt().valueOf(),

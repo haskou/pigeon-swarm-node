@@ -177,13 +177,16 @@ export default class WebSocketClientMessageHandler {
     identityId: string,
   ): Promise<string[]> {
     const actorId = new IdentityId(identityId);
-    const [conversations, communities] = await Promise.all([
-      this.conversationRepository.findByParticipant(
-        actorId,
-        WebSocketClientMessageHandler.IDENTITY_UPDATE_CONVERSATION_LIMIT,
-      ),
+    const [datedConversations, communities] = await Promise.all([
+      this.conversationRepository.findByParticipant(actorId),
       this.communityRepository.findByMember(actorId),
     ]);
+    const conversations = datedConversations
+      .slice(
+        0,
+        WebSocketClientMessageHandler.IDENTITY_UPDATE_CONVERSATION_LIMIT,
+      )
+      .map((dated) => dated.conversation);
     const recipients = new Set<string>();
 
     for (const conversation of conversations) {

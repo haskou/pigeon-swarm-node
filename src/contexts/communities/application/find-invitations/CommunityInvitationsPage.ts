@@ -1,6 +1,7 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { Community } from '../../domain/Community';
 import { CommunityInvitation } from '../../domain/entities/invitations/CommunityInvitation';
-import { PageSlice } from '../pagination/PageSlice';
 
 /** One page of a community's invitations, ordered by invitation id ascending. */
 export class CommunityInvitationsPage {
