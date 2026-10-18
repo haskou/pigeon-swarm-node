@@ -296,8 +296,9 @@ on the id alone, so it reveals nothing about the list.
 `PUT /node/blocks`, `PUT /node/block-exceptions`,
 `PUT /node/block-sources/{ownerIdentityId}` and
 `POST /node/block-sources/{ownerIdentityId}/approvals` refuse a body or path
-naming such an id with `400` code `400080` before anything is stored, so no
-owner write can add an alias. `DELETE /node/block-sources/{ownerIdentityId}`
+naming such an id with `400` code `400080` once the owner is authenticated,
+before anything is stored, so no owner write can add an alias.
+`DELETE /node/block-sources/{ownerIdentityId}`
 and `GET /node/block-sources/{ownerIdentityId}/pending-entries` refuse such a path id
 the same way once the owner is authenticated, before any source is read or
 removed, so an alias is never answered as a missing source. A fetched source
