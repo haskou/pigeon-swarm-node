@@ -2081,7 +2081,7 @@ a record or path id, answer `400` code `400080` for such an id instead.
 `PUT /node/blocks`, `PUT /node/block-exceptions`,
 `PUT /node/block-sources/{ownerIdentityId}` and
 `POST /node/block-sources/{ownerIdentityId}/approvals` answer `400` code
-`400080`, before anything is stored, for a body or path naming such an id;
+`400080`, once the owner is authenticated, before anything is stored, for a body or path naming such an id;
 `DELETE /node/block-sources/{ownerIdentityId}` and
 `GET /node/block-sources/{ownerIdentityId}/pending-entries` answer it for such a path
 id once the owner is authenticated, before any source is read or removed.
@@ -2248,7 +2248,8 @@ highest one this node ever accepted from that publisher, even after the source
 was removed or the owner settings were reset. `origin` must be a bare
 `https` origin; anything else gets `409 InvalidNodeBlockSourceOriginError`.
 An `ownerIdentityId` that is not the canonical encoding of a usable key gets
-`400` code `400080` before anything is stored. The source is fetched on the
+`400` code `400080` once the owner is authenticated, before anything is stored.
+The source is fetched on the
 next refresh run.
 
 The response is a source:
@@ -2349,8 +2350,8 @@ entry. Returns the source. Refusals answer `409` with one of these codes:
 | `NodeBlockSourceNotFoundError`              | The source is not adopted.                    |
 
 An `ownerIdentityId` or a named `blockedIdentityIds` entry that is not the
-canonical encoding of a usable key gets `400` code `400080` before anything is
-stored.
+canonical encoding of a usable key gets `400` code `400080` once the owner is
+authenticated, before anything is stored.
 
 ```http
 PUT /node/block-exceptions

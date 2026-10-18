@@ -26,22 +26,22 @@ export class PutNodeBlockExceptionsRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const message = new NodeBlockExceptionsUpdaterMessage(
-      body.identityIds,
-      body.nodePeerIds,
-    );
+    const exceptions = await this.writeAsNodeOwner(request, async () => {
+      const message = new NodeBlockExceptionsUpdaterMessage(
+        body.identityIds,
+        body.nodePeerIds,
+      );
 
-    if (
-      !message.exceptions
-        .getIdentityIds()
-        .every((identityId) => identityId.isCanonicalKey())
-    ) {
-      throw new NonCanonicalIdentityIdError();
-    }
+      if (
+        !message.exceptions
+          .getIdentityIds()
+          .every((identityId) => identityId.isCanonicalKey())
+      ) {
+        throw new NonCanonicalIdentityIdError();
+      }
 
-    const exceptions = await this.writeAsNodeOwner(request, () =>
-      this.updater.update(message),
-    );
+      return this.updater.update(message);
+    });
 
     return response
       .status(HttpRouteStatusEnum.OK)

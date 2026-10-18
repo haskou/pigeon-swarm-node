@@ -34,19 +34,19 @@ export class PutNodeBlockSourceRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const message = new NodeBlockSourceAdopterMessage(
-      ownerIdentityId,
-      body.origin,
-      body.autoApply,
-    );
+    const source = await this.writeAsNodeOwner(request, async () => {
+      const message = new NodeBlockSourceAdopterMessage(
+        ownerIdentityId,
+        body.origin,
+        body.autoApply,
+      );
 
-    if (!message.ownerIdentityId.isCanonicalKey()) {
-      throw new NonCanonicalIdentityIdError();
-    }
+      if (!message.ownerIdentityId.isCanonicalKey()) {
+        throw new NonCanonicalIdentityIdError();
+      }
 
-    const source = await this.writeAsNodeOwner(request, () =>
-      this.adopter.adopt(message),
-    );
+      return this.adopter.adopt(message);
+    });
 
     return response
       .status(HttpRouteStatusEnum.OK)
