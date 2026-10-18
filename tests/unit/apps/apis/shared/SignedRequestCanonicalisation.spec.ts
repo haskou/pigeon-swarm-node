@@ -9,6 +9,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import {
   KeyPair,
   PublicKey,
+  Signature,
   SignedHttpRequestBody,
   SignedHttpRequestSignature,
 } from '@haskou/pigeon-swarm-crypto';
@@ -85,15 +86,19 @@ function bigIntToLittleEndian(value: bigint, length: number): Buffer {
   return bytes;
 }
 
+/** The S scalar of a base64 Ed25519 signature: its last 32 bytes, little-endian. */
+function scalarOf(signature: string): bigint {
+  return littleEndianToBigInt(Buffer.from(signature, 'base64').subarray(32));
+}
+
 /** Same R and the scalar S+L: the same Ed25519 equation with different bytes. */
 function malleate(signature: string): string {
-  const bytes = Buffer.from(signature, 'hex');
-  const scalar = littleEndianToBigInt(bytes.subarray(32));
+  const bytes = Buffer.from(signature, 'base64');
   const twin = Buffer.concat([
     bytes.subarray(0, 32),
-    bigIntToLittleEndian(scalar + ED25519_ORDER, 32),
+    bigIntToLittleEndian(scalarOf(signature) + ED25519_ORDER, 32),
   ]);
-  return twin.toString('hex');
+  return twin.toString('base64');
 }
 
 describe('signed request canonicalisation', () => {
@@ -106,14 +111,20 @@ describe('signed request canonicalisation', () => {
       target: TARGET,
       timestamp: TIMESTAMP,
     });
+    const twinSignature = malleate(valid.headers['x-signature']);
     const twin: Wire = {
       ...valid,
       headers: {
         ...valid.headers,
-        'x-signature': malleate(valid.headers['x-signature']),
+        'x-signature': twinSignature,
       },
     };
 
+    // The twin is a well-formed canonical base64 signature over the same R and
+    // the same Ed25519 equation, so the only rule it breaks is S < L.
+    expect(scalarOf(valid.headers['x-signature']) < ED25519_ORDER).toBe(true);
+    expect(scalarOf(twinSignature) >= ED25519_ORDER).toBe(true);
+    expect(() => new Signature(twinSignature)).not.toThrow();
     expect(() => verifier.verifySignature(toRequest(valid))).not.toThrow();
     expect(() => verifier.verifySignature(toRequest(twin))).toThrow(
       InvalidSignedRequestError,
