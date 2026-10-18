@@ -29,3 +29,18 @@ Feature: Put saved sticker pack route
     Then response code is equal to 200
     And response body should contain "API stickers primary"
     And response body should contain "API stickers secondary"
+
+  Scenario Outline: Refuse to save a sticker pack whose id is "<packId>"
+    Given I am an anonymous user
+    And I remember the sticker pack id "<packId>"
+    And I sign the current saved sticker pack request
+    When I PUT the current sticker pack as saved
+    Then response code is equal to 409
+    And response body should contain "InvalidStickerIdError"
+
+    Examples:
+      | packId                                |
+      | pack:one                              |
+      | pack\|one                             |
+      | pack.one                              |
+      | abcdefghijklmnopqrstuvwxyz0123456789A |

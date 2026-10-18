@@ -7,8 +7,33 @@ import OrbitDBReplicatedStateRegistry from '../../../shared/infrastructure/orbit
 import { StickerPackNotFoundError } from '../../domain/errors/StickerPackNotFoundError';
 import StickerPackRepository from '../../domain/repositories/StickerPackRepository';
 import { StickerPack } from '../../domain/StickerPack';
+import { StickerId } from '../../domain/value-objects/StickerId';
 import { StickerPackId } from '../../domain/value-objects/StickerPackId';
 import { OrbitDBStickerPackDocument } from './documents/OrbitDBStickerPackDocument';
+
+/**
+ * Stored records written before the id rule, or by a peer, may carry ids this
+ * build cannot construct. Such packs are skipped on read, never thrown on, so
+ * one bad record cannot break the listing.
+ */
+function hasValidStickerId(sticker: unknown): boolean {
+  return (
+    typeof sticker === 'object' &&
+    sticker !== null &&
+    'id' in sticker &&
+    typeof sticker.id === 'string' &&
+    StickerId.isValid(sticker.id)
+  );
+}
+
+function hasValidIds(document: Record<string, unknown>): boolean {
+  return (
+    typeof document.id === 'string' &&
+    StickerPackId.isValid(document.id) &&
+    Array.isArray(document.stickers) &&
+    document.stickers.every(hasValidStickerId)
+  );
+}
 
 export default class OrbitDBStickerPackRepository extends StickerPackRepository {
   private static readonly HEAD_PREFIX = 'sticker-pack:';
@@ -34,11 +59,10 @@ export default class OrbitDBStickerPackRepository extends StickerPackRepository 
     return (
       document.removed !== true &&
       document.scopeType === 'sticker_pack' &&
-      typeof document.id === 'string' &&
+      hasValidIds(document) &&
       typeof document.createdAt === 'number' &&
       typeof document.name === 'string' &&
       typeof document.ownerIdentityId === 'string' &&
-      Array.isArray(document.stickers) &&
       typeof document.updatedAt === 'number'
     );
   }

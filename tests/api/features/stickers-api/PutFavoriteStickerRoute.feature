@@ -40,3 +40,19 @@ Feature: Put favorite sticker route
         "favoriteStickers": []
       }
       """
+
+  Scenario Outline: Refuse to favorite a sticker with pack id "<packId>" and sticker id "<stickerId>"
+    Given I am an anonymous user
+    And I remember the sticker pack id "<packId>"
+    And I remember the sticker id "<stickerId>"
+    And I sign the current favorite sticker request
+    When I PUT the current sticker as favorite
+    Then response code is equal to 409
+    And response body should contain "InvalidStickerIdError"
+
+    Examples:
+      | packId                                | stickerId                         |
+      | pack:one                              | sticker-one                       |
+      | pack-one                              | sticker\|one                      |
+      | pack-one                              | sticker.one                       |
+      | abcdefghijklmnopqrstuvwxyz0123456789A | sticker-one                       |

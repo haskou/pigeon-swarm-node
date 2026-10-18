@@ -17,6 +17,18 @@ paths:
           required: false
           schema:
             type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getStickersPacks
       responses:
         default:
@@ -64,12 +76,36 @@ paths:
       tags:
         - stickers
       summary: Get authenticated sticker library
-      description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity.
+      description: Returns saved packs, favorite stickers and the last 10 recently used stickers for the authenticated identity. Saved packs and favorite stickers are paged independently, most recent first; recent stickers are not paged.
       security:
         - signedRequest: []
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
+        - in: query
+          name: savedPacksLimit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: savedPacksCursor
+          schema:
+            type: string
+          description: Opaque cursor returned as savedPacksNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
+        - in: query
+          name: favoriteStickersLimit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: favoriteStickersCursor
+          schema:
+            type: string
+          description: Opaque cursor returned as favoriteStickersNextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getStickersLibrary
       responses:
         default:
@@ -375,13 +411,13 @@ components:
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/StickerPackIdentifier'
     StickerId:
       name: stickerId
       in: path
       required: true
       schema:
-        type: string
+        $ref: '#/components/schemas/StickerIdentifier'
     XIdentityId:
       in: header
       name: X-Identity-Id
@@ -395,6 +431,18 @@ components:
       schema:
         type: string
   schemas:
+    StickerPackIdentifier:
+      type: string
+      minLength: 1
+      maxLength: 36
+      pattern: '^[A-Za-z0-9_-]+$'
+      description: "Pack id: 1 to 36 ASCII letters, digits, '-' or '_'. Other ids are refused with 409 (InvalidStickerIdError)."
+    StickerIdentifier:
+      type: string
+      minLength: 1
+      maxLength: 36
+      pattern: '^[A-Za-z0-9_-]+$'
+      description: "Sticker id: 1 to 36 ASCII letters, digits, '-' or '_'. Other ids are refused with 409 (InvalidStickerIdError)."
     CreateStickerPackBody:
       type: object
       description: The client chooses the pack id and the creation time and signs both records. mutation is a put proof (store stickerPacks, recordId packId) over the whole pack document {id, name, ownerIdentityId, createdAt, updatedAt = createdAt, stickers [], scopeType sticker_pack}; savedPackMutation is a put proof (store stickerUserLibraries, recordId saved:<identityId>:<packId>) over {id, identityId, packId, savedAt = createdAt, scopeType sticker_saved_pack}.
@@ -406,7 +454,7 @@ components:
         - savedPackMutation
       properties:
         packId:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         name:
           type: string
           maxLength: 80
@@ -496,8 +544,7 @@ components:
             - stickerId
           properties:
             stickerId:
-              type: string
-              description: Client-chosen id of the new sticker.
+              $ref: '#/components/schemas/StickerIdentifier'
     DeleteStickerBody:
       type: object
       required:
@@ -611,7 +658,7 @@ components:
             - id
           properties:
             id:
-              type: string
+              $ref: '#/components/schemas/StickerIdentifier'
     StickerPackResource:
       type: object
       required:
@@ -623,7 +670,7 @@ components:
         - updatedAt
       properties:
         id:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         ownerIdentityId:
           type: string
         name:
@@ -640,7 +687,12 @@ components:
       type: object
       required:
         - results
+        - nextCursor
       properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
         results:
           type: array
           items:
@@ -654,9 +706,9 @@ components:
         - sticker
       properties:
         packId:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         stickerId:
-          type: string
+          $ref: '#/components/schemas/StickerIdentifier'
         favoritedAt:
           type: integer
         sticker:
@@ -670,9 +722,9 @@ components:
         - sticker
       properties:
         packId:
-          type: string
+          $ref: '#/components/schemas/StickerPackIdentifier'
         stickerId:
-          type: string
+          $ref: '#/components/schemas/StickerIdentifier'
         usedAt:
           type: integer
         sticker:
@@ -681,13 +733,23 @@ components:
       type: object
       required:
         - savedPacks
+        - savedPacksNextCursor
         - favoriteStickers
+        - favoriteStickersNextCursor
         - recentStickers
       properties:
+        savedPacksNextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page of saved packs; null unless the page is full.
         savedPacks:
           type: array
           items:
             $ref: '#/components/schemas/StickerPackResource'
+        favoriteStickersNextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page of favorite stickers; null unless the page is full.
         favoriteStickers:
           type: array
           items:

@@ -1,4 +1,5 @@
 import { StalePublicMutationError } from '@app/contexts/public-mutations/domain/errors/StalePublicMutationError';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { generateKeyPairSync } from 'node:crypto';
@@ -129,5 +130,42 @@ describe('OrbitDBStickerPackRepository', () => {
       repository.requireById(new StickerPackId(packId)),
     ).rejects.toBeInstanceOf(StickerPackNotFoundError);
     expect(await repository.findAll()).toEqual([]);
+  });
+
+  it('skips stored packs with ids this build cannot construct', async () => {
+    await repository.save(packOf('Moods'), await proof(1));
+
+    const storeUnreadable = async (id: string, stickerId: string) => {
+      const document = PublicMutationRecord.withProof(
+        {
+          ...StickerPackMother.create().toPrimitives(),
+          id,
+          ownerIdentityId: owner.valueOf(),
+          scopeType: 'sticker_pack',
+          stickers: [{ id: stickerId }],
+        },
+        await signedMutation({
+          identityId: owner.valueOf(),
+          kind: 'put',
+          recordId: id,
+          sequence: 1,
+          store: 'stickerPacks',
+        }),
+      );
+
+      registry.cacheHeadLocally(`sticker-pack:${id}`, {
+        id: `sticker-pack:${id}`,
+        ownerIdentityId: owner.valueOf(),
+        stickerPacks: [document],
+        updatedAt: Date.now(),
+      });
+    };
+
+    await storeUnreadable('pack.with.dots', 'sticker-1');
+    await storeUnreadable('pack-two', 'sticker with spaces');
+
+    expect(
+      (await repository.findAll()).map((pack) => pack.toPrimitives().name),
+    ).toEqual(['Moods']);
   });
 });
