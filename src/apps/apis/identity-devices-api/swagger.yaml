@@ -161,6 +161,8 @@ paths:
           description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied proof is not exactly one valid device or recovery proof, or the proof was already used (code 401020).
         '409':
           description: The authorization checkpoint is unavailable on this node.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - identity-devices

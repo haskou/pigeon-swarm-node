@@ -46,6 +46,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NotificationsResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - notifications
