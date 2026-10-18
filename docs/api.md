@@ -5357,7 +5357,7 @@ a `community_invitation` that includes `encryptedKey`:
 ```
 
 Byte-exact contract (vectors in
-[`tests/fixtures/notification-vectors.json`](../tests/fixtures/notification-vectors.json),
+[`@haskou/pigeon-swarm-crypto/vectors/notification.json`](https://www.npmjs.com/package/@haskou/pigeon-swarm-crypto),
 checked by `NotificationVectors.spec.ts`):
 
 - notification id: `"invitation:" + hex(sha256(utf8(canonicalize({inviterIdentityId, nonce, recipientIdentityId, subjectId}))))`,
