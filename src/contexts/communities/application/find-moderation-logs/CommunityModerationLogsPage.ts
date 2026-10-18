@@ -10,7 +10,8 @@ export class CommunityModerationLogsPage {
     return [...this.logs];
   }
 
-  public getNextBeforeLogId(): string | undefined {
+  /** The log id to read before next: the oldest entry of a full page, otherwise none. */
+  public getNextPosition(): string | undefined {
     return this.logs.length === this.limit
       ? this.logs[this.logs.length - 1].getId().valueOf()
       : undefined;
