@@ -15,6 +15,15 @@ Feature: Post one-to-one conversation route
       | type | one-to-one |
     And response body should contain "one-to-one:"
 
+  Scenario: Refuse a malformed participant id as a bad request
+    Given I am an anonymous user
+    And I register a test IPFS network "conversation-api-malformed-participant-network"
+    And I have published a keychain for the authenticated identity
+    And I set a one-to-one conversation body with a malformed participant
+    And I sign the current one-to-one conversation request
+    When I POST to "/conversations"
+    Then response code is equal to 400
+
   Scenario: Refuse a group conversation genesis signed as older clients did
     Given I am an anonymous user
     And I register a test IPFS network "conversation-api-group-network"
