@@ -199,6 +199,7 @@ export default class Definitions {
   private communityPinCount = 0;
   private communityDraftCount = 0;
   private pageNextCursor: string | undefined;
+  private readonly pageCursors = new Map<string, string>();
   private communityThreadRootMessageId: string | undefined;
   private communityMessageCreatedAt = 0;
   private communityId: string | undefined;
@@ -5575,6 +5576,41 @@ export default class Definitions {
     await send[method](path);
   }
 
+  @when(
+    'I send the GET to the block source path {string} with the remembered {string} page cursor',
+  )
+  public async iSendTheGetToTheBlockSourcePathWithTheRememberedCursor(
+    suffix: string,
+    name: string,
+  ): Promise<void> {
+    const path = await this.blockSourcePath(suffix);
+
+    await this.iGET(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(this.pageCursors.get(name) ?? ''),
+      ),
+    );
+  }
+
+  @when(
+    'I send the GET to the block source path {string} with the cursor for resource {string} at position {string}',
+  )
+  public async iSendTheGetToTheBlockSourcePathWithACursorForResource(
+    suffix: string,
+    resource: string,
+    position: string,
+  ): Promise<void> {
+    const path = await this.blockSourcePath(suffix);
+
+    await this.iGET(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(PageCursor.encode({ position, resource })),
+      ),
+    );
+  }
+
   @then('response body should contain the block source publisher id')
   public async responseBodyShouldContainTheBlockSourcePublisherId(): Promise<void> {
     const publisher = await this.ensureBlockSourcePublisherKeyPair();
@@ -8462,26 +8498,31 @@ export default class Definitions {
     this.pageNextCursor = cursor;
   }
 
-  @then('I remember the response {word} page cursor')
-  public iRememberTheResponseNamedPageCursor(name: string): void {
-    const cursor = (this.response?.data as Record<string, unknown> | undefined)?.[
-      `${name}NextCursor`
-    ];
+  @then('I remember the response {string} next cursor')
+  public iRememberTheResponseNamedNextCursor(name: string): void {
+    const cursor = (
+      this.response?.data as Record<string, unknown> | undefined
+    )?.[`${name}NextCursor`];
 
     if (typeof cursor !== 'string') {
       throw new Error(`Response ${name} next cursor not found.`);
     }
 
-    this.pageNextCursor = cursor;
+    this.pageCursors.set(name, cursor);
   }
 
-  @then('the response {word} page cursor is null')
-  public responseNamedPageCursorIsNull(name: string): void {
-    const cursor = (this.response.data as Record<string, unknown>)[
-      `${name}NextCursor`
-    ];
+  @then('the response {string} next cursor is null')
+  public responseNamedNextCursorIsNull(name: string): void {
+    const data = this.response.data as Record<string, unknown>;
 
-    expect(cursor).to.equal(null);
+    expect(data[`${name}NextCursor`]).to.equal(null);
+  }
+
+  @then('response {string} holds {int} items')
+  public responseHoldsItems(name: string, count: number): void {
+    const data = this.response.data as Record<string, unknown[]>;
+
+    expect(data[name]).to.have.lengthOf(count);
   }
 
   @when('I GET {string} with the forged {string} cursor at position {string}')
@@ -8670,6 +8711,56 @@ export default class Definitions {
     await this.getWithCursor(
       path,
       PageCursor.encode({ position: 'x'.repeat(length), resource }),
+    );
+  }
+
+  @when('I GET {string} with the remembered {string} page cursor')
+  public async iGETWithTheRememberedNamedPageCursor(
+    path: string,
+    name: string,
+  ): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(this.pageCursors.get(name) ?? ''),
+      ),
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET {string} with the cursor for resource {string} at position {string}',
+  )
+  public async iGETWithTheCursorForResourceAtPosition(
+    path: string,
+    resource: string,
+    position: string,
+  ): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(PageCursor.encode({ position, resource })),
+      ),
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET {string} with the cursor for resource {string} at a position {int} characters long',
+  )
+  public async iGETWithTheCursorForResourceAtALongPosition(
+    path: string,
+    resource: string,
+    length: number,
+  ): Promise<void> {
+    this.response = await this.restClient.get(
+      path.replace(
+        'CURSOR',
+        encodeURIComponent(
+          PageCursor.encode({ position: 'x'.repeat(length), resource }),
+        ),
+      ),
+      this.headers,
     );
   }
 

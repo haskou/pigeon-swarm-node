@@ -56,12 +56,12 @@ Feature: Get sticker user library route
     When I GET "/stickers/library?favoriteStickersLimit=1"
     Then response code is equal to 200
     And response lists 1 favorite stickers
-    And I remember the response favoriteStickers page cursor
+    And I remember the response "favoriteStickers" next cursor
     Given I sign the current sticker library request
-    When I GET "/stickers/library?favoriteStickersLimit=1&favoriteStickersCursor=CURSOR" with the remembered page cursor
+    When I GET "/stickers/library?favoriteStickersLimit=1&favoriteStickersCursor=CURSOR" with the remembered "favoriteStickers" page cursor
     Then response code is equal to 200
     And response lists 0 favorite stickers
-    And the response favoriteStickers page cursor is null
+    And the response "favoriteStickers" next cursor is null
 
   Scenario: Page my saved packs independently of my favorite stickers
     Given I am an anonymous user
@@ -77,12 +77,12 @@ Feature: Get sticker user library route
     When I GET "/stickers/library?savedPacksLimit=1"
     Then response code is equal to 200
     And response lists 1 saved packs
-    And I remember the response savedPacks page cursor
+    And I remember the response "savedPacks" next cursor
     Given I sign the current sticker library request
-    When I GET "/stickers/library?savedPacksLimit=1&savedPacksCursor=CURSOR" with the remembered page cursor
+    When I GET "/stickers/library?savedPacksLimit=1&savedPacksCursor=CURSOR" with the remembered "savedPacks" page cursor
     Then response code is equal to 200
     And response lists 0 saved packs
-    And the response savedPacks page cursor is null
+    And the response "savedPacks" next cursor is null
 
   Scenario: Refuse a sticker library cursor with a forged position
     Given I am an anonymous user
