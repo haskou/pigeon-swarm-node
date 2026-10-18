@@ -166,26 +166,21 @@ describe(DeviceAuthorizationRequestAuthenticator.name, () => {
   );
 
   it.each(IdentityIdMother.aliases())(
-    'reads a device proof that names its key by %s as a key the log does not record',
+    'refuses a reader proof that names its key by %s and takes no replay slot',
     async (_encoding, aliasOf: (of: IdentityId) => IdentityId) => {
       const { authorization, headers, request } = await fixture();
       const log = logOf(authorization);
-      new DeviceAuthorizationRequestAuthenticator().authenticateReader(
-        request,
-        log,
-      );
       headers['x-device-credential'] = aliasOf(
         new IdentityId(String(headers['x-device-credential'])),
       ).valueOf();
       const accept = jest.spyOn(signedRequestReplayGuard, 'accept');
 
-      const reader =
+      expect(() =>
         new DeviceAuthorizationRequestAuthenticator().authenticateReader(
           request,
           log,
-        );
-
-      expect(log.records(reader)).toBe(false);
+        ),
+      ).toThrow('Invalid signed request.');
       expect(accept).not.toHaveBeenCalled();
     },
   );

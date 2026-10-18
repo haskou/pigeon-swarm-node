@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { OrbitDBIdentityMutationGate } from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMutationGate';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -1361,12 +1362,16 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       const signer = await SignedIdentityMother.create();
       const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
       const recordOf = async (
-        identity: Identity,
+        identity: Identity | IdentityPrimitives,
       ): Promise<Record<string, unknown>> => {
-        const primitives = identity.toPrimitives();
-        const cid = (
-          await ipfs.calculateJSONId(mapper.toDocument(identity))
-        ).valueOf();
+        const primitives =
+          identity instanceof Identity ? identity.toPrimitives() : identity;
+        const cid =
+          identity instanceof Identity
+            ? (
+                await ipfs.calculateJSONId(mapper.toDocument(identity))
+              ).valueOf()
+            : 'bafy-unconstructible';
 
         return {
           cid,
@@ -1388,7 +1393,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       await headCache.save(
         'network-1',
         `identity:${aliasId}`,
-        await recordOf(signer.build({ id: aliasId })),
+        await recordOf(signer.primitives({ id: aliasId })),
       );
       await headCache.save(
         'network-1',
@@ -1750,12 +1755,16 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         const signer = await SignedIdentityMother.create();
         const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
         const recordOf = async (
-          identity: Identity,
+          identity: Identity | IdentityPrimitives,
         ): Promise<{ key: string; value: Record<string, unknown> }> => {
-          const primitives = identity.toPrimitives();
-          const cid = (
-            await ipfs.calculateJSONId(mapper.toDocument(identity))
-          ).valueOf();
+          const primitives =
+            identity instanceof Identity ? identity.toPrimitives() : identity;
+          const cid =
+            identity instanceof Identity
+              ? (
+                  await ipfs.calculateJSONId(mapper.toDocument(identity))
+                ).valueOf()
+              : 'bafy-unconstructible';
 
           return {
             key: cid,
@@ -1790,7 +1799,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
         expect(projected).toHaveLength(1);
 
-        const alias = await recordOf(signer.build({ id: aliasId }));
+        const alias = await recordOf(signer.primitives({ id: aliasId }));
 
         identities.emitUpdate({ payload: alias });
         await jest.advanceTimersByTimeAsync(0);
