@@ -74,7 +74,7 @@ function createMailbox(
 ): Promise<Response> {
   return fetch(`${baseUrl}/mailboxes/${'A'.repeat(43)}`, {
     body: JSON.stringify({
-      creationNonce: 'x',
+      creationNonce: '0',
       postTokenHash: '0'.repeat(64),
       readTokenHash: '1'.repeat(64),
     }),

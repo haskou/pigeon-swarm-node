@@ -64,9 +64,10 @@ const DAY = 24 * 60 * 60 * 1000;
 const IDLE_MS = MailboxPolicy.EVICTION_IDLE.getTotalMilliseconds().valueOf();
 /**
  * Mined once with `new MailboxCreationProof(FRESH, POST_HASH, READ_HASH)`
- * `.mine(20)`; mining 20 bits takes about seven seconds under jest.
+ * `.mine(20)` (the library's v2 proof of work); mining 20 bits takes about
+ * a second.
  */
-const FULL_NONCE = '1761816';
+const FULL_NONCE = '1840333';
 
 /** First nonce that meets `meets` difficulty bits but not `misses`. */
 const proofMeeting = (

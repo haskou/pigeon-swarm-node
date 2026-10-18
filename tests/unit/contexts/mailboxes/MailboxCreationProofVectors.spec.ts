@@ -1,58 +1,75 @@
 import { MailboxCreationProof } from '@app/contexts/mailboxes/domain/MailboxCreationProof';
-import { leadingZeroBits } from '@app/contexts/shared/domain/proof-of-work/LeadingZeroBits';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-type Vectors = Record<
-  'accepted' | 'rejected',
-  {
-    derived: { digestHex: string; leadingZeroBits: number; preimage: string };
-    input: {
-      difficultyBits: number;
-      mailboxId: string;
-      nonce: string;
-      postTokenHash: string;
-      readTokenHash: string;
-    };
-    name: string;
-  }[]
->;
+import { proofOfWorkVectors } from '../../../support/proofOfWorkVectors';
 
-const vectors = JSON.parse(
-  readFileSync(
-    join(__dirname, '../../../fixtures/mailbox-creation-proof-vectors.json'),
-    'utf8',
-  ),
-) as Vectors;
+const vectors = proofOfWorkVectors.mailboxCreation;
 
-const all = [...vectors.accepted, ...vectors.rejected];
+describe('Mailbox creation proof library vectors', () => {
+  it.each(vectors.accepted)(
+    'accepts $name',
+    ({ challenge, difficultyBits, nonce }) => {
+      expect(
+        new MailboxCreationProof(
+          challenge.mailboxId,
+          challenge.postTokenHash,
+          challenge.readTokenHash,
+        ).isValid(nonce as string, difficultyBits),
+      ).toBe(true);
+    },
+  );
 
-describe('Mailbox creation proof vectors', () => {
-  it.each(all)('pins the digest of $name', ({ derived }) => {
-    const digest = createHash('sha256').update(derived.preimage).digest();
+  it.each(vectors.accepted.filter(({ minted }) => minted))(
+    'mints the library nonce for $name',
+    ({ challenge, difficultyBits, nonce }) => {
+      expect(
+        new MailboxCreationProof(
+          challenge.mailboxId,
+          challenge.postTokenHash,
+          challenge.readTokenHash,
+        ).mine(difficultyBits),
+      ).toBe(nonce);
+    },
+  );
 
-    expect(digest.toString('hex')).toBe(derived.digestHex);
-    expect(leadingZeroBits(digest)).toBe(derived.leadingZeroBits);
-  });
+  it.each(vectors.rejected)(
+    'rejects $name',
+    ({ challenge, difficultyBits, nonce }) => {
+      expect(
+        new MailboxCreationProof(
+          challenge.mailboxId,
+          challenge.postTokenHash,
+          challenge.readTokenHash,
+        ).isValid(nonce as string, difficultyBits),
+      ).toBe(false);
+    },
+  );
 
-  it.each(all)('binds the preimage fields of $name', ({ derived, input }) => {
-    expect(
-      new MailboxCreationProof(
-        input.mailboxId,
-        input.postTokenHash,
-        input.readTokenHash,
-      ).isValid(input.nonce, derived.leadingZeroBits),
-    ).toBe(input.nonce.length > 0 && input.nonce.length <= 64);
-  });
+  it.each(vectors.invalidChallenges)(
+    'refuses to prove $name',
+    ({ challenge }) => {
+      expect(
+        new MailboxCreationProof(
+          challenge.mailboxId as string,
+          challenge.postTokenHash as string,
+          challenge.readTokenHash as string,
+        ).isValid('0', 1),
+      ).toBe(false);
+    },
+  );
 
-  it.each(vectors.rejected)('rejects $name', ({ input }) => {
-    expect(
-      new MailboxCreationProof(
-        input.mailboxId,
-        input.postTokenHash,
-        input.readTokenHash,
-      ).isValid(input.nonce, input.difficultyBits),
-    ).toBe(false);
+  it('rejects proofs minted under the retired v1 encoding', () => {
+    const { mailboxId, postTokenHash, readTokenHash } =
+      vectors.accepted[0].challenge;
+    const proof = new MailboxCreationProof(
+      mailboxId,
+      postTokenHash,
+      readTokenHash,
+    );
+
+    // v1 nonce for this challenge, valid at 16 bits under the old
+    // `pigeon-mailbox-creation:v1:<id>:<post>:<read>:<nonce>` preimage.
+    expect(proof.isValid('110571', 16)).toBe(false);
+    // v1 accepted any 1-64 character string as a nonce.
+    expect(proof.isValid('a_b-c', 1)).toBe(false);
   });
 });

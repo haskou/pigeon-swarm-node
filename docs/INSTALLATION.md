@@ -63,6 +63,16 @@ Nodes that ran before identity ids had to be canonical may hold alias ids (a DER
 
 The full upgrade behaviour is described in [docs/design/node-owner-registration-and-blocking.md](design/node-owner-registration-and-blocking.md). No endpoint or response shape changed; requests that use an alias id now get `401` with code `401020` or `400` with code `400080`, as described in [api.md](api.md).
 
+## Upgrading to Proof of Work v2
+
+This release switches identity admission and mailbox creation proofs to the length-prefixed v2 encoding of `@haskou/pigeon-swarm-crypto` 8.0.0. There is no v1 reader, fallback or migration: a v1 nonce never verifies, so identity records and mailbox creations proven under v1 are rejected and discarded.
+
+Upgrade every node and the UI together, then bump the wrapper pin. A node on this release cannot admit identities minted by an older node or UI, and the reverse. For each node:
+
+1. Stop the node.
+2. Delete the `PIGEON_LOCAL_DB_PATH` folder (`/var/www/local_storage` in the bundled `docker-compose.yml`, so remove its volume or bind-mounted folder). Keep `IPFS_STORAGE_PATH`: the IPFS peer key survives.
+3. Start the new version. The node is unclaimed like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API, then have users create their identities and mailboxes again from an up-to-date UI.
+
 ## Frontend Static Assets
 
 The backend can serve static files from the root `public/` directory. This is

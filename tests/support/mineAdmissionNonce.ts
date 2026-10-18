@@ -17,5 +17,6 @@ export function mineAdmissionNonce(
   return proof.mine(
     (nonce) =>
       proof.isValid(nonce, exactBits) && !proof.isValid(nonce, exactBits + 1),
+    exactBits,
   );
 }

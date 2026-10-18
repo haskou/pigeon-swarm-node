@@ -43,6 +43,7 @@ describe('IdentityPublisher', () => {
 
     return proof.mine(
       (nonce) => proof.isValid(nonce, bits) && !proof.isValid(nonce, bits + 1),
+      bits,
     );
   }
 

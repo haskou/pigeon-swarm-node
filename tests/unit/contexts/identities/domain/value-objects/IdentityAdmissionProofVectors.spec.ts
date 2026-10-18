@@ -1,56 +1,77 @@
 import { IdentityAdmissionProof } from '@app/contexts/identities/domain/value-objects/IdentityAdmissionProof';
-import { leadingZeroBits } from '@app/contexts/shared/domain/proof-of-work/LeadingZeroBits';
-import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 
-type Vectors = Record<
-  'accepted' | 'rejected',
-  {
-    derived: { digestHex: string; leadingZeroBits: number; preimage: string };
-    input: { identityId: string; networkIds: string[]; nonce: string };
-    name: string;
-  }[]
-> & { difficultyBits: number };
+import { proofOfWorkVectors } from '../../../../../support/proofOfWorkVectors';
 
-const vectors = JSON.parse(
-  readFileSync(
-    join(
-      __dirname,
-      '../../../../../fixtures/identity-admission-proof-vectors.json',
-    ),
-    'utf8',
-  ),
-) as Vectors;
+const vectors = proofOfWorkVectors.identityAdmission;
 
-const all = [...vectors.accepted, ...vectors.rejected];
-
-describe('Identity admission proof vectors', () => {
-  it('pins the protocol difficulty', () => {
-    expect(IdentityAdmissionProof.DIFFICULTY_BITS).toBe(vectors.difficultyBits);
-  });
-
-  it.each(all)('pins the digest of $name', ({ derived }) => {
-    const digest = createHash('sha256').update(derived.preimage).digest();
-
-    expect(digest.toString('hex')).toBe(derived.digestHex);
-    expect(leadingZeroBits(digest)).toBe(derived.leadingZeroBits);
-  });
-
-  it.each(all)('binds the preimage fields of $name', ({ derived, input }) => {
+describe('Identity admission proof library vectors', () => {
+  it('keeps the protocol difficulty at the library floor vector', () => {
+    expect(IdentityAdmissionProof.DIFFICULTY_BITS).toBe(16);
     expect(
-      new IdentityAdmissionProof(input.identityId, input.networkIds).isValid(
-        input.nonce,
-        derived.leadingZeroBits,
-      ),
-    ).toBe(input.nonce.length > 0);
+      vectors.accepted.some(({ difficultyBits }) => difficultyBits === 16),
+    ).toBe(true);
   });
 
-  it.each(vectors.rejected)('rejects $name', ({ input }) => {
+  it.each(vectors.accepted)(
+    'accepts $name',
+    ({ challenge, difficultyBits, nonce }) => {
+      expect(
+        new IdentityAdmissionProof(
+          challenge.identityId,
+          challenge.networkIds,
+        ).isValid(nonce as string, difficultyBits),
+      ).toBe(true);
+    },
+  );
+
+  it.each(vectors.accepted.filter(({ minted }) => minted))(
+    'mints the library nonce for $name',
+    ({ challenge, difficultyBits, nonce }) => {
+      expect(
+        new IdentityAdmissionProof(
+          challenge.identityId,
+          challenge.networkIds,
+        ).mine(undefined, difficultyBits),
+      ).toBe(nonce);
+    },
+  );
+
+  it.each(vectors.rejected)(
+    'rejects $name',
+    ({ challenge, difficultyBits, nonce }) => {
+      expect(
+        new IdentityAdmissionProof(
+          challenge.identityId,
+          challenge.networkIds,
+        ).isValid(nonce as string, difficultyBits),
+      ).toBe(false);
+    },
+  );
+
+  it.each(vectors.invalidChallenges)(
+    'refuses to prove $name',
+    ({ challenge }) => {
+      expect(
+        new IdentityAdmissionProof(
+          challenge.identityId as string,
+          challenge.networkIds as string[],
+        ).isValid('0', 1),
+      ).toBe(false);
+    },
+  );
+
+  it('rejects proofs minted under the retired v1 encoding', () => {
+    const identityId = vectors.accepted[0].challenge.identityId;
+    const networkIds = vectors.accepted[0].challenge.networkIds;
+
+    // v1 nonces for this challenge, valid at 16 bits under the old
+    // `pigeon-identity-admission:v1:<id>:<networks>:<nonce>` preimage.
     expect(
-      new IdentityAdmissionProof(input.identityId, input.networkIds).isValid(
-        input.nonce,
-      ),
+      new IdentityAdmissionProof(identityId, networkIds).isValid('2233', 16),
+    ).toBe(false);
+    // v1 accepted any 1-64 character string as a nonce.
+    expect(
+      new IdentityAdmissionProof(identityId, networkIds).isValid('a_b-c', 1),
     ).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -29,6 +30,7 @@ export class PostIdentityBody {
 
   @IsOptional()
   @IsString()
+  @Matches(/^(0|[1-9][0-9]{0,15})$/)
   public readonly admissionNonce?: string;
 
   @IsString()

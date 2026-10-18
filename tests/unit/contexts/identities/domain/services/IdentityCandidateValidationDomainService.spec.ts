@@ -60,11 +60,18 @@ describe('IdentityCandidateValidationDomainService', () => {
       '550e8400-e29b-41d4-a716-446655440077',
     ];
     const proof = new IdentityAdmissionProof(mother.id.valueOf(), networks);
+    // The mother's fixed nonce proves only the previous networks.
+    const nonce = mother.admissionNonce as string;
+
+    expect(
+      new IdentityAdmissionProof(mother.id.valueOf(), previousNetworks).isValid(
+        nonce,
+      ),
+    ).toBe(true);
+    expect(proof.isValid(nonce)).toBe(false);
+
     const candidate = await mother.buildNext({
-      admissionNonce: new IdentityAdmissionProof(
-        mother.id.valueOf(),
-        previousNetworks,
-      ).mine((nonce) => !proof.isValid(nonce)),
+      admissionNonce: nonce,
       networks,
       previousIdentityExternalIdentifier: 'bafypreviousidentity',
     });
