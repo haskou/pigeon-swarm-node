@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { InvalidIdentitySignatureError } from '@app/contexts/identities/domain/errors/InvalidIdentitySignatureError';
 import IdentityRecordAdmissionDomainService from '@app/contexts/identities/domain/services/IdentityRecordAdmissionDomainService';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
@@ -98,16 +99,17 @@ describe('IdentityRecordAdmissionDomainService', () => {
     });
 
     it.each(IdentityIdMother.aliases())(
-      'should reject an identity signed under %s of its key',
+      'should not construct an identity signed under %s of its key',
       async (_, aliasOf) => {
         const signer = await SignedIdentityMother.create();
-        const identity = signer.build({
-          id: aliasOf(new IdentityId(signer.id)).valueOf(),
-        });
 
-        expect(admission.admitsIdentity(identity, recordFor(identity))).toBe(
-          false,
-        );
+        expect(() =>
+          Identity.fromPrimitives(
+            signer.primitives({
+              id: aliasOf(new IdentityId(signer.id)).valueOf(),
+            }),
+          ),
+        ).toThrow(InvalidIdentitySignatureError);
       },
     );
 

@@ -16,7 +16,9 @@ import IdentityMetadataIndex from '../../../../../../src/contexts/identities/inf
 import { IdentityId } from '../../../../../../src/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS';
+import { IdentityIdMother } from '../../../../mothers/IdentityIdMother';
 import { IdentityMother } from '../../../../mothers/IdentityMother';
+import { SignedIdentityMother } from '../../../../mothers/SignedIdentityMother';
 
 describe('IpfsIdentityRepository', () => {
   let ipfsManager: MockProxy<IPFS>;
@@ -617,6 +619,42 @@ describe('IpfsIdentityRepository', () => {
       expect(result[0].getIdentity().toPrimitives()).toEqual(primitives);
       expect(ipfsManager.getJSON).toHaveBeenCalledWith(cid, 64 * 1024);
     });
+
+    it.each(IdentityIdMother.aliases())(
+      'should treat a stored record signed under %s of its key as not found',
+      async (_, aliasOf) => {
+        const signer = await SignedIdentityMother.create();
+        const stored = signer.primitives({
+          id: aliasOf(new IdentityId(signer.id)).valueOf(),
+        });
+        const cid = new IPFSId('bafy-stored-alias-identity');
+
+        metadataRepository.findByIdentityId.mockResolvedValue([]);
+        ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+        ipfsManager.getRecordCandidates.mockResolvedValue([cid.valueOf()]);
+        ipfsManager.getJSON.mockResolvedValue({
+          _id: stored.id,
+          admissionNonce: stored.admissionNonce,
+          authorizationRevision: stored.authorizationRevision,
+          deviceCredential: stored.deviceCredential,
+          deviceCredentialCommitment: stored.deviceCredentialCommitment,
+          mailboxHome: stored.mailboxHome,
+          networks: stored.networks,
+          previousCid: stored.previousIdentityExternalIdentifier,
+          profile: stored.profile,
+          recoveryAuthority: stored.recoveryAuthority,
+          signature: stored.signature,
+          timestamp: stored.timestamp,
+          version: stored.version,
+        });
+
+        await expect(
+          repository.findFreshCandidateReferencesById(
+            new IdentityId(signer.id),
+          ),
+        ).rejects.toBeInstanceOf(IdentityNotFoundError);
+      },
+    );
 
     it('should select same-version cached forks independently of receipt order', async () => {
       const preferred = await mother.buildNext({

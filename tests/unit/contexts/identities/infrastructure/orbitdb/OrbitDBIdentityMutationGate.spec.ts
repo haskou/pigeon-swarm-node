@@ -1,4 +1,5 @@
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import IdentityRecordAdmissionDomainService from '@app/contexts/identities/domain/services/IdentityRecordAdmissionDomainService';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import { OrbitDBIdentityMutationGate } from '@app/contexts/identities/infrastructure/orbitdb/OrbitDBIdentityMutationGate';
@@ -25,13 +26,15 @@ describe('OrbitDBIdentityMutationGate', () => {
   const gate = new OrbitDBIdentityMutationGate(ipfs);
 
   async function metadata(
-    identity: Identity,
+    identity: Identity | IdentityPrimitives,
     overrides: Record<string, unknown> = {},
   ): Promise<Record<string, unknown>> {
-    const primitives = identity.toPrimitives();
-    const cid = (
-      await ipfs.calculateJSONId(mapper.toDocument(identity))
-    ).valueOf();
+    const primitives =
+      identity instanceof Identity ? identity.toPrimitives() : identity;
+    const cid =
+      identity instanceof Identity
+        ? (await ipfs.calculateJSONId(mapper.toDocument(identity))).valueOf()
+        : 'bafy-unconstructible';
 
     return {
       cid,
@@ -236,7 +239,7 @@ describe('OrbitDBIdentityMutationGate', () => {
     async (_, aliasOf) => {
       const signer = await SignedIdentityMother.create();
       const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
-      const record = await metadata(signer.build({ id: aliasId }));
+      const record = await metadata(signer.primitives({ id: aliasId }));
 
       await expect(gate.accepts('identities', record)).resolves.toBe(false);
       await expect(

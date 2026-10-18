@@ -32,7 +32,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
         '400':
-          description: Invalid body, or an admissionNonce below the difficulty this node asks while a network is busy (admissions this node accepted plus fresh ones replicated from other nodes), or 20 bits when the identity timestamp is more than 10 minutes from the node clock. A short proof gets `requiredDifficultyBits`; mine again at that difficulty and retry. An `id` that is not the one canonical encoding of a usable key gets code 400080 unless this node already holds the record.
+          description: Invalid body, or an admissionNonce below the difficulty this node asks while a network is busy (admissions this node accepted plus fresh ones replicated from other nodes), or 20 bits when the identity timestamp is more than 10 minutes from the node clock. A short proof gets `requiredDifficultyBits`; mine again at that difficulty and retry. An `id` that is not the one canonical encoding of a usable key gets code 400080, before its signature is read.
           content:
             application/json:
               schema:

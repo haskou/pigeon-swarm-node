@@ -1,5 +1,6 @@
 import { IdentitySignatureDomainService } from '@app/contexts/identities/domain/domain-services/IdentitySignatureDomainService';
 import { Identity } from '@app/contexts/identities/domain/Identity';
+import { IdentityPrimitives } from '@app/contexts/identities/domain/IdentityPrimitives';
 import { IdentitySignaturePayload } from '@app/contexts/identities/domain/IdentitySignaturePayload';
 import { Profile } from '@app/contexts/identities/domain/Profile';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
@@ -57,6 +58,15 @@ export class SignedIdentityMother {
   }
 
   public build(options: SignedIdentityOptions = {}): Identity {
+    return Identity.fromPrimitives(this.primitives(options));
+  }
+
+  /**
+   * The signed record as received from the network, without constructing the
+   * identity: a record under an id the signature cannot verify for (an alias
+   * encoding of the key) cannot be constructed.
+   */
+  public primitives(options: SignedIdentityOptions = {}): IdentityPrimitives {
     const id = options.id ?? this.id;
     const networks = options.networks ?? [
       '550e8400-e29b-41d4-a716-446655440000',
@@ -93,9 +103,9 @@ export class SignedIdentityMother {
       ),
     );
 
-    return Identity.fromPrimitives({
+    return {
       ...payload,
       signature: signature.valueOf(),
-    });
+    };
   }
 }

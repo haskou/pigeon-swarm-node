@@ -2,8 +2,8 @@ import { NotificationId } from '@app/contexts/notifications/domain/value-objects
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import canonicalize from 'canonicalize';
 import { createHash, createPublicKey, verify } from 'node:crypto';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+
+import { cryptoVectors } from '../../../../support/cryptoVectors';
 
 interface Vector {
   derived: {
@@ -24,12 +24,7 @@ interface Vectors {
   keys: Record<string, { identityId: string; publicKeyPem: string }>;
 }
 
-const vectors = JSON.parse(
-  readFileSync(
-    join(__dirname, '../../../../fixtures/notification-vectors.json'),
-    'utf8',
-  ),
-) as Vectors;
+const vectors = cryptoVectors<Vectors>('notification');
 const digestOfText = (value: string): string =>
   createHash('sha256').update(value).digest('base64url');
 
