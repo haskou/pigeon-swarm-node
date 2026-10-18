@@ -2,9 +2,14 @@ import 'reflect-metadata';
 import DiagnosticsTraceInitializer from '@app/apps/initializers/diagnostics/DiagnosticsTraceInitializer';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import { Initializer } from '@app/shared/infrastructure/lifecycle/Initializer';
+import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { Kernel } from '@haskou/ddd-kernel';
 import { mock } from 'jest-mock-extended';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, relative } from 'node:path';
 import { setTimeout } from 'timers/promises';
+import winston from 'winston';
 
 const INITIALIZER_TIMEOUT_MS = 50;
 
@@ -76,9 +81,79 @@ describe('PigeonApplication initializers', () => {
 
 describe('PigeonApplication kernel-loaded environment', () => {
   const previous = { ...process.env };
+  const logFileName = 'application-log-test.log';
+  const closedLoggers = new WeakSet<WinstonLogger>();
+  let directory: string;
+  let printed: unknown[];
 
-  afterEach(() => {
+  const closeLogger = (logger: WinstonLogger): Promise<void> => {
+    if (closedLoggers.has(logger)) {
+      return Promise.resolve();
+    }
+    closedLoggers.add(logger);
+    const finished = Promise.withResolvers<void>();
+    logger.logger.on('finish', finished.resolve);
+    logger.logger.end();
+    return finished.promise;
+  };
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'pigeon-application-log-'));
+    printed = [];
+    Object.assign(process.env, {
+      LOG_LEVEL: 'info',
+      LOG_URL: relative(process.cwd(), directory),
+      SERVICE_NAME: 'application-log-test',
+    });
+    jest
+      .spyOn(winston.transports.Console.prototype, 'log')
+      .mockImplementation((info, callback) => {
+        printed.push(info);
+        if (typeof callback === 'function') callback();
+      });
+  });
+
+  afterEach(async () => {
     process.env = { ...previous };
+    await closeLogger(Kernel.logger as WinstonLogger);
+    jest.restoreAllMocks();
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it('should keep the log file absent until the environment is valid', async () => {
+    const application = new PigeonApplication();
+    const logger = Kernel.logger as WinstonLogger;
+    logger.info('before validation');
+    process.env.NODE_INITIALIZER_TIMEOUT_MS = '0';
+
+    expect(() => application.loadEnvironmentVariables()).toThrow(
+      'Environment variable "NODE_INITIALIZER_TIMEOUT_MS" must be an integer from 1 to 2147483647.',
+    );
+    logger.info('after failed validation');
+    await closeLogger(logger);
+
+    await expect(
+      readFile(join(directory, logFileName), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(JSON.stringify(printed)).toContain('before validation');
+  });
+
+  it('should write only the lines logged once the environment is valid', async () => {
+    process.env.NODE_INITIALIZER_TIMEOUT_MS = '2147483647';
+    const application = new PigeonApplication();
+    const logger = Kernel.logger as WinstonLogger;
+    logger.info('before validation');
+    await expect(
+      readFile(join(directory, logFileName), 'utf8'),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+
+    application.loadEnvironmentVariables();
+    logger.info('after validation');
+    await closeLogger(logger);
+
+    const file = await readFile(join(directory, logFileName), 'utf8');
+    expect(file).toContain('after validation');
+    expect(file).not.toContain('before validation');
   });
 
   it.each([['0'], ['-1'], ['1.5'], ['2147483648']])(

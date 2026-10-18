@@ -70,6 +70,7 @@ describe('WebSocket log privacy with real connections', () => {
         if (typeof callback === 'function') callback();
       });
     logger = new WinstonLogger();
+    logger.enableFileLogging();
     jest.spyOn(Kernel, 'logger', 'get').mockReturnValue(logger);
     logger.info('Realtime privacy fixture started');
     hub = new WebSocketEventHub();
