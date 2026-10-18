@@ -138,7 +138,7 @@ paths:
             type: string
             pattern: '^(0|[1-9][0-9]*)$'
             default: '0'
-          description: Keep only entries whose revision is greater than this non-negative safe integer, without leading zeros. It is outside the signed canonical payload and can only narrow the response. Incremental sync only; never the basis of a wipe.
+          description: Keep only entries whose revision is greater than this non-negative safe integer, without leading zeros. It is part of the signed request target, so changing it invalidates the signature, and it can only narrow the response. Incremental sync only; never the basis of a wipe.
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
@@ -161,6 +161,8 @@ paths:
           description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied proof is not exactly one valid device or recovery proof, or the proof was already used (code 401020).
         '409':
           description: The authorization checkpoint is unavailable on this node.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - identity-devices
@@ -262,7 +264,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, path, timestamp and body hash).
+          description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, request target, timestamp and body hash).
       requestBody:
         required: true
         content:
@@ -319,7 +321,7 @@ paths:
           required: true
           schema:
             type: string
-          description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, path, timestamp and body hash).
+          description: Device signature over the signed HTTP request content (pigeon:signed-http-request:v1 domain, then the canonical method, request target, timestamp and body hash).
       operationId: getIdentityDevicesByIdentityIdSealedSecrets
       responses:
         default:

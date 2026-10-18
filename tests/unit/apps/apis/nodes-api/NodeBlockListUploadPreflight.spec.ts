@@ -117,7 +117,7 @@ describe('NodeBlockListUploadPreflight', () => {
       header: (name: string) => headers[name.toLowerCase()],
       headers,
       method: 'PUT',
-      path: PATH,
+      originalUrl: PATH,
     }) as unknown as UploadRequest;
   };
 
@@ -238,7 +238,7 @@ describe('NodeBlockListUploadPreflight', () => {
     const replayed = Object.assign(new PassThrough(), {
       header: request.header,
       method: 'PUT',
-      path: PATH,
+      originalUrl: PATH,
     }) as unknown as UploadRequest;
     expect(await outcome(preflight, replayed, response())).toBeInstanceOf(
       InvalidSignedRequestError,

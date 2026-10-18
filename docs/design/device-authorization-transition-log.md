@@ -115,9 +115,9 @@ Unauthenticated callers and other identities get the generic `401` and learn
 nothing; the existing catalog already requires the identity signature plus an
 authorized device proof.
 
-`after` is outside the signed canonical payload (the path excludes the query),
-so a relay can change it. That only narrows what the authenticated reader is
-entitled to; it never widens a disclosure.
+`after` is part of the signed request target (path and query), so a relay cannot
+change it without invalidating the signature. The node still only narrows what the
+authenticated reader is entitled to; it never widens a disclosure.
 
 ## Client verification algorithm
 

@@ -59,7 +59,7 @@ async function buildSignedRequest(
     header: (name: string) => headers[name.toLowerCase()],
     ip: CLIENT_ADDRESS,
     method,
-    path: '/resource',
+    originalUrl: '/resource',
   } as unknown as Request;
 }
 

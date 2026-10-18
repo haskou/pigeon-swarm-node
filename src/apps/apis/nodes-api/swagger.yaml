@@ -252,6 +252,8 @@ paths:
                 $ref: '#/components/schemas/NodeBlockSourcesResource'
         '403':
           description: The authenticated identity is not the node owner (code 403010).
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /node/block-sources/{ownerIdentityId}:
     put:
       tags:
@@ -373,6 +375,8 @@ paths:
           description: The authenticated identity is not the node owner (code 403010).
         '409':
           description: The source is not adopted (code NodeBlockSourceNotFoundError).
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /node/block-sources/{ownerIdentityId}/approvals:
     post:
       tags:
@@ -734,6 +738,8 @@ paths:
                 $ref: '#/components/schemas/NodeRegistrationCodesResource'
         '403':
           description: The request is not signed by the node owner or the node has no owner (code `403010`).
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /node/registration-codes/{codeId}:
     delete:
       tags:
@@ -781,6 +787,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PeersResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
 components:
   parameters:
     XIdentityId:

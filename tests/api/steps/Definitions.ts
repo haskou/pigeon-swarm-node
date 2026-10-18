@@ -215,10 +215,18 @@ export default class Definitions {
   private concurrentResponses: RestResponse[] = [];
   private formData: FormData | undefined;
   private headers: Record<string, string> = {};
+  private lastSigner:
+    | {
+        identityId: IdentityId | undefined;
+        keyPair: KeyPair;
+        timestamp: string;
+      }
+    | undefined;
   private identityKeyPair: KeyPair | undefined;
   private identityDeviceOwnerKeyPair: KeyPair | undefined;
   private identityRecoveryKeyPair: KeyPair | undefined;
   private identityDeviceTargetKeyPair: KeyPair | undefined;
+  private deviceProofKeyPair: KeyPair | undefined;
   private signedDeviceAuthorizationTransitions: string[] = [];
 
   private signedConversationRequest:
@@ -1459,14 +1467,33 @@ export default class Definitions {
     );
     this.attachCommunityModerationLog(method, path, signerKeyPair, createdAt);
 
-    const declaredBodyHash = this.declaredBodyHashOf(method, path);
+    this.signTarget(method, path, timestamp, signerKeyPair, signerIdentityId);
+  }
+
+  /**
+   * Writes the signature headers over the exact target as sent (path plus raw
+   * query string). Does not attach fixtures, so it is safe to call per request.
+   */
+  private signTarget(
+    method: string,
+    target: string,
+    timestamp: string,
+    signerKeyPair: KeyPair,
+    signerIdentityId: IdentityId | undefined,
+  ): void {
+    const declaredBodyHash = this.declaredBodyHashOf(method, target);
     const signedRequestPayload = SignedHttpRequestSignature.signingContent({
       body: declaredBodyHash ?? this.getCurrentRequestBody(),
       method,
-      path,
+      path: target,
       timestamp: Number(timestamp),
     });
 
+    this.lastSigner = {
+      identityId: signerIdentityId,
+      keyPair: signerKeyPair,
+      timestamp,
+    };
     this.headers['x-identity-id'] = signerIdentityId?.valueOf() || '';
     this.headers['x-timestamp'] = timestamp;
     this.headers['x-signature'] = signerKeyPair
@@ -1477,6 +1504,33 @@ export default class Definitions {
     if (declaredBodyHash) {
       this.headers['x-body-hash'] = declaredBodyHash;
     }
+  }
+
+  /**
+   * Sends a GET. A target carrying a query is re-signed with the last signer,
+   * so its signature covers the query this step sends. A bare target keeps the
+   * headers the scenario set, so a header it tampered with is sent as written.
+   * A signature over a different target than the one sent is only made by the
+   * explicit "using the headers signed without it" step.
+   */
+  private async getSignedTarget(
+    target: string,
+    headers: Record<string, string>,
+  ): Promise<RestResponse> {
+    if (this.lastSigner && target.includes('?')) {
+      this.signTarget(
+        'GET',
+        target,
+        this.lastSigner.timestamp,
+        this.lastSigner.keyPair,
+        this.lastSigner.identityId,
+      );
+      if (this.deviceProofKeyPair && this.headers['x-device-signature']) {
+        this.signDeviceProof(target, this.deviceProofKeyPair);
+      }
+    }
+
+    return this.restClient.get(target, headers);
   }
 
   /**
@@ -2549,12 +2603,20 @@ export default class Definitions {
     this.body = undefined;
     const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}${suffix}`;
     await this.signCurrentRequest('GET', path);
-    const timestamp = this.headers['x-timestamp'] as string;
+    this.deviceProofKeyPair = device;
+    this.signDeviceProof(path, device);
+  }
+
+  /**
+   * Writes the device credential and proof over the exact target, so the
+   * proof covers the same query string as the owner signature.
+   */
+  private signDeviceProof(target: string, device: KeyPair): void {
     const payload = SignedHttpRequestSignature.signingContent({
       body: this.getCurrentRequestBody(),
       method: 'GET',
-      path,
-      timestamp: Number(timestamp),
+      path: target,
+      timestamp: Number(this.headers['x-timestamp'] as string),
     });
     this.headers['x-device-credential'] = new IdentityId(
       device.toPrimitives().publicKey,
@@ -2773,7 +2835,7 @@ export default class Definitions {
   @when('I GET the current sealed secret delivery')
   public async iGETTheCurrentSealedSecretDelivery(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealed-secrets`,
       this.headers,
     );
@@ -6345,7 +6407,7 @@ export default class Definitions {
 
   @when('I GET the current sticker pack')
   public async iGETTheCurrentStickerPack(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/stickers/packs/${this.stickerPackId}`,
       this.headers,
     );
@@ -6380,7 +6442,7 @@ export default class Definitions {
 
   @when('I GET my sticker library')
   public async iGETMyStickerLibrary(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       '/stickers/library',
       this.headers,
     );
@@ -7394,7 +7456,7 @@ export default class Definitions {
 
   @when('I GET the current community invitations')
   public async iGETTheCurrentCommunityInvitations(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitations`,
       this.headers,
     );
@@ -7402,7 +7464,7 @@ export default class Definitions {
 
   @when('I GET the current community invitation claims')
   public async iGETTheCurrentCommunityInvitationClaims(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitation-claims`,
       this.headers,
     );
@@ -7418,8 +7480,24 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitations${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET the current community invitations with query {string} using the headers signed without it',
+  )
+  public async iGETTheCurrentCommunityInvitationsWithQuerySignedWithoutIt(
+    query: string,
+  ): Promise<void> {
+    if (!this.communityId) {
+      throw new Error('Community must be created first.');
+    }
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/invitations${query}`,
       this.headers,
     );
   }
@@ -7437,7 +7515,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/invitation-claims`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitations?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7456,7 +7534,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/invitations`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitations?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7472,7 +7550,7 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitation-claims${resolved}`,
       this.headers,
     );
@@ -7491,7 +7569,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/invitations`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitation-claims?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7510,7 +7588,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/invitation-claims`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/invitation-claims?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7702,7 +7780,7 @@ export default class Definitions {
   public async iGETCurrentCommunitiesWithQuery(query: string): Promise<void> {
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities${resolved}`,
       this.headers,
     );
@@ -7719,7 +7797,7 @@ export default class Definitions {
       resource: 'discoverable-communities',
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7733,7 +7811,7 @@ export default class Definitions {
       .replace('CURSOR', this.pageNextCursor ?? '')
       .replace(/^\?/, '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/discoverable-communities?query=API&networkId=${this.currentNetworkId}${params ? `&${params}` : ''}`,
       this.headers,
     );
@@ -7750,7 +7828,7 @@ export default class Definitions {
       resource: 'communities',
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/discoverable-communities?query=API&networkId=${this.currentNetworkId}&cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7762,7 +7840,7 @@ export default class Definitions {
   ): Promise<void> {
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/community-membership-requests${resolved}`,
       this.headers,
     );
@@ -7775,7 +7853,7 @@ export default class Definitions {
       resource: 'communities',
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/community-membership-requests?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -7801,7 +7879,7 @@ export default class Definitions {
 
   @when('I GET discoverable communities')
   public async iGETDiscoverableCommunities(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/discoverable-communities?query=API&networkId=${this.currentNetworkId}`,
       this.headers,
     );
@@ -7809,7 +7887,7 @@ export default class Definitions {
 
   @when('I GET community membership requests')
   public async iGETCommunityMembershipRequests(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       '/community-membership-requests',
       this.headers,
     );
@@ -7844,7 +7922,7 @@ export default class Definitions {
       throw new Error('Call must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/calls/${this.callId}`,
       this.headers,
     );
@@ -7852,7 +7930,7 @@ export default class Definitions {
 
   @when('I GET call ICE servers')
   public async iGETCallIceServers(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       '/call-ice-servers',
       this.headers,
     );
@@ -7951,7 +8029,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}`,
       this.headers,
     );
@@ -7963,7 +8041,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/frontier`,
       this.headers,
     );
@@ -7979,7 +8057,7 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/operations${resolved}`,
       this.headers,
     );
@@ -7991,7 +8069,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/moderation-logs?limit=50`,
       this.headers,
     );
@@ -8007,7 +8085,7 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/moderation-logs${resolved}`,
       this.headers,
     );
@@ -8026,7 +8104,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/operations`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/moderation-logs?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8043,7 +8121,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/moderation-logs`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/operations?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8062,7 +8140,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/operations`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/operations?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8081,7 +8159,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/moderation-logs`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/moderation-logs?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8117,7 +8195,7 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/pins${resolved}`,
       this.headers,
     );
@@ -8136,7 +8214,7 @@ export default class Definitions {
       resource: 'community-drafts',
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8155,7 +8233,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8167,7 +8245,7 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/pins?cursor=not-a-cursor`,
       this.headers,
     );
@@ -8183,7 +8261,7 @@ export default class Definitions {
   public async iGETTheCommunityDraftsWithQuery(query: string): Promise<void> {
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/community-drafts${resolved}`,
       this.headers,
     );
@@ -8204,7 +8282,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/channels/${this.communityChannelId}/pins`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/community-drafts?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8212,7 +8290,7 @@ export default class Definitions {
 
   @when('I GET the community drafts with a garbage cursor')
   public async iGETTheCommunityDraftsWithAGarbageCursor(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       '/community-drafts?cursor=not-a-cursor',
       this.headers,
     );
@@ -8264,7 +8342,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels`,
       this.headers,
     );
@@ -8432,7 +8510,7 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/${list}${resolved}`,
       this.headers,
     );
@@ -8453,7 +8531,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/${resource}`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/${list}?cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8506,7 +8584,7 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?limit=50`,
       this.headers,
     );
@@ -8524,7 +8602,7 @@ export default class Definitions {
 
     const resolved = query.replace('CURSOR', this.pageNextCursor ?? '');
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages${resolved}`,
       this.headers,
     );
@@ -8543,7 +8621,7 @@ export default class Definitions {
       resource: `communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
     });
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?limit=1&cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8594,7 +8672,7 @@ export default class Definitions {
     resource: string,
     position: string,
   ): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace(
         'CURSOR',
         encodeURIComponent(PageCursor.encode({ position, resource })),
@@ -8650,7 +8728,7 @@ export default class Definitions {
       throw new Error('Community and channel must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?query=searchable&limit=20`,
       this.headers,
     );
@@ -8662,7 +8740,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/messages?query=searchable&limit=20`,
       this.headers,
     );
@@ -8674,7 +8752,7 @@ export default class Definitions {
       throw new Error('Community must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/communities/${this.communityId}/messages`,
       this.headers,
     );
@@ -8750,12 +8828,12 @@ export default class Definitions {
 
   @when('I GET {string}')
   public async iGET(path: string): Promise<void> {
-    this.response = await this.restClient.get(path, this.headers);
+    this.response = await this.getSignedTarget(path, this.headers);
   }
 
   @when('I GET {string} with the remembered page cursor')
   public async iGETWithTheRememberedPageCursor(path: string): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace('CURSOR', encodeURIComponent(this.pageNextCursor ?? '')),
       this.headers,
     );
@@ -8800,7 +8878,7 @@ export default class Definitions {
     path: string,
     name: string,
   ): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace(
         'CURSOR',
         encodeURIComponent(this.pageCursors.get(name) ?? ''),
@@ -8811,7 +8889,7 @@ export default class Definitions {
 
   @when('I GET {string} with an oversized cursor')
   public async iGETWithAnOversizedCursor(path: string): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace('CURSOR', 'A'.repeat(513)),
       this.headers,
     );
@@ -8825,7 +8903,7 @@ export default class Definitions {
     resource: string,
     length: number,
   ): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace(
         'CURSOR',
         encodeURIComponent(
@@ -8857,7 +8935,7 @@ export default class Definitions {
       throw new Error(`Unknown non-canonical cursor shape ${shape}.`);
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace('CURSOR', encodeURIComponent(cursor)),
       this.headers,
     );
@@ -8871,7 +8949,7 @@ export default class Definitions {
     resource: string,
     position: string,
   ): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace(
         'CURSOR',
         encodeURIComponent(PageCursor.encode({ position, resource })),
@@ -8888,7 +8966,7 @@ export default class Definitions {
     resource: string,
     length: number,
   ): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace(
         'CURSOR',
         encodeURIComponent(
@@ -8904,7 +8982,7 @@ export default class Definitions {
     path: string,
     suffix: string,
   ): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       path.replace(
         'CURSOR',
         encodeURIComponent(`${this.pageNextCursor ?? ''}${suffix}`),
@@ -8916,7 +8994,7 @@ export default class Definitions {
   private async getWithCursor(path: string, cursor: string): Promise<void> {
     const separator = path.includes('?') ? '&' : '?';
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `${path}${separator}cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
@@ -8939,7 +9017,7 @@ export default class Definitions {
   public async iGETTheCurrentIdentityPresence(): Promise<void> {
     await this.ensureIdentityKeyPair();
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/presence/${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
       this.headers,
     );
@@ -8949,7 +9027,7 @@ export default class Definitions {
   public async iGETTheCurrentPresenceList(): Promise<void> {
     await this.ensureIdentityKeyPair();
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/presence?identityIds=${encodeURIComponent(this.ownerIdentityId?.valueOf() || '')}`,
       this.headers,
     );
@@ -8961,7 +9039,7 @@ export default class Definitions {
   ): Promise<void> {
     await this.ensureIdentityKeyPair();
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/presence?identityIds=${encodeURIComponent(identityIds)}`,
       this.headers,
     );
@@ -8983,7 +9061,7 @@ export default class Definitions {
       );
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/presence?identityIds=${encodeURIComponent(identityIds.join(','))}`,
       this.headers,
     );
@@ -8993,7 +9071,7 @@ export default class Definitions {
   public async iGETThePresenceListWithRawQuery(query: string): Promise<void> {
     await this.ensureIdentityKeyPair();
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/presence?${query}`,
       this.headers,
     );
@@ -9005,7 +9083,7 @@ export default class Definitions {
       throw new Error('Authenticated identity must exist first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/keychains/${encodeURIComponent(this.ownerIdentityId.valueOf())}`,
       this.headers,
     );
@@ -9014,7 +9092,7 @@ export default class Definitions {
   @when('I GET the current device list')
   public async iGetTheCurrentDeviceList(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/identity-devices/${encodeURIComponent(identityId.valueOf())}/devices`,
       this.headers,
     );
@@ -9023,16 +9101,50 @@ export default class Definitions {
   @when('I GET the current device authorization checkpoint')
   public async iGetTheCurrentDeviceAuthorizationCheckpoint(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/identity-devices/${encodeURIComponent(identityId.valueOf())}`,
       this.headers,
     );
   }
 
+  @when(
+    'I GET the current device authorization checkpoint with a request target of {int} bytes signed by the enrolled device',
+  )
+  public async iGetTheCurrentDeviceAuthorizationCheckpointWithTargetBytes(
+    bytes: number,
+  ): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    const pad = '?pad=';
+    const query = `${pad}${'a'.repeat(bytes - Buffer.byteLength(`${path}${pad}`))}`;
+
+    await this.signDeviceAuthorizationRequest(
+      query,
+      this.identityDeviceTargetKeyPair as KeyPair,
+    );
+    this.response = await this.getSignedTarget(`${path}${query}`, this.headers);
+  }
+
+  @when(
+    'I GET the current device authorization checkpoint with a request target of {int} bytes using the headers signed for a shorter target',
+  )
+  public async iGetTheCurrentDeviceAuthorizationCheckpointWithTargetBytesSignedForAShorterTarget(
+    bytes: number,
+  ): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    const path = `/identity-devices/${encodeURIComponent(identityId.valueOf())}`;
+    const pad = '?pad=';
+    const target = `${path}${pad}${'a'.repeat(bytes - Buffer.byteLength(`${path}${pad}`))}`;
+
+    // The crypto package refuses to sign a target this long, so the request
+    // carries the headers of the shorter signed target, which no longer match.
+    this.response = await this.restClient.get(target, this.headers);
+  }
+
   @when('I GET the current device transition log')
   public async iGetTheCurrentDeviceTransitionLog(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions`,
       this.headers,
     );
@@ -9043,7 +9155,7 @@ export default class Definitions {
     after: string,
   ): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions?after=${encodeURIComponent(after)}`,
       this.headers,
     );
@@ -9051,7 +9163,7 @@ export default class Definitions {
 
   @when('I GET current conversations')
   public async iGetCurrentConversations(): Promise<void> {
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       '/conversations?limit=20',
       this.headers,
     );
@@ -9063,7 +9175,7 @@ export default class Definitions {
       throw new Error('Identity must be created first.');
     }
 
-    this.response = await this.restClient.get(
+    this.response = await this.getSignedTarget(
       `/identities/${encodeURIComponent(this.createdIdentityId)}`,
       this.headers,
     );

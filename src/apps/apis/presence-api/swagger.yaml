@@ -49,6 +49,8 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/IdentityPresenceResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /presence/{identityId}:
     get:
       tags:

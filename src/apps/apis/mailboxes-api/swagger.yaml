@@ -172,6 +172,8 @@ paths:
                           type: string
         '404':
           description: Unknown mailbox or wrong capability.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /mailboxes/{mailboxId}/readers:
     get:
       tags:

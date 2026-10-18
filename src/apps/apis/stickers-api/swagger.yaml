@@ -39,6 +39,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StickerPacksResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - stickers
@@ -118,6 +120,8 @@ paths:
                 $ref: '#/components/schemas/StickerUserLibraryResource'
         '401':
           description: Invalid signed request.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /stickers/packs/{packId}:
     get:
       tags:

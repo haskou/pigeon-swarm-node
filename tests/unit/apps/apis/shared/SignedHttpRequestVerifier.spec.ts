@@ -34,7 +34,7 @@ function buildSignedRequest(
 
   request.body = {};
   request.method = 'GET';
-  request.path = path;
+  request.originalUrl = path;
   request.header.mockImplementation(
     (header: string) => headers[header.toLowerCase()],
   );

@@ -37,6 +37,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunitiesResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - communities
@@ -109,6 +111,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityDiscoveryResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /community-membership-requests:
     get:
       tags:
@@ -141,6 +145,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityMembershipRequestsResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - communities
@@ -312,6 +318,8 @@ paths:
           description: limit is not an integer from 1 to 100, or the cursor is malformed or issued for another list (codes 400060 and 400110).
         '409':
           description: The community is unknown to the node (CommunityNotFoundError) or the authenticated identity is not a member (CommunityMemberNotFoundError).
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/invitations:
     post:
       tags:
@@ -381,6 +389,8 @@ paths:
           description: Missing or invalid request signature.
         '409':
           description: The community is unknown to the node or the authenticated identity is not a member.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/invitation-preview:
     get:
       tags:
@@ -574,6 +584,8 @@ paths:
                 $ref: '#/components/schemas/CommunityModerationLogsResource'
         '409':
           description: Authenticated identity does not have manage_members.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/members:
     get:
       tags:
@@ -607,6 +619,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityMembersResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/members/{identityId}/roles:
     put:
       tags:
@@ -735,6 +749,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityRolesResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - communities
@@ -925,6 +941,8 @@ paths:
                 $ref: '#/components/schemas/CommunityChannelsResource'
         '409':
           description: Community not found, or the authenticated identity is not a member (CommunityNotFoundError, CommunityMemberNotFoundError).
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - communities
@@ -1086,6 +1104,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityChannelDraftsResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/channels/{channelId}/draft:
     put:
       tags:
@@ -1175,6 +1195,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityChannelMessagePinsResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/mls/records:
     get:
       tags:
@@ -1213,6 +1235,8 @@ paths:
                 $ref: '#/components/schemas/MLSRecordsResource'
         '409':
           description: Authenticated identity is not a member, or cannot view the channel of the group.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - communities
@@ -1246,7 +1270,7 @@ paths:
       tags:
         - communities
       summary: List or search community text channel messages
-      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `cursor` is ignored and `polls` is empty. Query string values are not part of the signed path.
+      description: Only community members can read text channel messages. Private community messages expose encryptedPayload. Public community messages expose plaintextPayload. Voice-channel call lifecycle is exposed through calls/channel presence, not this text timeline. With `query`, the page holds the public plaintext messages that match it instead of the timeline; only public community messages are searchable, `limit` defaults to 20 and is at most 50, `cursor` is ignored and `polls` is empty. The signature covers the full request target, query string included.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: path
@@ -1285,6 +1309,8 @@ paths:
                 $ref: '#/components/schemas/CommunityChannelMessagesResource'
         '409':
           description: Authenticated identity is not a member or the channel does not exist, or `query` is given for a private community.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
     post:
       tags:
         - communities
@@ -1323,7 +1349,7 @@ paths:
       tags:
         - communities
       summary: Search public community messages across visible text channels
-      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. Messages are listed per channel, so `query` is required here. The request is signed as GET /communities/{communityId}/messages; query string values are not part of the signed path.
+      description: Only public community plaintext messages are searchable. Results are limited to text channels visible to the authenticated member. Messages are listed per channel, so `query` is required here. The request is signed as GET /communities/{communityId}/messages?query=...; the signature covers the full request target, query string included.
       parameters:
         - $ref: '#/components/parameters/CommunityId'
         - in: query
@@ -1355,6 +1381,8 @@ paths:
           description: '`query` is missing (code 400100).'
         '409':
           description: The community is private or the authenticated identity is not a member.
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}:
     put:
       tags:
@@ -1536,6 +1564,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityChannelMessagesResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /communities/{communityId}/channels/{channelId}/messages/{messageId}/reactions:
     post:
       tags:

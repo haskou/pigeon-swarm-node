@@ -20,7 +20,7 @@ const requestOf = (
       : Buffer.from(input.bodyBase64, 'base64'),
   header: (name: string) => headers[name],
   method: input.method,
-  path: input.path,
+  originalUrl: input.path,
 });
 
 describe('Signed HTTP request vectors', () => {

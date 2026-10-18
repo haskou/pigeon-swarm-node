@@ -1,5 +1,6 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from '@app/apps/apis/shared/errors/MissingSignedRequestHeaderError';
+import { SignedRequestTargetIsTooLongError } from '@app/apps/apis/shared/errors/SignedRequestTargetIsTooLongError';
 import {
   SignedHttpRequest,
   SignedHttpRequestVerifier,
@@ -7,6 +8,8 @@ import {
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import {
   KeyPair,
+  PublicKey,
+  Signature,
   SignedHttpRequestBody,
   SignedHttpRequestSignature,
 } from '@haskou/pigeon-swarm-crypto';
@@ -16,14 +19,15 @@ const ED25519_ORDER = BigInt(
   '7237005577332262213973186563042994240857116359379907606001950938285454250989',
 );
 const BYTE = BigInt(256);
-const PATH = '/resource';
+const TARGET = '/resource';
 const TIMESTAMP = Date.now();
 
 type Wire = {
   body?: SignedHttpRequestBody;
   headers: Record<string, string>;
   method: string;
-  path: string;
+  /** Raw request target as received: the path, then `?` and the raw query. */
+  target: string;
 };
 
 /** Signs the canonical payload exactly as a client does and returns the wire request. */
@@ -32,7 +36,7 @@ function sign(
   signed: {
     body?: SignedHttpRequestBody;
     method: string;
-    path: string;
+    target: string;
     timestamp: number;
   },
   identityId = new IdentityId(keyPair.toPrimitives().publicKey),
@@ -40,7 +44,7 @@ function sign(
   const canonical = SignedHttpRequestSignature.signingContent({
     body: signed.body,
     method: signed.method,
-    path: signed.path,
+    path: signed.target,
     timestamp: signed.timestamp,
   });
 
@@ -52,7 +56,7 @@ function sign(
       'x-timestamp': String(signed.timestamp),
     },
     method: signed.method,
-    path: signed.path,
+    target: signed.target,
   };
 }
 
@@ -61,7 +65,7 @@ function toRequest(wire: Wire): SignedHttpRequest {
     body: wire.body,
     header: (name: string) => wire.headers[name.toLowerCase()],
     method: wire.method,
-    path: wire.path,
+    originalUrl: wire.target,
   };
 }
 
@@ -74,25 +78,27 @@ function littleEndianToBigInt(bytes: Uint8Array): bigint {
 
 function bigIntToLittleEndian(value: bigint, length: number): Buffer {
   const bytes = Buffer.alloc(length);
-  let rest = value;
-
+  let remaining = value;
   for (let index = 0; index < length; index += 1) {
-    bytes[index] = Number(rest % BYTE);
-    rest /= BYTE;
+    bytes[index] = Number(remaining % BYTE);
+    remaining /= BYTE;
   }
-
   return bytes;
+}
+
+/** The S scalar of a base64 Ed25519 signature: its last 32 bytes, little-endian. */
+function scalarOf(signature: string): bigint {
+  return littleEndianToBigInt(Buffer.from(signature, 'base64').subarray(32));
 }
 
 /** Same R and the scalar S+L: the same Ed25519 equation with different bytes. */
 function malleate(signature: string): string {
   const bytes = Buffer.from(signature, 'base64');
-  const scalar = littleEndianToBigInt(bytes.subarray(32));
-
-  return Buffer.concat([
+  const twin = Buffer.concat([
     bytes.subarray(0, 32),
-    bigIntToLittleEndian(scalar + ED25519_ORDER, 32),
-  ]).toString('base64');
+    bigIntToLittleEndian(scalarOf(signature) + ED25519_ORDER, 32),
+  ]);
+  return twin.toString('base64');
 }
 
 describe('signed request canonicalisation', () => {
@@ -102,17 +108,23 @@ describe('signed request canonicalisation', () => {
     const keyPair = await KeyPair.generate();
     const valid = sign(keyPair, {
       method: 'GET',
-      path: PATH,
+      target: TARGET,
       timestamp: TIMESTAMP,
     });
+    const twinSignature = malleate(valid.headers['x-signature']);
     const twin: Wire = {
       ...valid,
       headers: {
         ...valid.headers,
-        'x-signature': malleate(valid.headers['x-signature']),
+        'x-signature': twinSignature,
       },
     };
 
+    // The twin is a well-formed canonical base64 signature over the same R and
+    // the same Ed25519 equation, so the only rule it breaks is S < L.
+    expect(scalarOf(valid.headers['x-signature']) < ED25519_ORDER).toBe(true);
+    expect(scalarOf(twinSignature) >= ED25519_ORDER).toBe(true);
+    expect(() => new Signature(twinSignature)).not.toThrow();
     expect(() => verifier.verifySignature(toRequest(valid))).not.toThrow();
     expect(() => verifier.verifySignature(toRequest(twin))).toThrow(
       InvalidSignedRequestError,
@@ -129,31 +141,181 @@ describe('signed request canonicalisation', () => {
     '/resource/%61%2Fb',
   ])(
     'refuses a signature over %s presented as a different raw path',
-    async (presentedPath) => {
+    async (presentedTarget) => {
       const keyPair = await KeyPair.generate();
       const signed = sign(keyPair, {
         method: 'GET',
-        path: SIGNED_PATH,
+        target: SIGNED_PATH,
         timestamp: TIMESTAMP,
       });
 
       expect(() =>
-        verifier.verifySignature(toRequest({ ...signed, path: presentedPath })),
+        verifier.verifySignature(
+          toRequest({ ...signed, target: presentedTarget }),
+        ),
       ).toThrow(InvalidSignedRequestError);
     },
   );
+
+  describe('query string', () => {
+    const SIGNED = '/communities/c1/messages?query=hello&limit=20&cursor=abc';
+
+    it.each([
+      '/communities/c1/messages?query=hello&limit=20&cursor=zzz',
+      '/communities/c1/messages?query=hello&limit=500&cursor=abc',
+      '/communities/c1/messages?query=other&limit=20&cursor=abc',
+      '/communities/c1/messages?query=hello&limit=20',
+      '/communities/c1/messages?query=hello&limit=20&cursor=abc&extra=1',
+      '/communities/c1/messages?query=hello&cursor=abc&limit=20',
+      '/communities/c1/messages?query=hello%20&limit=20&cursor=abc',
+      '/communities/c1/messages?query=hello&limit=20&cursor=abc&',
+      '/communities/c1/messages?',
+      '/communities/c1/messages',
+    ])(
+      'refuses a signature over the signed query presented as %s',
+      async (presentedTarget) => {
+        const keyPair = await KeyPair.generate();
+        const signed = sign(keyPair, {
+          method: 'GET',
+          target: SIGNED,
+          timestamp: TIMESTAMP,
+        });
+
+        expect(() =>
+          verifier.verifySignature(
+            toRequest({ ...signed, target: presentedTarget }),
+          ),
+        ).toThrow(InvalidSignedRequestError);
+      },
+    );
+
+    it('accepts the exact signed target', async () => {
+      const keyPair = await KeyPair.generate();
+      const signed = sign(keyPair, {
+        method: 'GET',
+        target: SIGNED,
+        timestamp: TIMESTAMP,
+      });
+
+      expect(() => verifier.verifySignature(toRequest(signed))).not.toThrow();
+    });
+
+    it('treats the raw query bytes as signed: an encoding variant is refused', async () => {
+      const keyPair = await KeyPair.generate();
+      const signed = sign(keyPair, {
+        method: 'GET',
+        target: '/search?q=a%20b',
+        timestamp: TIMESTAMP,
+      });
+
+      expect(() =>
+        verifier.verifySignature(
+          toRequest({ ...signed, target: '/search?q=a+b' }),
+        ),
+      ).toThrow(InvalidSignedRequestError);
+    });
+
+    it('distinguishes a bare `?` from no query at all', async () => {
+      const keyPair = await KeyPair.generate();
+      const signed = sign(keyPair, {
+        method: 'GET',
+        target: '/resource?',
+        timestamp: TIMESTAMP,
+      });
+
+      expect(() =>
+        verifier.verifySignature(toRequest({ ...signed, target: TARGET })),
+      ).toThrow(InvalidSignedRequestError);
+    });
+
+    it('refuses a device-proof signature over a changed query', async () => {
+      const keyPair = await KeyPair.generate();
+      const signedTarget = '/discoverable-communities?after=a';
+      const signature = keyPair.sign(
+        SignedHttpRequestSignature.signingContent({
+          body: undefined,
+          method: 'GET',
+          path: signedTarget,
+          timestamp: TIMESTAMP,
+        }),
+      );
+      const key = PublicKey.fromPEM(
+        new IdentityId(keyPair.toPrimitives().publicKey).toString(),
+      );
+      const request = toRequest({
+        headers: {},
+        method: 'GET',
+        target: '/discoverable-communities?after=b',
+      });
+
+      expect(() =>
+        verifier.verifyWith(
+          request,
+          String(TIMESTAMP),
+          signature.valueOf(),
+          key,
+        ),
+      ).toThrow(InvalidSignedRequestError);
+    });
+
+    it.each([
+      [
+        'verifySignature',
+        (verifier: SignedHttpRequestVerifier, request: SignedHttpRequest) =>
+          verifier.verifySignature(request),
+      ],
+      [
+        'verifyDeclaredBodySignature',
+        (verifier: SignedHttpRequestVerifier, request: SignedHttpRequest) =>
+          verifier.verifyDeclaredBodySignature(request),
+      ],
+    ])(
+      'refuses an oversized target with 414 before %s checks any signature',
+      async (_entry, verifyEntry) => {
+        const keyPair = await KeyPair.generate();
+        const oversized = `/resource?q=${'a'.repeat(8192)}`;
+        const signed = sign(keyPair, {
+          method: 'GET',
+          target: TARGET,
+          timestamp: TIMESTAMP,
+        });
+        const verifySpy = jest.spyOn(SignedHttpRequestSignature, 'verify');
+
+        try {
+          expect(() =>
+            verifyEntry(verifier, toRequest({ ...signed, target: oversized })),
+          ).toThrow(SignedRequestTargetIsTooLongError);
+          expect(verifySpy).not.toHaveBeenCalled();
+        } finally {
+          verifySpy.mockRestore();
+        }
+      },
+    );
+
+    it('accepts a target of exactly 8192 bytes', async () => {
+      const keyPair = await KeyPair.generate();
+      const target = `/resource?q=${'a'.repeat(8192 - '/resource?q='.length)}`;
+      const signed = sign(keyPair, {
+        method: 'GET',
+        target,
+        timestamp: TIMESTAMP,
+      });
+
+      expect(() => verifier.verifySignature(toRequest(signed))).not.toThrow();
+    });
+  });
 
   it('treats an absent body as an empty object, so both spellings share one signature', async () => {
     const keyPair = await KeyPair.generate();
     const absent = sign(keyPair, {
       method: 'POST',
-      path: PATH,
+      target: TARGET,
       timestamp: TIMESTAMP,
     });
     const empty = sign(keyPair, {
       body: {},
       method: 'POST',
-      path: PATH,
+      target: TARGET,
       timestamp: TIMESTAMP,
     });
 
@@ -171,7 +333,7 @@ describe('signed request canonicalisation', () => {
     const signed = sign(keyPair, {
       body: { a: 1, b: 2 },
       method: 'POST',
-      path: PATH,
+      target: TARGET,
       timestamp: TIMESTAMP,
     });
 
@@ -186,7 +348,7 @@ describe('signed request canonicalisation', () => {
     const other = await KeyPair.generate();
     const signed = sign(
       signer,
-      { method: 'GET', path: PATH, timestamp: TIMESTAMP },
+      { method: 'GET', target: TARGET, timestamp: TIMESTAMP },
       new IdentityId(other.toPrimitives().publicKey),
     );
 
@@ -201,7 +363,7 @@ describe('signed request canonicalisation', () => {
       const keyPair = await KeyPair.generate();
       const signed = sign(keyPair, {
         method: 'GET',
-        path: PATH,
+        target: TARGET,
         timestamp: TIMESTAMP,
       });
 
@@ -220,7 +382,7 @@ describe('signed request canonicalisation', () => {
     const keyPair = await KeyPair.generate();
     const signed = sign(keyPair, {
       method: 'GET',
-      path: PATH,
+      target: TARGET,
       timestamp: TIMESTAMP,
     });
 
@@ -245,7 +407,7 @@ describe('signed request canonicalisation', () => {
       const keyPair = await KeyPair.generate();
       const signed = sign(keyPair, {
         method: 'GET',
-        path: PATH,
+        target: TARGET,
         timestamp: TIMESTAMP,
       });
 

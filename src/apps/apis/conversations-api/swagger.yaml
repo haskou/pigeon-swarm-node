@@ -61,6 +61,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationsResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /conversation-drafts:
     get:
       tags:
@@ -93,6 +95,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationDraftsResource'
+        '414':
+          $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
   /conversation-drafts/{draftKey}:
     put:
       tags:

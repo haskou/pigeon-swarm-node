@@ -255,6 +255,17 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    RequestTargetTooLong:
+      description: >-
+        A signed request whose raw target (path and query string, as sent) is
+        longer than 8192 UTF-8 bytes. Refused before any signature header is
+        read, hashed or verified, so the body is not checked either. Error code
+        `414010`. Every signed route can answer this, device-authenticated
+        routes included; the operations that take query parameters list it.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
   schemas:
     ErrorResponse:
       type: object

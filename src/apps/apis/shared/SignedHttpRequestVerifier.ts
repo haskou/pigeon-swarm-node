@@ -8,10 +8,14 @@ import {
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
+import { SignedRequestTargetIsTooLongError } from './errors/SignedRequestTargetIsTooLongError';
 import { SignedHttpRequest } from './SignedHttpRequest';
 import { SignedRequestBodyHash } from './SignedRequestBodyHash';
 
 export type { SignedHttpRequest } from './SignedHttpRequest';
+
+/** Matches the crypto package's signed path bound (8192 characters), measured here in UTF-8 bytes. */
+const MAX_TARGET_BYTES = 8192;
 
 export class SignedHttpRequestVerifier {
   private verifyOver(
@@ -27,7 +31,7 @@ export class SignedHttpRequestVerifier {
         {
           body,
           method: request.method,
-          path: request.path,
+          path: request.originalUrl,
           timestamp: Number(timestamp),
         },
         parsed,
@@ -80,6 +84,19 @@ export class SignedHttpRequestVerifier {
     }
   }
 
+  /**
+   * Refuses an oversized raw request target before any signature header is
+   * read, hashed or verified: the crypto package never verifies a longer path,
+   * so this only answers earlier and says why. Callers that catch verification
+   * errors call it first, so an oversized target stays 414 and is not rewritten
+   * as 401.
+   */
+  public assertTargetWithinLimit(request: SignedHttpRequest): void {
+    if (Buffer.byteLength(request.originalUrl, 'utf8') > MAX_TARGET_BYTES) {
+      throw new SignedRequestTargetIsTooLongError(MAX_TARGET_BYTES);
+    }
+  }
+
   public getRequiredHeader(request: SignedHttpRequest, header: string): string {
     const value = request.header(header);
     const normalizedValue = Array.isArray(value) ? value[0] : value;
@@ -101,6 +118,8 @@ export class SignedHttpRequestVerifier {
     signature: string,
     key: PublicKey,
   ): Signature {
+    this.assertTargetWithinLimit(request);
+
     return this.verifyOver(
       request,
       request.body as SignedHttpRequestBody,
@@ -115,6 +134,8 @@ export class SignedHttpRequestVerifier {
     signature: Signature;
     timestamp: string;
   } {
+    this.assertTargetWithinLimit(request);
+
     return this.verifyIdentitySignature(
       request,
       request.body as SignedHttpRequestBody,
@@ -132,6 +153,7 @@ export class SignedHttpRequestVerifier {
     signature: Signature;
     timestamp: string;
   } {
+    this.assertTargetWithinLimit(request);
     const bodyHash = this.declaredBodyHash(request);
 
     return {
