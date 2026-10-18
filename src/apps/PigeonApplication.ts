@@ -250,6 +250,7 @@ export default class PigeonApplication {
   public loadEnvironmentVariables(environment?: string): void {
     this.kernel.loadEnvironmentVariables(environment);
     validatePigeonEnvironment(this.kernel.environment);
+    this.logger.enableFileLogging();
   }
 
   public async dependencyInjection(

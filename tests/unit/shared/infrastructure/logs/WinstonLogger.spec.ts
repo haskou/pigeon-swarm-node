@@ -98,3 +98,67 @@ describe('HTTP log privacy', () => {
     }
   });
 });
+
+describe('WinstonLogger file transport', () => {
+  const previous = {
+    LOG_LEVEL: process.env.LOG_LEVEL,
+    LOG_URL: process.env.LOG_URL,
+    SERVICE_NAME: process.env.SERVICE_NAME,
+  };
+  let directory: string;
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'pigeon-file-transport-'));
+    Object.assign(process.env, {
+      LOG_LEVEL: 'info',
+      LOG_URL: '.',
+      SERVICE_NAME: 'file-transport-test',
+    });
+    jest.spyOn(Kernel, 'rootDirectory', 'get').mockReturnValue(directory);
+    jest
+      .spyOn(winston.transports.Console.prototype, 'log')
+      .mockImplementation((_info, callback) => {
+        if (typeof callback === 'function') callback();
+      });
+  });
+
+  afterEach(async () => {
+    jest.restoreAllMocks();
+    for (const [name, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it('should not construct the file transport before file logging is enabled', () => {
+    const open = jest
+      .spyOn(winston.transports.File.prototype, 'open')
+      .mockImplementation(() => undefined);
+    const logger = new WinstonLogger();
+
+    logger.info('before validation');
+
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it('should write to the file resolved at first use once file logging is enabled', async () => {
+    const logger = new WinstonLogger();
+
+    logger.info('before validation');
+    process.env.LOG_URL = 'elsewhere';
+    logger.enableFileLogging();
+    logger.info('after validation');
+    await new Promise<void>((resolve) => {
+      logger.logger.on('finish', resolve);
+      logger.logger.end();
+    });
+
+    const file = await readFile(
+      join(directory, 'file-transport-test.log'),
+      'utf8',
+    );
+    expect(file).toContain('after validation');
+    expect(file).not.toContain('before validation');
+  });
+});

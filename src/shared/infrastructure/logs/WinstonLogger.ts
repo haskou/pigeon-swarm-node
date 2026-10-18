@@ -36,6 +36,10 @@ export default class WinstonLogger implements Log {
 
   private _logger: Logger;
 
+  private fileOptions: ConstructorParameters<typeof winston.transports.File>[0];
+
+  private fileTransport?: InstanceType<typeof winston.transports.File>;
+
   private server?: HttpAppProvider;
 
   private createLoggerOptions() {
@@ -44,16 +48,26 @@ export default class WinstonLogger implements Log {
     return {
       level: environment.LOG_LEVEL,
       transports: [
-        new winston.transports.Console({
-          format: this.consoleFormat,
-          level: environment.LOG_LEVEL,
-        }),
-        new winston.transports.File({
-          filename: this.getLogFileName(),
-          format: this.jsonFormat,
-          level: environment.LOG_LEVEL,
-        }),
+        this.createConsoleTransport(environment.LOG_LEVEL),
+        new winston.transports.File(
+          this.createFileOptions(environment.LOG_LEVEL),
+        ),
       ],
+    };
+  }
+
+  private createConsoleTransport(level: string) {
+    return new winston.transports.Console({
+      format: this.consoleFormat,
+      level,
+    });
+  }
+
+  private createFileOptions(level: string) {
+    return {
+      filename: this.getLogFileName(),
+      format: this.jsonFormat,
+      level,
     };
   }
 
@@ -132,10 +146,32 @@ export default class WinstonLogger implements Log {
 
   public get logger(): Logger {
     if (!this._logger) {
-      this._logger = winston.createLogger(this.createLoggerOptions());
+      const environment = pigeonEnvironment();
+
+      this.fileOptions = this.createFileOptions(environment.LOG_LEVEL);
+      this._logger = winston.createLogger({
+        level: environment.LOG_LEVEL,
+        transports: [this.createConsoleTransport(environment.LOG_LEVEL)],
+      });
     }
 
     return this._logger;
+  }
+
+  /**
+   * Adds the file transport. Winston opens the file as soon as the transport
+   * is constructed, so this is called only once the configuration is valid.
+   * The path and level are the ones resolved at first use, as before.
+   */
+  public enableFileLogging(): void {
+    if (this.fileTransport) {
+      return;
+    }
+
+    const logger = this.logger;
+
+    this.fileTransport = new winston.transports.File(this.fileOptions);
+    logger.add(this.fileTransport);
   }
 
   public attach(server: HttpAppProvider): void {

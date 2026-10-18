@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import DiagnosticsTraceInitializer from '@app/apps/initializers/diagnostics/DiagnosticsTraceInitializer';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import { Initializer } from '@app/shared/infrastructure/lifecycle/Initializer';
+import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { Kernel } from '@haskou/ddd-kernel';
 import { mock } from 'jest-mock-extended';
 import { setTimeout } from 'timers/promises';
@@ -79,6 +80,33 @@ describe('PigeonApplication kernel-loaded environment', () => {
 
   afterEach(() => {
     process.env = { ...previous };
+  });
+
+  let enableFileLogging: jest.SpyInstance;
+
+  beforeEach(() => {
+    enableFileLogging = jest
+      .spyOn(WinstonLogger.prototype, 'enableFileLogging')
+      .mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('should keep the log file closed when the environment is invalid', () => {
+    process.env.NODE_INITIALIZER_TIMEOUT_MS = '0';
+
+    expect(() => new PigeonApplication().loadEnvironmentVariables()).toThrow();
+    expect(enableFileLogging).not.toHaveBeenCalled();
+  });
+
+  it('should open the log file once the environment is valid', () => {
+    process.env.NODE_INITIALIZER_TIMEOUT_MS = '2147483647';
+
+    new PigeonApplication().loadEnvironmentVariables();
+
+    expect(enableFileLogging).toHaveBeenCalledTimes(1);
   });
 
   it.each([['0'], ['-1'], ['1.5'], ['2147483648']])(
