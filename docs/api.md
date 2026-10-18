@@ -363,6 +363,11 @@ response.
   and `requiredDifficultyBits` appear only where the operation documents them.
 - Status codes are listed per operation: each operation documents the codes it
   can return.
+- A malformed id in a request body (for example a conversation `participantIds`
+  entry that is not a canonical identity key) returns `400`. The same id in a
+  path returns `404`, the same as an unknown id, so the response does not reveal
+  which shape a resource id must have. A removed verb-style path that matches
+  `/:id` is refused the same way.
 
 ### Delete responses
 

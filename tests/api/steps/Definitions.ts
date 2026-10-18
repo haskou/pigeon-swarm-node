@@ -2975,6 +2975,16 @@ export default class Definitions {
     this.headers['content-type'] = contentType;
   }
 
+  @given('I set a one-to-one conversation body with a malformed participant')
+  public async iSetAOneToOneConversationBodyWithAMalformedParticipant(): Promise<void> {
+    await this.iSetAOneToOneConversationBodyForANewParticipant();
+    const body = JSON.parse(this.body as string) as {
+      participantIds: string[];
+    };
+    body.participantIds[1] = 'not-a-public-key';
+    this.body = JSON.stringify(body);
+  }
+
   @given('I set a one-to-one conversation body for a new participant')
   public async iSetAOneToOneConversationBodyForANewParticipant(): Promise<void> {
     if (!this.keychainExternalIdentifier) {
