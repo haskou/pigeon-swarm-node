@@ -1,8 +1,8 @@
 import { NodeBlockSourceNotFoundError } from '../../domain/errors/NodeBlockSourceNotFoundError';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
-import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
 import { NodeOwnerWriteHolderMessage } from '../hold-owner-write/messages/NodeOwnerWriteHolderMessage';
+import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
 import { NodeBlockSourceRemoverMessage } from './messages/NodeBlockSourceRemoverMessage';
 
 /** Stops following a source; everything it applied stops applying at once. */

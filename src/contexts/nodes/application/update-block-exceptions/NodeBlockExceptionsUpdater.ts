@@ -1,8 +1,8 @@
 import { NodeBlockEntries } from '../../domain/NodeBlockEntries';
 import NodeBlockExceptionsRepository from '../../domain/repositories/NodeBlockExceptionsRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
-import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
 import { NodeOwnerWriteHolderMessage } from '../hold-owner-write/messages/NodeOwnerWriteHolderMessage';
+import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
 import { NodeBlockExceptionsUpdaterMessage } from './messages/NodeBlockExceptionsUpdaterMessage';
 
 /** Replaces the identities and nodes adopted lists may never block. */

@@ -1,8 +1,8 @@
 import { NodeBlockSource } from '../../domain/NodeBlockSource';
 import NodeBlockSourceRepository from '../../domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '../../domain/services/NodeBlockPolicy';
-import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
 import { NodeOwnerWriteHolderMessage } from '../hold-owner-write/messages/NodeOwnerWriteHolderMessage';
+import NodeOwnerWriteHolder from '../hold-owner-write/NodeOwnerWriteHolder';
 import { NodeBlockSourceAdopterMessage } from './messages/NodeBlockSourceAdopterMessage';
 
 /**

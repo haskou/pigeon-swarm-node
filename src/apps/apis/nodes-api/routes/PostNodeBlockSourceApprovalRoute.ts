@@ -39,10 +39,10 @@ export class PostNodeBlockSourceApprovalRoute extends NodeOwnerRouteSupport {
       async (authenticatedIdentityId) => {
         const message = new NodeBlockSourceEntriesApproverMessage({
           all: body.all,
+          authenticatedIdentityId: authenticatedIdentityId.valueOf(),
           blockedIdentityIds: body.blockedIdentityIds ?? [],
           blockedNodePeerIds: body.blockedNodePeerIds ?? [],
           ownerIdentityId,
-          authenticatedIdentityId: authenticatedIdentityId.valueOf(),
           version: body.version,
         });
 
