@@ -1,7 +1,8 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+import { PageTimestamp } from '@app/contexts/shared/application/pagination/PageTimestamp';
+
 import { CommunityChannelDraft } from '../../domain/CommunityChannelDraft';
 import CommunityChannelDraftRepository from '../../domain/repositories/CommunityChannelDraftRepository';
-import { PageSlice } from '../pagination/PageSlice';
-import { PageTimestamp } from '../pagination/PageTimestamp';
 import { CommunityChannelDraftsPage } from './CommunityChannelDraftsPage';
 import { CommunityChannelDraftsFindMessage } from './messages/CommunityChannelDraftsFindMessage';
 

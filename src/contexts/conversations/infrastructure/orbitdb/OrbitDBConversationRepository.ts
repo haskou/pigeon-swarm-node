@@ -1,4 +1,5 @@
 import { Conversation } from '@app/contexts/conversations/domain/Conversation';
+import { DatedConversation } from '@app/contexts/conversations/domain/DatedConversation';
 import { ConversationNotFoundError } from '@app/contexts/conversations/domain/errors/ConversationNotFoundError';
 import { OneToOneConversation } from '@app/contexts/conversations/domain/OneToOneConversation';
 import { ConversationOperation } from '@app/contexts/conversations/domain/operations/ConversationOperation';
@@ -209,23 +210,14 @@ export default class OrbitDBConversationRepository implements ConversationReposi
 
   public findByParticipant(
     participantId: IdentityId,
-    limit: number,
-    beforeConversationId?: ConversationId,
-  ): Promise<Conversation[]> {
-    const memberOf = this.cachedConversations().filter((found) =>
-      found.roster.isMember(participantId.valueOf()),
-    );
-    const before = beforeConversationId
-      ? memberOf.find(
-          (found) => found.roster.getId() === beforeConversationId.valueOf(),
-        )
-      : undefined;
-
+  ): Promise<DatedConversation[]> {
     return Promise.resolve(
-      memberOf
-        .filter((found) => (before ? found.createdAt < before.createdAt : true))
-        .slice(0, limit)
-        .map((found) => this.conversationOf(found)),
+      this.cachedConversations()
+        .filter((found) => found.roster.isMember(participantId.valueOf()))
+        .map(
+          (found) =>
+            new DatedConversation(this.conversationOf(found), found.createdAt),
+        ),
     );
   }
 

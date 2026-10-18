@@ -90,7 +90,6 @@ describe('OrbitDBConversationRepository', () => {
 
     const participantConversations = await repository.findByParticipant(
       mother.author,
-      10,
     );
 
     expect(participantConversations).toHaveLength(1);
@@ -112,7 +111,7 @@ describe('OrbitDBConversationRepository', () => {
     expect(
       await repository.hasById(new ConversationId(legacy.conversationId)),
     ).toBe(false);
-    expect(await repository.findByParticipant(mother.author, 10)).toEqual([]);
+    expect(await repository.findByParticipant(mother.author)).toEqual([]);
   });
 
   /** Stores the signed creation of a conversation, the only thing that makes it exist. */

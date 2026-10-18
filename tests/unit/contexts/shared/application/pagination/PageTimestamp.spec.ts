@@ -1,4 +1,4 @@
-import { PageTimestamp } from '@app/contexts/communities/application/pagination/PageTimestamp';
+import { PageTimestamp } from '@app/contexts/shared/application/pagination/PageTimestamp';
 
 describe('PageTimestamp', () => {
   const EXTREME_MILLISECONDS = 8_640_000_000_000_000;

@@ -37,7 +37,8 @@ Feature: Conversation drafts live under opaque keys
             "encryptedPayload": "sealed-draft-payload",
             "updatedAt": 1700000000000
           }
-        ]
+        ],
+        "nextCursor": null
       }
       """
     Given I sign a DELETE request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
@@ -54,7 +55,8 @@ Feature: Conversation drafts live under opaque keys
     Then response data should match exactly
       """
       {
-        "drafts": []
+        "drafts": [],
+        "nextCursor": null
       }
       """
 
@@ -76,7 +78,8 @@ Feature: Conversation drafts live under opaque keys
     And response data should match exactly
       """
       {
-        "drafts": []
+        "drafts": [],
+        "nextCursor": null
       }
       """
     Given I sign a GET request to "/conversation-drafts"
@@ -132,3 +135,78 @@ Feature: Conversation drafts live under opaque keys
       | method |
       | PUT    |
       | DELETE |
+
+  Scenario: A garbage or foreign draft cursor is refused
+    Given I am an anonymous user
+    And I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1&cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1" with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario: A draft cursor from another identity does not reveal its drafts
+    Given I set json body
+      """
+      {
+        "encryptedPayload": "sealed-draft-payload",
+        "updatedAt": 1700000000000
+      }
+      """
+    And I sign a PUT request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I PUT "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    Then response code is equal to 200
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given another identity signs a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 200
+    And response lists 0 drafts
+
+  Scenario Outline: A forged draft cursor is refused
+    Given I set json body
+      """
+      {
+        "encryptedPayload": "sealed-draft-payload",
+        "updatedAt": 1700000000000
+      }
+      """
+    And I sign a PUT request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I PUT "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    Then response code is equal to 200
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1" with a forged "conversation-drafts" cursor at position "<position>"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+    Examples:
+      | position                                                                        |
+      | abc\|eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4                                |
+      | 0000000000000001\|eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4                   |
+      | 99999999999999999\|eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4                  |
+      | 00000000000000001\|eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4A                 |
+      | 00000000000000001                                                               |
+
+  Scenario: A draft cursor is refused by the notifications list
+    Given I set json body
+      """
+      {
+        "encryptedPayload": "sealed-draft-payload",
+        "updatedAt": 1700000000000
+      }
+      """
+    And I sign a PUT request to "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    When I PUT "/conversation-drafts/eNqRUR5nVYf1ud94vt669VYNoqu4gWLuh13N90SVHZ4"
+    Then response code is equal to 200
+    Given I sign a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given I sign the current notifications request
+    When I GET "/notifications?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 400
+    And response body should contain "400110"

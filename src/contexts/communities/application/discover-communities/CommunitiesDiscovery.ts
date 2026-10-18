@@ -1,6 +1,7 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { Community } from '../../domain/Community';
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
-import { PageSlice } from '../pagination/PageSlice';
 
 export class CommunitiesDiscovery {
   constructor(

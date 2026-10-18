@@ -774,6 +774,8 @@ GET /calls
 
 Returns active calls associated with the authenticated identity, filtered by current conversation membership or voice-channel permissions. Former participation does not preserve access.
 
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Calls are ordered by creation time, oldest first, then call id. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is `null` on the last page. A malformed cursor, or one from another list, returns `400` with code `400110`.
+
 ### List past calls
 
 ```http
@@ -781,6 +783,8 @@ GET /past-calls
 ```
 
 Returns active and finished conversation calls where the authenticated identity participated and still has conversation access. Historical participant states and lifecycle timestamps are available only through this history contract. Community voice-channel histories are excluded.
+
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Calls are ordered by creation time, oldest first, then call id. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is `null` on the last page. A malformed cursor, or one from another list, returns `400` with code `400110`.
 
 ### Get call
 
@@ -3123,14 +3127,14 @@ Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,
 ### List conversations
 
 ```http
-GET /conversations?limit=20&beforeConversationId=<conversationId>
+GET /conversations?limit=20&cursor=<cursor>
 ```
 
 Implemented:
 
 - require signed request auth
 - list conversations where the authenticated identity participates
-- support `limit` and `beforeConversationId`
+- support `limit` (1..100, default 50) and an opaque `cursor`. Conversations are ordered newest first by creation time, then conversation id. Responds `{ "conversations": [...], "nextCursor": "<cursor or null>" }`; `nextCursor` is `null` on a short page. A full last page returns a cursor, so the next read may be empty. Creation time is this node's own fold time, so the order can differ between nodes. A malformed cursor, or one from another list, returns `400` with code `400110`
 
 ### Create a conversation
 
@@ -3367,6 +3371,8 @@ GET /conversation-drafts
 PUT /conversation-drafts/{draftKey}
 DELETE /conversation-drafts/{draftKey}
 ```
+
+`GET /conversation-drafts` takes `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Drafts are ordered by `updatedAt` newest first, then draft key. Pass `nextCursor` as `cursor` to read the next page; it is `null` on the last page. A malformed cursor, or one from another list, returns `400` with code `400110`.
 
 `draftKey` is opaque: the client derives it as
 `base64url(HMAC-SHA256(K_draft, utf8(conversationId)))`, where `K_draft` is a
@@ -5424,14 +5430,14 @@ alerts such as missed calls. Message delivery does not create notifications.
 ### List notifications
 
 ```http
-GET /notifications?limit=20&beforeNotificationId=<notificationId>
+GET /notifications?limit=20&cursor=<cursor>
 ```
 
 Implemented:
 
 - require signed request auth
 - return notifications where the authenticated identity is the recipient
-- support `limit` and `beforeNotificationId`
+- support `limit` (1..100, default 50) and an opaque `cursor`; responds `{ "results": [...], "nextCursor": "<cursor or null>" }`
 - can include backend-created `missed_call` notifications for conversation
   calls
 - hold back pending group invitations beyond two caps. A
@@ -5447,10 +5453,10 @@ Implemented:
   list the same letters. Accepting or declining a listed letter lists the next
   held-back one. The inviter is not told. Answered group invitations and every
   other notification type are listed as before
-- apply the caps before pagination: `limit` and `beforeNotificationId` page over
-  the listed notifications only, newest record id first. A held-back
-  `beforeNotificationId` is treated like an unknown one and the listing starts
-  from the first page
+- apply the caps before pagination: `limit` and `cursor` page over the listed
+  notifications only, newest record id first. `nextCursor` is the id of the
+  last notification on a full page, and `null` otherwise. A malformed cursor,
+  or one from another list, returns `400` with code `400110`
 
 ### Create an invitation notification
 

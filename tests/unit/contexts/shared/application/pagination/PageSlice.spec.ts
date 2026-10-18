@@ -1,4 +1,4 @@
-import { PageSlice } from '@app/contexts/communities/application/pagination/PageSlice';
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
 
 describe('PageSlice', () => {
   const items = ['d', 'b', 'a', 'c'];
@@ -81,5 +81,50 @@ describe('PageSlice', () => {
     });
 
     expect(input).toEqual(['b', 'a']);
+  });
+
+  it('pages every item once across same-millisecond ties', () => {
+    const rows: { created: string; id: string }[] = [
+      { created: '1|c', id: 'c' },
+      { created: '1|a', id: 'a' },
+      { created: '2|b', id: 'b' },
+      { created: '1|b', id: 'b1' },
+    ];
+    const position = (row: { created: string; id: string }): string =>
+      row.created;
+    const seen: string[] = [];
+    let after: string | undefined;
+
+    for (;;) {
+      const page = PageSlice.of({
+        items: rows,
+        position,
+        order: 'asc',
+        limit: 2,
+        after,
+      });
+
+      seen.push(...page.items.map((row) => row.id));
+
+      if (page.nextPosition === undefined) break;
+
+      after = page.nextPosition;
+    }
+
+    expect(seen).toEqual(['a', 'b1', 'c', 'b']);
+  });
+
+  it('computes each position once per item', () => {
+    const position = jest.fn((item: string): string => item);
+
+    PageSlice.of({
+      items: ['c', 'a', 'b'],
+      position,
+      order: 'asc',
+      limit: 2,
+      after: 'a',
+    });
+
+    expect(position).toHaveBeenCalledTimes(3);
   });
 });

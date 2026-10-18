@@ -1,5 +1,6 @@
+import { PageTimestamp } from '@app/contexts/shared/application/pagination/PageTimestamp';
+
 import { CommunityRequestId } from '../../domain/value-objects/CommunityRequestId';
-import { PageTimestamp } from '../pagination/PageTimestamp';
 
 /**
  * Position of a membership request in its list: the fixed-width update time,

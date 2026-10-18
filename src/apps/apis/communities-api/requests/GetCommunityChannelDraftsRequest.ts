@@ -2,9 +2,9 @@ import { InvalidPageCursorError } from '@app/apps/apis/shared/errors/InvalidPage
 import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import { PageLimit } from '@app/apps/apis/shared/pagination/PageLimit';
 import { CommunityChannelDraftsFindMessage } from '@app/contexts/communities/application/manage-channel-draft/messages/CommunityChannelDraftsFindMessage';
-import { PageTimestamp } from '@app/contexts/communities/application/pagination/PageTimestamp';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
+import { PageTimestamp } from '@app/contexts/shared/application/pagination/PageTimestamp';
 
 /** One page of an identity's drafts, read after the position of its cursor. */
 export class GetCommunityChannelDraftsRequest {

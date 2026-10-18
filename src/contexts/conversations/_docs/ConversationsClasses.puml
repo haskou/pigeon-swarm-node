@@ -11,6 +11,11 @@ package "conversations.domain" {
     +getCreatorId(): IdentityId | undefined
   }
 
+  class DatedConversation {
+    -conversation: Conversation
+    -createdAt: number
+  }
+
   class OneToOneConversation
 
   note right of OneToOneConversation
@@ -58,7 +63,7 @@ package "conversations.domain" {
   interface ConversationRepository {
     +hasById(id: ConversationId): Promise<boolean>
     +requireMetadataById(id: ConversationId): Promise<Conversation>
-    +findByParticipant(participantId: IdentityId, limit: number, beforeConversationId?: ConversationId): Promise<Conversation[]>
+    +findByParticipant(participantId: IdentityId): Promise<DatedConversation[]>
     +findOperations(id: ConversationId): Promise<ConversationOperation[]>
     +saveOperation(operation: ConversationOperation, proof: PublicMutationProof): Promise<void>
   }
@@ -101,7 +106,7 @@ package "conversations.application" {
   }
 
   class ConversationsFinder {
-    +find(query): Promise<Conversation[]>
+    +find(query): Promise<PageSlice<DatedConversation>>
   }
 
   class ConversationDraftSaver {

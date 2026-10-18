@@ -2,6 +2,7 @@ import { PublicMutationProof } from '@app/contexts/public-mutations/domain/Publi
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 import { Conversation } from '../Conversation';
+import { DatedConversation } from '../DatedConversation';
 import { ConversationOperation } from '../operations/ConversationOperation';
 import { ConversationId } from '../value-objects/ConversationId';
 
@@ -19,14 +20,12 @@ export default abstract class ConversationRepository {
   ): Promise<Conversation>;
 
   /**
-   * The conversations `participantId` belongs to in the folded state, newest
+   * Every conversation `participantId` belongs to in the folded state, newest
    * first. The participant index is local: it is the fold of the cached logs.
    */
   public abstract findByParticipant(
     participantId: IdentityId,
-    limit: number,
-    beforeConversationId?: ConversationId,
-  ): Promise<Conversation[]>;
+  ): Promise<DatedConversation[]>;
 
   /** Every stored operation of the conversation log, in no particular order. */
   public abstract findOperations(

@@ -1,5 +1,6 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { CommunityInvitationClaim } from '../../domain/entities/invitations/CommunityInvitationClaim';
-import { PageSlice } from '../pagination/PageSlice';
 
 /** One page of pending invitation claims, ordered by claim id ascending. */
 export class CommunityInvitationClaimsPage {

@@ -113,7 +113,7 @@ package "notifications" {
     class NotificationsFinder {
       -repository: NotificationRepository
       -caps: PendingGroupInvitationCaps
-      +find(message: NotificationsFindMessage): Promise<Notification[]>
+      +find(message: NotificationsFindMessage): Promise<PageSlice<Notification>>
     }
 
     class NotificationUpdater {

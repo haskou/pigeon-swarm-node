@@ -1,5 +1,6 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
-import { PageSlice } from '../pagination/PageSlice';
 
 /** One page of membership requests, newest update first. */
 export class CommunityMembershipRequestsPage {

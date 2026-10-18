@@ -1,7 +1,8 @@
+import { PageSlice } from '@app/contexts/shared/application/pagination/PageSlice';
+
 import { CommunityMembershipRequest } from '../../domain/entities/membership/CommunityMembershipRequest';
 import CommunityMembershipRequestRepository from '../../domain/repositories/CommunityMembershipRequestRepository';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
-import { PageSlice } from '../pagination/PageSlice';
 import { CommunityMembershipRequestPosition } from './CommunityMembershipRequestPosition';
 import { CommunityMembershipRequestsPage } from './CommunityMembershipRequestsPage';
 import { CommunityMembershipRequestsFindMessage } from './messages/CommunityMembershipRequestsFindMessage';

@@ -11,6 +11,19 @@ paths:
       tags:
         - calls
       summary: List active calls for the authenticated identity
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getCalls
       responses:
         default:
@@ -269,6 +282,19 @@ paths:
         - calls
       summary: List conversation call history for the authenticated identity
       description: Requires current conversation membership. Community voice-channel histories are not exposed.
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+          description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getPastCalls
       responses:
         default:
@@ -481,6 +507,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CallResource'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     CallIceServersResource:
       type: object
       required:
@@ -618,6 +648,10 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/HistoricalCallParticipant'
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null unless the page is full.
     HistoricalCallParticipant:
       type: object
       required: [identityId, status, connected]

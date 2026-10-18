@@ -1,19 +1,12 @@
-import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
 export class ConversationsFindMessage {
-  public readonly beforeConversationId: ConversationId | undefined;
+  public readonly after: string | undefined;
   public readonly limit: number;
   public readonly requesterIdentityId: IdentityId;
 
-  constructor(
-    requesterIdentityId: string,
-    limit = 20,
-    beforeConversationId?: string,
-  ) {
-    this.beforeConversationId = beforeConversationId
-      ? new ConversationId(beforeConversationId)
-      : undefined;
+  constructor(requesterIdentityId: string, limit: number, after?: string) {
+    this.after = after;
     this.limit = limit;
     this.requesterIdentityId = new IdentityId(requesterIdentityId);
   }

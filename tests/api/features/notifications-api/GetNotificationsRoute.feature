@@ -57,3 +57,76 @@ Feature: Get notifications route
     When I GET "/notifications?limit=20"
     Then response code is equal to 200
     And response body lists the 5 lowest created notification ids
+
+  Scenario: Notifications page over the recipient list and end with a null cursor
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1"
+    Then response code is equal to 200
+    And response body is an array with length of 1
+    And I remember the response next cursor
+    Given the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 200
+    And response body is an array with length of 0
+    And the response next cursor is null
+
+  Scenario: A garbage or foreign notifications cursor is refused
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1&cursor=not-a-cursor"
+    Then response code is equal to 400
+    And response body should contain "400110"
+    Given the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1" with a cursor for another list
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario: A notifications cursor from the recipient reveals nothing to another identity
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1"
+    Then response code is equal to 200
+    And response body is an array with length of 1
+    And I remember the response next cursor
+    Given I sign the current notifications request
+    When I GET "/notifications?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 200
+    And response body is an array with length of 0
+
+  Scenario: A notifications cursor is refused by the conversation drafts list
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1"
+    Then response code is equal to 200
+    And I remember the response next cursor
+    Given another identity signs a GET request to "/conversation-drafts"
+    When I GET "/conversation-drafts?limit=1&cursor=CURSOR" with the remembered page cursor
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+  Scenario Outline: A forged notifications cursor is refused
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1" with a forged "notifications" cursor at position "<position>"
+    Then response code is equal to 400
+    And response body should contain "400110"
+
+    Examples:
+      | position                    |
+      | notanid                     |
+      | invitation                  |
+      | conversation:invitation-1   |
+
+  Scenario: An oversized notifications cursor is refused
+    Given I am an anonymous user
+    And I have created a conversation invitation notification
+    And the notification recipient signs the current notifications request
+    When I GET "/notifications?limit=1" with a "notifications" cursor whose position is 257 characters long
+    Then response code is equal to 400
+    And response body should contain "400110"

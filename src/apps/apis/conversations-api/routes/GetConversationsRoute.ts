@@ -19,23 +19,24 @@ export class GetConversationsRoute extends Route {
   @Get()
   public async getConversations(
     @QueryParam('limit') limit: string | undefined,
-    @QueryParam('beforeConversationId')
-    beforeConversationId: string | undefined,
+    @QueryParam('cursor') cursor: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
     const requesterIdentityId =
       await this.signedRequestAuthenticator.authenticate(request);
-    const conversations = await this.finder.find(
-      new GetConversationsRequest(
-        requesterIdentityId,
-        limit,
-        beforeConversationId,
-      ).getMessage(),
+    const pageRequest = new GetConversationsRequest(
+      requesterIdentityId,
+      limit,
+      cursor,
     );
+    const page = await this.finder.find(pageRequest.getMessage());
 
-    return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new ConversationsViewModel(conversations).toResource());
+    return response.status(HttpRouteStatusEnum.OK).send(
+      new ConversationsViewModel(
+        page.items.map((dated) => dated.conversation),
+        pageRequest.nextCursor(page.nextPosition),
+      ).toResource(),
+    );
   }
 }

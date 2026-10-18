@@ -23,27 +23,28 @@ export class PageSlice<T> {
     after: string | undefined;
   }): PageSlice<T> {
     const direction = input.order === 'asc' ? 1 : -1;
-    const sorted = [...input.items].sort(
+    const positioned = input.items.map((item) => ({
+      item,
+      position: input.position(item),
+    }));
+    const sorted = positioned.sort(
       (left, right) =>
-        direction *
-        PageSlice.compare(input.position(left), input.position(right)),
+        direction * PageSlice.compare(left.position, right.position),
     );
     const remaining =
       input.after === undefined
         ? sorted
         : sorted.filter(
-            (item) =>
-              direction *
-                PageSlice.compare(input.position(item), input.after!) >
-              0,
+            ({ position }) =>
+              direction * PageSlice.compare(position, input.after!) > 0,
           );
-    const items = remaining.slice(0, input.limit);
-    const last = items.at(-1);
+    const page = remaining.slice(0, input.limit);
+    const last = page.at(-1);
 
     return new PageSlice(
-      items,
-      items.length === input.limit && last !== undefined
-        ? input.position(last)
+      page.map(({ item }) => item),
+      page.length === input.limit && last !== undefined
+        ? last.position
         : undefined,
     );
   }
