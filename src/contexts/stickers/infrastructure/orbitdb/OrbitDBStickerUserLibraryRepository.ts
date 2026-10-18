@@ -53,8 +53,11 @@ export default class OrbitDBStickerUserLibraryRepository extends StickerUserLibr
       typeof document.id === 'string' &&
       typeof document.identityId === 'string' &&
       typeof document.packId === 'string' &&
+      StickerPackId.isValid(document.packId) &&
       typeof document[timestampField] === 'number' &&
-      (!needsSticker || typeof document.stickerId === 'string')
+      (!needsSticker ||
+        (typeof document.stickerId === 'string' &&
+          StickerId.isValid(document.stickerId)))
     );
   }
 

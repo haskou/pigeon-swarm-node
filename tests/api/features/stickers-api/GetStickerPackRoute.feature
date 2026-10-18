@@ -18,3 +18,17 @@ Feature: Get sticker pack route
     Then response code is equal to 200
     And response contains a valid resource with the following fields
       | name | API stickers primary |
+
+  Scenario Outline: Refuse to read a sticker pack whose id is "<packId>"
+    Given I am an anonymous user
+    And I remember the sticker pack id "<packId>"
+    And I sign the current sticker pack request
+    When I GET the current sticker pack
+    Then response code is equal to 409
+    And response body should contain "InvalidStickerIdError"
+
+    Examples:
+      | packId                            |
+      | abcdefghijklmnopqrstuvwxyz0123456 |
+      | pack.one                          |
+      | pack:one                          |

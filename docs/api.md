@@ -6029,9 +6029,13 @@ every id and timestamp, signs the resulting record, and the node applies the sam
 change and verifies that the digest of the result equals the signed digest. Missing,
 forged, copied, stale or wrong-author proofs fail with 409.
 
-Sticker pack and sticker ids are 1 to 32 ASCII letters, digits, `-` or `_`
-characters. An id outside that rule is refused with `409` and code
-`InvalidStickerIdError`, the same response as other domain validation failures.
+Sticker pack and sticker ids are 1 to 36 ASCII letters, digits, `-` or `_`
+characters. UUIDs (36 characters) and ShortIds (24 characters) both fit. An id
+outside that rule is refused with `409` and code `InvalidStickerIdError`, the
+same response as other domain validation failures.
+
+Breaking change: a malformed sticker pack or sticker id in a path parameter used
+to return `404`. It now returns `409` with `InvalidStickerIdError`.
 
 - Store `stickerPacks`: one whole-pack document per pack, signed by the owner. The
   proof has `recordId = <packId>`, kind `put`, and `payloadDigest` covers

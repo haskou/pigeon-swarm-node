@@ -113,7 +113,22 @@ Feature: Get sticker user library route
     And I sign the current sticker creation request
     When I POST to the current sticker pack stickers
     Then response code is equal to 200
-    Given I remember the current sticker
+    Given I remember the sticker I just created
+    And I sign the current favorite sticker request
+    When I PUT the current sticker as favorite
+    Then response code is equal to 200
+    Given I remember the current identity and sticker
+    And I switch to a new identity
+    And I set a sticker pack body
+    And I sign the current sticker pack creation request
+    When I POST to "/stickers/packs"
+    Then response code is equal to 201
+    Given I remember the current sticker pack
+    And I set a static sticker body
+    And I sign the current sticker creation request
+    When I POST to the current sticker pack stickers
+    Then response code is equal to 200
+    Given I remember the sticker I just created
     And I sign the current favorite sticker request
     When I PUT the current sticker as favorite
     Then response code is equal to 200
@@ -121,19 +136,21 @@ Feature: Get sticker user library route
     And I sign the current sticker creation request
     When I POST to the current sticker pack stickers
     Then response code is equal to 200
-    Given I remember the current sticker
+    Given I remember the sticker I just created
     And I sign the current favorite sticker request
     When I PUT the current sticker as favorite
     Then response code is equal to 200
     Given I sign the current sticker library request
     When I GET "/stickers/library?favoriteStickersLimit=1"
     Then response code is equal to 200
+    And response lists 1 favorite stickers
     And I remember the response "favoriteStickers" next cursor
-    Given I switch to a new identity
+    Given I restore the remembered identity and sticker
     And I sign the current sticker library request
-    When I GET "/stickers/library?favoriteStickersLimit=1&favoriteStickersCursor=CURSOR" with the remembered "favoriteStickers" page cursor
+    When I GET "/stickers/library?favoriteStickersLimit=10&favoriteStickersCursor=CURSOR" with the remembered "favoriteStickers" page cursor
     Then response code is equal to 200
-    And response lists 0 favorite stickers
+    And response lists 1 favorite stickers
+    And the response first favorite sticker is the remembered one
 
   Scenario: Replayed saved pack cursor lists only the replaying identity's packs
     Given I am an anonymous user
@@ -141,27 +158,39 @@ Feature: Get sticker user library route
     And I sign the current sticker pack creation request
     When I POST to "/stickers/packs"
     Then response code is equal to 201
-    And I remember the current sticker pack
-    Given I sign the current saved sticker pack request
+    Given I remember the current sticker pack
+    And I sign the current saved sticker pack request
+    When I PUT the current sticker pack as saved
+    Then response code is equal to 200
+    Given I remember the current identity and sticker
+    And I switch to a new identity
+    And I set a sticker pack body
+    And I sign the current sticker pack creation request
+    When I POST to "/stickers/packs"
+    Then response code is equal to 201
+    Given I remember the current sticker pack
+    And I sign the current saved sticker pack request
     When I PUT the current sticker pack as saved
     Then response code is equal to 200
     Given I set a sticker pack body
     And I sign the current sticker pack creation request
     When I POST to "/stickers/packs"
     Then response code is equal to 201
-    And I remember the current sticker pack
-    Given I sign the current saved sticker pack request
+    Given I remember the current sticker pack
+    And I sign the current saved sticker pack request
     When I PUT the current sticker pack as saved
     Then response code is equal to 200
     Given I sign the current sticker library request
     When I GET "/stickers/library?savedPacksLimit=1"
     Then response code is equal to 200
+    And response lists 1 saved packs
     And I remember the response "savedPacks" next cursor
-    Given I switch to a new identity
+    Given I restore the remembered identity and sticker
     And I sign the current sticker library request
-    When I GET "/stickers/library?savedPacksLimit=1&savedPacksCursor=CURSOR" with the remembered "savedPacks" page cursor
+    When I GET "/stickers/library?savedPacksLimit=10&savedPacksCursor=CURSOR" with the remembered "savedPacks" page cursor
     Then response code is equal to 200
-    And response lists 0 saved packs
+    And response lists 1 saved packs
+    And the response first saved pack is the remembered sticker pack
 
   Scenario: Refuse a favorite stickers cursor used as a saved packs cursor
     Given I am an anonymous user

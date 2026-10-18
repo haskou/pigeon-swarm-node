@@ -256,6 +256,17 @@ export default class Definitions {
   private readonly ipfsDefinition: IPFSDefinition = new IPFSDefinition();
   private stickerPackId: string | undefined;
   private stickerId: string | undefined;
+  private rememberedIdentity:
+    | {
+        createdIdentityId: string | undefined;
+        identityDeviceOwnerKeyPair: KeyPair | undefined;
+        identityKeyPair: KeyPair | undefined;
+        identityRecoveryKeyPair: KeyPair | undefined;
+        ownerIdentityId: IdentityId | undefined;
+        stickerId: string | undefined;
+        stickerPackId: string | undefined;
+      }
+    | undefined;
 
   private async ensureIdentityKeyPair(): Promise<KeyPair> {
     if (!this.identityKeyPair) {
@@ -2024,6 +2035,35 @@ export default class Definitions {
     this.identityDeviceOwnerKeyPair = undefined;
     this.ownerIdentityId = undefined;
     this.createdIdentityId = undefined;
+  }
+
+  @given('I remember the current identity and sticker')
+  public iRememberTheCurrentIdentityAndSticker(): void {
+    this.rememberedIdentity = {
+      createdIdentityId: this.createdIdentityId,
+      identityDeviceOwnerKeyPair: this.identityDeviceOwnerKeyPair,
+      identityKeyPair: this.identityKeyPair,
+      identityRecoveryKeyPair: this.identityRecoveryKeyPair,
+      ownerIdentityId: this.ownerIdentityId,
+      stickerId: this.stickerId,
+      stickerPackId: this.stickerPackId,
+    };
+  }
+
+  @given('I restore the remembered identity and sticker')
+  public iRestoreTheRememberedIdentityAndSticker(): void {
+    if (!this.rememberedIdentity) {
+      throw new Error('Identity must be remembered first.');
+    }
+
+    const remembered = this.rememberedIdentity;
+    this.createdIdentityId = remembered.createdIdentityId;
+    this.identityDeviceOwnerKeyPair = remembered.identityDeviceOwnerKeyPair;
+    this.identityKeyPair = remembered.identityKeyPair;
+    this.identityRecoveryKeyPair = remembered.identityRecoveryKeyPair;
+    this.ownerIdentityId = remembered.ownerIdentityId;
+    this.stickerId = remembered.stickerId;
+    this.stickerPackId = remembered.stickerPackId;
   }
 
   @given('I clear request headers')
@@ -6110,6 +6150,16 @@ export default class Definitions {
     this.stickerId = stickerId;
   }
 
+  @given('I remember the sticker pack id {string}')
+  public iRememberTheStickerPackId(packId: string): void {
+    this.stickerPackId = packId;
+  }
+
+  @given('I remember the sticker id {string}')
+  public iRememberTheStickerId(stickerId: string): void {
+    this.stickerId = stickerId;
+  }
+
   @given('I set a static sticker body')
   public iSetAStaticStickerBody(): void {
     this.body = JSON.stringify({
@@ -8565,6 +8615,24 @@ export default class Definitions {
     const { savedPacks } = this.response.data as { savedPacks: unknown[] };
 
     expect(savedPacks).to.have.lengthOf(count);
+  }
+
+  @then('the response first saved pack is the remembered sticker pack')
+  public responseFirstSavedPackIsRemembered(): void {
+    const { savedPacks } = this.response.data as {
+      savedPacks: Array<{ id: string }>;
+    };
+
+    expect(savedPacks[0]?.id).to.equal(this.stickerPackId);
+  }
+
+  @then('the response first favorite sticker is the remembered one')
+  public responseFirstFavoriteStickerIsRemembered(): void {
+    const { favoriteStickers } = this.response.data as {
+      favoriteStickers: Array<{ stickerId: string }>;
+    };
+
+    expect(favoriteStickers[0]?.stickerId).to.equal(this.stickerId);
   }
 
   @then('response lists {int} favorite stickers')
