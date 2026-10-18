@@ -340,6 +340,48 @@ Documented exceptions, RPC-style operations with no resource to write:
 | `POST /mailboxes/{mailboxId}/ack`    | Advances a per-reader cursor that is only valid forward; it is not a state the reader owns. |
 | `POST /push/test`                    | Triggers a one-shot delivery with no stored resource.                                       |
 
+## Errors
+
+Every refused request answers with a JSON object (`application/json`, never
+`application/problem+json`). The shape is shared by every operation through the
+`Error` response in `src/apps/apis/open-api.yaml` (`#/components/responses/Error`,
+schema `ErrorResponse`), which each operation references as its `default`
+response.
+
+```json
+{
+  "code": 400060,
+  "message": "Human-readable reason.",
+  "httpStatus": 400
+}
+```
+
+- `code` is a stable numeric code (for example `400060`) or, for domain
+  refusals, the error class name (for example `StalePublicMutationError`). Clients
+  branch on `code`, never on `message`.
+- `httpStatus` repeats the HTTP status for framework errors; `details`, `errors`
+  and `requiredDifficultyBits` appear only where the operation documents them.
+- Status codes are listed per operation: each operation documents the codes it
+  can return. Cross-route status changes (for example `415` for a missing
+  content type and `404` for every malformed id) are tracked on #607.
+
+### Operation ids
+
+Every operation has an `operationId`, unique across the API documents and
+matching `^[a-z][A-Za-z0-9]*$`. It is the lowercase method followed by the path
+segments in PascalCase, each `{param}` as `By<Param>`: `GET /polls/{pollId}` is
+`getPollsByPollId`, `POST /polls` is `postPolls`. The spec test
+`tests/unit/apps/apis/OperationIds.spec.ts` asserts the format, uniqueness and
+the shared error response on every operation.
+
+### Concurrency
+
+Mutable resources do not use `ETag` or `If-Match`. Where a resource carries a
+`sequence` or an authorization revision, the node refuses a stale write with
+`409 StalePublicMutationError`; everything else is last-write-wins. Adding
+`If-Match` to drafts, settings, profiles or roles is deferred until a client
+needs it.
+
 ## Realtime WebSocket API
 
 Realtime events are exposed through a WebSocket upgrade endpoint:

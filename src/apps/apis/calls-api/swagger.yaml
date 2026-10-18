@@ -11,7 +11,10 @@ paths:
       tags:
         - calls
       summary: List active calls for the authenticated identity
+      operationId: getCalls
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Active calls.
           content:
@@ -54,7 +57,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCallBody'
+      operationId: postCalls
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Call started.
           content:
@@ -74,7 +80,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CallId'
         - $ref: '#/components/parameters/CallCapability'
+      operationId: getCallsByCallId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Call found for the currently authorized identity.
           content:
@@ -101,7 +110,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CallMutationBody'
+      operationId: deleteCallsByCallId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Call ended.
           content:
@@ -127,7 +139,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CallMutationBody'
+      operationId: postCallsByCallIdParticipants
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Call joined.
           content:
@@ -153,7 +168,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CallMutationBody'
+      operationId: deleteCallsByCallIdParticipantsMe
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Call left.
           content:
@@ -178,7 +196,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchCallParticipantBody'
+      operationId: patchCallsByCallIdParticipantsMe
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Participant heartbeat recorded. No response body.
         '409':
@@ -199,7 +220,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCallSignalBody'
+      operationId: postCallsByCallIdSignals
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Signal accepted for retryable delivery.
           content:
@@ -218,7 +242,10 @@ paths:
         - calls
       summary: Get ICE servers for WebRTC calls
       description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Local temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the local coturn server. Private-network v2 relays issue their own credentials over an authenticated encrypted stream, so different deployments keep independent secrets. Missing or known public local secrets disable local credential issuance and relay publication, but do not prevent fetching credentials from eligible v2 owners. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Local requests issue a fresh lifetime; remote v2 credentials are reused until thirty seconds before their ten-minute expiry while connection eligibility is rechecked; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. V1 shared pools require the same secret on every selected server. V2 issuance is limited per peer and globally and credentials are never published through gossip. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
+      operationId: getCallIceServers
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: ICE server configuration for the authenticated client.
           content:
@@ -231,7 +258,10 @@ paths:
         - calls
       summary: List conversation call history for the authenticated identity
       description: Requires current conversation membership. Community voice-channel histories are not exposed.
+      operationId: getPastCalls
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Conversation call history for a currently authorized participant.
           content:

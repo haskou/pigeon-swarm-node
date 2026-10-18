@@ -11,7 +11,10 @@ paths:
       tags:
         - push
       summary: Get the VAPID public key used for browser PushManager subscriptions
+      operationId: getPushVapidPublicKey
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Push configuration status.
           content:
@@ -33,7 +36,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PushSubscriptionBody'
+      operationId: putPushSubscriptions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Push subscription registered.
           content:
@@ -54,7 +60,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PushSubscriptionBody'
+      operationId: deletePushSubscriptions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Push subscription removed.
           content:
@@ -86,7 +95,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PushTestBody'
+      operationId: postPushTest
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Test push delivery diagnostics.
           content:

@@ -33,7 +33,10 @@ paths:
           name: beforeNotificationId
           schema:
             type: string
+      operationId: getNotifications
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Notifications for the authenticated recipient.
           content:
@@ -54,7 +57,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostNotificationBody'
+      operationId: postNotifications
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Notification created.
           content:
@@ -87,7 +93,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchNotificationBody'
+      operationId: patchNotificationsByNotificationId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Notification updated.
           content:

@@ -18,7 +18,10 @@ paths:
           schema:
             type: string
           description: CID of the IPFS content.
+      operationId: getIpfsContentsByCid
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: "Public binary content or JSON content found. Bytes are sniffed: allowlisted passive media is served inline with its sniffed type, anything else as application/octet-stream with Content-Disposition attachment. X-Content-Type-Options: nosniff is always set."
           content:
@@ -70,7 +73,10 @@ paths:
             schema:
               type: string
               format: binary
+      operationId: postIpfsContents
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '201':
           description: Public content stored in IPFS.
           content:
@@ -114,7 +120,10 @@ paths:
                   type: number
                 mutation:
                   type: object
+      operationId: putIpfsReplicationsByCid
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Registered.
         '400':
@@ -147,7 +156,10 @@ paths:
                   type: string
                 mutation:
                   type: object
+      operationId: deleteIpfsReplicationsByCid
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Withdrawn.
         '401':
@@ -163,7 +175,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
+      operationId: getIpfsReplicationStatus
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Local replication status.
           content:

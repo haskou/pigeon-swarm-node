@@ -15,7 +15,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunities
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Communities where the authenticated identity is a member.
           content:
@@ -37,7 +40,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityBody'
+      operationId: postCommunities
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community created.
           content:
@@ -64,7 +70,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getDiscoverableCommunities
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Discoverable communities.
           content:
@@ -81,7 +90,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunityMembershipRequests
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community membership requests.
           content:
@@ -103,7 +115,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityJoinRequestBody'
+      operationId: postCommunityMembershipRequests
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Pending or auto-accepted join request.
           content:
@@ -133,7 +148,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchCommunityMembershipRequestBody'
+      operationId: patchCommunityMembershipRequestsByRequestId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Membership request updated.
           content:
@@ -151,7 +169,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community found.
           content:
@@ -178,7 +199,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchCommunityBody'
+      operationId: patchCommunitiesByCommunityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community updated.
           content:
@@ -198,7 +222,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdFrontier
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Frontier found.
           content:
@@ -231,7 +258,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdOperations
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: One page of community operations.
           content:
@@ -259,7 +289,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityInvitationBody'
+      operationId: postCommunitiesByCommunityIdInvitations
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Invitation created.
           content:
@@ -280,7 +313,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdInvitations
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community invitations.
           content:
@@ -301,7 +337,10 @@ paths:
         - InvitationKey: []
       parameters:
         - $ref: '#/components/parameters/CommunityId'
+      operationId: getCommunitiesByCommunityIdInvitationPreview
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The invitation preview.
           content:
@@ -333,7 +372,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityInvitationClaimBody'
+      operationId: postCommunitiesByCommunityIdInvitationsByInvitationIdClaims
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Claim stored.
           content:
@@ -355,7 +397,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdInvitationClaims
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Pending claims.
           content:
@@ -389,7 +434,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityInvitationAdmissionBody'
+      operationId: postCommunitiesByCommunityIdInvitationsByInvitationIdAdmissions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Identity admitted.
           content:
@@ -423,7 +471,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityInvitationRevocationBody'
+      operationId: postCommunitiesByCommunityIdInvitationsByInvitationIdRevocation
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Invitation revoked.
           content:
@@ -457,7 +508,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdModerationLogs
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Moderation log entries ordered from newest to oldest.
           content:
@@ -477,7 +531,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdMembers
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community members.
           content:
@@ -507,7 +564,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutCommunityMemberRolesBody'
+      operationId: putCommunitiesByCommunityIdMembersByIdentityIdRoles
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Member roles replaced.
           content:
@@ -533,7 +593,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityBanBody'
+      operationId: postCommunitiesByCommunityIdBans
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Identity banned.
           content:
@@ -563,7 +626,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteCommunityBanBody'
+      operationId: deleteCommunitiesByCommunityIdBansByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Ban removed.
           content:
@@ -581,7 +647,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdRoles
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community roles and member role assignments.
           content:
@@ -604,7 +673,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityRoleBody'
+      operationId: postCommunitiesByCommunityIdRoles
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Role created.
           content:
@@ -635,7 +707,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityRoleBody'
+      operationId: patchCommunitiesByCommunityIdRolesByRoleId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Role updated.
           content:
@@ -663,7 +738,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteCommunityRoleBody'
+      operationId: deleteCommunitiesByCommunityIdRolesByRoleId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Role deleted.
           content:
@@ -687,7 +765,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteCommunityMemberBody'
+      operationId: deleteCommunitiesByCommunityIdMembersMe
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Member removed from the community.
           content:
@@ -719,7 +800,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteCommunityMemberByIdBody'
+      operationId: deleteCommunitiesByCommunityIdMembersByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Member removed from the community.
           content:
@@ -739,7 +823,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdChannels
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community channels.
           content:
@@ -764,7 +851,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityChannelBody'
+      operationId: postCommunitiesByCommunityIdChannels
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Channel created.
           content:
@@ -797,7 +887,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchCommunityChannelBody'
+      operationId: patchCommunitiesByCommunityIdChannelsByChannelId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Channel renamed.
           content:
@@ -827,7 +920,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteCommunityChannelBody'
+      operationId: deleteCommunitiesByCommunityIdChannelsByChannelId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Channel deleted.
           content:
@@ -858,7 +954,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PatchCommunityChannelPermissionsBody'
+      operationId: patchCommunitiesByCommunityIdChannelsByChannelIdPermissions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Channel visibility updated.
           content:
@@ -875,7 +974,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunityDrafts
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community channel drafts.
           content:
@@ -903,7 +1005,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityChannelDraftBody'
+      operationId: putCommunitiesByCommunityIdChannelsByChannelIdDraft
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Draft saved.
           content:
@@ -924,7 +1029,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdDraft
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Draft deleted.
   /communities/{communityId}/channels/{channelId}/pins:
@@ -942,7 +1050,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdChannelsByChannelIdPins
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Community channel pinned messages.
           content:
@@ -975,7 +1086,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdMlsRecords
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: MLS records of the group.
           content:
@@ -1000,7 +1114,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostMLSRecordBody'
+      operationId: postCommunitiesByCommunityIdMlsRecords
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The stored record.
           content:
@@ -1040,7 +1157,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdChannelsByChannelIdMessages
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Channel timeline items ordered from oldest to newest in the page, or the matching public messages when `query` is given. Community channel poll ids are valid channel message ids and can be used as beforeMessageId.
           content:
@@ -1070,7 +1190,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostCommunityChannelMessageBody'
+      operationId: postCommunitiesByCommunityIdChannelsByChannelIdMessages
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Message stored.
           content:
@@ -1102,7 +1225,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdMessages
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Matching public messages from visible text channels.
           content:
@@ -1140,7 +1266,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutCommunityChannelMessageBody'
+      operationId: putCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Message edited.
           content:
@@ -1175,7 +1304,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteCommunityChannelMessageBody'
+      operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Message deleted locally.
           content:
@@ -1211,7 +1343,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityChannelMessagePinBody'
+      operationId: postCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdPin
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Message pinned.
         '409':
@@ -1242,7 +1377,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityChannelMessageUnpinBody'
+      operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdPin
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Message unpinned.
         '409':
@@ -1272,7 +1410,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdThread
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Messages whose replyToMessageId points to the requested message.
           content:
@@ -1306,7 +1447,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityChannelMessageReactionBody'
+      operationId: postCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdReactions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Reaction stored.
           content:
@@ -1341,7 +1485,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CommunityChannelMessageReactionBody'
+      operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdReactions
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Reaction removed.
           content:

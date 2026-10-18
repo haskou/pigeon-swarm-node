@@ -19,7 +19,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getNotificationSettings
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Notification settings.
           content:
@@ -55,7 +58,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutNotificationScopeSettingsBody'
+      operationId: putNotificationSettingsScopes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Scope settings updated.
           content:
@@ -77,7 +83,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteNotificationScopeSettingsBody'
+      operationId: deleteNotificationSettingsScopes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Scope settings reset.
 components:

@@ -18,7 +18,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostPrivateAuthorizationScopeBody'
+      operationId: postPrivateAuthorizationScopes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '201':
           description: Scope provisioned
           content:
@@ -60,7 +63,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostPrivateAuthorizationChallengeBody'
+      operationId: postPrivateAuthorizationChallenges
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Exact canonical challenge request to sign
           content:
@@ -90,7 +96,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostPrivateAuthorizationOperationBody'
+      operationId: postPrivateAuthorizationOperations
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Operation accepted or already committed
           content:

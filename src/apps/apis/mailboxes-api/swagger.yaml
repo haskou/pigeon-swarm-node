@@ -36,7 +36,10 @@ paths:
                   type: string
                   pattern: '^(0|[1-9][0-9]{0,15})$'
                   description: Canonical decimal proof-of-work nonce of 1 to 16 digits, without leading zeros. The crypto library's v2 mailbox-creation proof (`ProofOfWork.mailboxCreation`) bound to the mailbox id and both token hashes must have the required leading zero bits.
+      operationId: putMailboxesByMailboxId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Already exists with the same hashes.
         '201':
@@ -55,7 +58,10 @@ paths:
         - readCapability: []
       parameters:
         - $ref: '#/components/parameters/MailboxId'
+      operationId: deleteMailboxesByMailboxId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Deleted.
         '404':
@@ -87,7 +93,10 @@ paths:
                 body:
                   type: string
                   description: Base64url ciphertext.
+      operationId: postMailboxesByMailboxIdEnvelopes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Duplicate envelopeId; the earlier cursor.
           content:
@@ -130,7 +139,10 @@ paths:
             minimum: 1
             maximum: 100
             default: 100
+      operationId: getMailboxesByMailboxIdEnvelopes
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: A page of envelopes.
           content:
@@ -170,7 +182,10 @@ paths:
         - readCapability: []
       parameters:
         - $ref: '#/components/parameters/MailboxId'
+      operationId: getMailboxesByMailboxIdReaders
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The reader set.
           content:
@@ -220,7 +235,10 @@ paths:
                 readTokenHash:
                   type: string
                   pattern: '^[0-9a-f]{64}$'
+      operationId: postMailboxesByMailboxIdReaders
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: The hash is already a reader.
         '201':
@@ -245,7 +263,10 @@ paths:
           schema:
             type: string
             pattern: '^[0-9a-f]{64}$'
+      operationId: deleteMailboxesByMailboxIdReadersByReadTokenHash
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Revoked.
         '404':
@@ -274,7 +295,10 @@ paths:
                 upTo:
                   type: integer
                   minimum: 0
+      operationId: postMailboxesByMailboxIdAck
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Acknowledged.
         '404':

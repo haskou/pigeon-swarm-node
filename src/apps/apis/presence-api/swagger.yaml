@@ -35,7 +35,10 @@ paths:
           style: form
           explode: true
           description: Comma-separated identity ids or repeated identityIds query params. Identity ids are public keys without PEM wrapping.
+      operationId: getPresence
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Presence states.
           content:
@@ -63,7 +66,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: getPresenceByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Presence state.
           content:
@@ -91,7 +97,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutPresenceBody'
+      operationId: putPresenceMe
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Presence updated.
           content:

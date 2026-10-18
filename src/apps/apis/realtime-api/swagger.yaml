@@ -102,7 +102,10 @@ paths:
           schema:
             type: string
           description: Offers `pigeon-realtime.v1` and `ticket.<ticket>`. The ticket is single-use and is consumed as soon as it is presented.
+      operationId: getRealtime
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '101':
           description: WebSocket upgrade accepted. The server selects `pigeon-realtime.v1`.
         '401':
@@ -130,7 +133,10 @@ paths:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
+      operationId: postRealtimeTickets
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '201':
           description: Ticket issued.
           content:

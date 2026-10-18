@@ -30,7 +30,10 @@ paths:
                   type: integer
                   minimum: 1
                   description: Exact ciphertext size in bytes. Clients SHOULD pad to a size bucket; padding does not remove all size correlation.
+      operationId: postPrivateBlobs
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '201':
           description: Reservation created.
           content:
@@ -60,7 +63,10 @@ paths:
             schema:
               type: string
               format: binary
+      operationId: putPrivateBlobsByBlobId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Stored. Retention starts now.
         '400':
@@ -84,7 +90,10 @@ paths:
           schema:
             type: string
           example: bytes=0-1023
+      operationId: getPrivateBlobsByBlobId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Full ciphertext.
           content:
@@ -107,7 +116,10 @@ paths:
         - uploadCapability: []
       parameters:
         - $ref: '#/components/parameters/BlobId'
+      operationId: deletePrivateBlobsByBlobId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '204':
           description: Removed.
         '404':

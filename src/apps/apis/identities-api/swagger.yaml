@@ -24,7 +24,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PostIdentityBody'
+      operationId: postIdentities
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Identity published successfully.
           content:
@@ -54,7 +57,10 @@ paths:
           schema:
             type: string
           example: MCowBQYDK2VwAyEANHSu7gNCaXDe%2Bhzph8c3HomozCnC%2FLdXe13%2FWpeIaVM%3D
+      operationId: getIdentitiesByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Latest valid identity.
           content:
@@ -99,7 +105,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SignedIdentityBody'
+      operationId: putIdentitiesByIdentityId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Identity updated successfully.
           content:

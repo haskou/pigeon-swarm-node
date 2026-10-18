@@ -17,7 +17,10 @@ paths:
           required: false
           schema:
             type: string
+      operationId: getStickersPacks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker packs.
           content:
@@ -39,7 +42,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateStickerPackBody'
+      operationId: postStickersPacks
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker pack created.
           content:
@@ -59,7 +65,10 @@ paths:
       parameters:
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
+      operationId: getStickersLibrary
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Authenticated sticker library.
           content:
@@ -75,7 +84,10 @@ paths:
       summary: Get a sticker pack
       parameters:
         - $ref: '#/components/parameters/PackId'
+      operationId: getStickersPacksByPackId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker pack.
           content:
@@ -100,7 +112,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateStickerPackBody'
+      operationId: patchStickersPacksByPackId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker pack updated.
           content:
@@ -129,7 +144,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AddStickerBody'
+      operationId: postStickersPacksByPackIdStickers
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker added.
           content:
@@ -158,7 +176,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/StickerBody'
+      operationId: patchStickersPacksByPackIdStickersByStickerId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker updated.
           content:
@@ -186,7 +207,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DeleteStickerBody'
+      operationId: deleteStickersPacksByPackIdStickersByStickerId
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker removed.
           content:
@@ -214,7 +238,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutSavedStickerPackBody'
+      operationId: putStickersPacksByPackIdSaved
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker library updated.
           content:
@@ -237,7 +264,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SignedMutationBody'
+      operationId: deleteStickersPacksByPackIdSaved
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker library updated.
           content:
@@ -262,7 +292,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutFavoriteStickerBody'
+      operationId: putStickersPacksByPackIdStickersByStickerIdFavorite
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker library updated.
           content:
@@ -286,7 +319,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/SignedMutationBody'
+      operationId: deleteStickersPacksByPackIdStickersByStickerIdFavorite
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker library updated.
           content:
@@ -312,7 +348,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/PutStickerUsageBody'
+      operationId: putStickersPacksByPackIdStickersByStickerIdUsage
       responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
         '200':
           description: Sticker library updated.
           content:
