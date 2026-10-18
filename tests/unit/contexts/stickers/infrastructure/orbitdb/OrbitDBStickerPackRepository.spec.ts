@@ -168,4 +168,41 @@ describe('OrbitDBStickerPackRepository', () => {
       (await repository.findAll()).map((pack) => pack.toPrimitives().name),
     ).toEqual(['Moods']);
   });
+
+  it('skips a stored pack the domain refuses without hiding the others', async () => {
+    await repository.save(packOf('Moods'), await proof(1));
+
+    const longPackId = 'pack-long';
+
+    registry.cacheHeadLocally(`sticker-pack:${longPackId}`, {
+      id: `sticker-pack:${longPackId}`,
+      ownerIdentityId: owner.valueOf(),
+      stickerPacks: [
+        PublicMutationRecord.withProof(
+          {
+            ...StickerPackMother.create().toPrimitives(),
+            id: longPackId,
+            name: 'x'.repeat(81),
+            ownerIdentityId: owner.valueOf(),
+            scopeType: 'sticker_pack',
+          },
+          await signedMutation({
+            identityId: owner.valueOf(),
+            kind: 'put',
+            recordId: longPackId,
+            sequence: 1,
+            store: 'stickerPacks',
+          }),
+        ),
+      ],
+      updatedAt: Date.now(),
+    });
+
+    expect(
+      (await repository.findAll()).map((pack) => pack.toPrimitives().name),
+    ).toEqual(['Moods']);
+    await expect(
+      repository.requireById(new StickerPackId(longPackId)),
+    ).rejects.toBeInstanceOf(StickerPackNotFoundError);
+  });
 });
