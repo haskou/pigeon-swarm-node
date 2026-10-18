@@ -80,7 +80,10 @@ import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/
 import LocalPrivateBlobOwnerKeyDeriver from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver';
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
 import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
-import { pigeonEnvironmentSchema } from '../shared/infrastructure/environment/PigeonEnvironment';
+import {
+  pigeonEnvironmentSchema,
+  validatePigeonEnvironment,
+} from '../shared/infrastructure/environment/PigeonEnvironment';
 import InitializerTimedOutError from '../shared/infrastructure/errors/InitializerTimedOutError';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
 import {
@@ -246,6 +249,7 @@ export default class PigeonApplication {
 
   public loadEnvironmentVariables(environment?: string): void {
     this.kernel.loadEnvironmentVariables(environment);
+    validatePigeonEnvironment(this.kernel.environment);
   }
 
   public async dependencyInjection(
