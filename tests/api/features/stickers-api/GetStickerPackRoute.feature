@@ -28,7 +28,7 @@ Feature: Get sticker pack route
     And response body should contain "InvalidStickerIdError"
 
     Examples:
-      | packId                            |
-      | abcdefghijklmnopqrstuvwxyz0123456 |
-      | pack.one                          |
-      | pack:one                          |
+      | packId                                |
+      | abcdefghijklmnopqrstuvwxyz0123456789A |
+      | pack.one                              |
+      | pack:one                              |

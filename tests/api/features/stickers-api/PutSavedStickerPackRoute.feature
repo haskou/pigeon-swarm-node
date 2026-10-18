@@ -39,8 +39,8 @@ Feature: Put saved sticker pack route
     And response body should contain "InvalidStickerIdError"
 
     Examples:
-      | packId                            |
-      | pack:one                          |
-      | pack\|one                         |
-      | pack.one                          |
-      | abcdefghijklmnopqrstuvwxyz0123456 |
+      | packId                                |
+      | pack:one                              |
+      | pack\|one                             |
+      | pack.one                              |
+      | abcdefghijklmnopqrstuvwxyz0123456789A |

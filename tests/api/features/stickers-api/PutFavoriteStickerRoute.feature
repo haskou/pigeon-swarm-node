@@ -51,8 +51,8 @@ Feature: Put favorite sticker route
     And response body should contain "InvalidStickerIdError"
 
     Examples:
-      | packId                            | stickerId                         |
-      | pack:one                          | sticker-one                       |
-      | pack-one                          | sticker\|one                      |
-      | pack-one                          | sticker.one                       |
-      | abcdefghijklmnopqrstuvwxyz0123456 | sticker-one                       |
+      | packId                                | stickerId                         |
+      | pack:one                              | sticker-one                       |
+      | pack-one                              | sticker\|one                      |
+      | pack-one                              | sticker.one                       |
+      | abcdefghijklmnopqrstuvwxyz0123456789A | sticker-one                       |
