@@ -107,7 +107,7 @@ reverse proxy in front of the node should keep them.
 | `ROUTE_PREFIX` | unset (no prefix) | No | Route prefix for API endpoints, for example `/api`. |
 | `CONTAINER_BUILD` | `false` | No | Source runs only: autowires DI from TypeScript sources. Compiled builds (`dist/`) cannot read sources, so they ignore it and load the committed `config/container/services.yaml`. Regenerate that file with `CONTAINER_BUILD=true`; `tests/unit/config/ServicesYamlGeneration.spec.ts` fails when the committed file no longer matches a fresh generation. |
 | `PIGEON_LOCAL_DB_PATH` | `<project root>/local_storage` | No | Local embedded storage folder. |
-| `NODE_INITIALIZER_TIMEOUT_MS` | `600000` | No | Longest time each startup initializer may take (10 minutes), for example the purge of non-canonical identity ids on a large local database. The API does not listen until every initializer has finished, so one that does not finish in time fails startup with exit status `1` instead of leaving the node up with its port closed. Raise it if a large database needs longer. |
+| `NODE_INITIALIZER_TIMEOUT_MS` | `600000` | No | Longest time each startup initializer may take (10 minutes), for example the purge of non-canonical identity ids on a large local database. Must be an integer from `1` to `2147483647` milliseconds; any other value fails startup with `Environment variable "NODE_INITIALIZER_TIMEOUT_MS" must be an integer from 1 to 2147483647.`. The API does not listen until every initializer has finished, so one that does not finish in time fails startup with exit status `1` instead of leaving the node up with its port closed. Raise it if a large database needs longer. |
 
 ## Logging Variables
 

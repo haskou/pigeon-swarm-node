@@ -23,17 +23,12 @@ describe('PigeonEnvironment NODE_INITIALIZER_TIMEOUT_MS', () => {
     expect(pigeonEnvironment().NODE_INITIALIZER_TIMEOUT_MS).toBe(expected);
   });
 
-  it.each([
-    ['0'],
-    ['-1'],
-    ['1.5'],
-    ['soon'],
-    ['2147483648'],
-  ])('should reject %s and name the variable', (raw) => {
-    process.env.NODE_INITIALIZER_TIMEOUT_MS = raw;
+  it.each([['0'], ['-1'], ['1.5'], ['soon'], ['2147483648']])(
+    'should reject %s and name the variable',
+    (raw) => {
+      process.env.NODE_INITIALIZER_TIMEOUT_MS = raw;
 
-    expect(() => pigeonEnvironment()).toThrow(
-      /NODE_INITIALIZER_TIMEOUT_MS/,
-    );
-  });
+      expect(() => pigeonEnvironment()).toThrow(/NODE_INITIALIZER_TIMEOUT_MS/);
+    },
+  );
 });

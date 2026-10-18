@@ -2,6 +2,8 @@ import { MAX_DEVICE_CREDENTIALS } from '@app/contexts/identity-devices/domain/De
 import { Kernel, KernelEnvironment } from '@haskou/ddd-kernel';
 
 const MAILBOX_RETENTION_DEFAULT_MS = 14 * 24 * 60 * 60 * 1000;
+// setTimeout fires immediately for longer delays, so the bound must stay here.
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export const pigeonEnvironmentSchema = {
   API_PORT: { defaultValue: 8080, type: 'number' },
@@ -186,6 +188,12 @@ export type PigeonEnvironment = KernelEnvironment<
   typeof pigeonEnvironmentSchema
 >;
 
+// Integer bounds enforced on top of the kernel schema, which only checks that
+// numbers are finite. Kept beside the schema so the bounds sit with the names.
+export const pigeonEnvironmentIntegerRanges = {
+  NODE_INITIALIZER_TIMEOUT_MS: { max: MAX_TIMER_DELAY_MS, min: 1 },
+} as const;
+
 function parseEnvironmentValue(
   rawValue: string | undefined,
   definition: (typeof pigeonEnvironmentSchema)[keyof typeof pigeonEnvironmentSchema],
@@ -205,13 +213,42 @@ function parseEnvironmentValue(
   return rawValue;
 }
 
+/**
+ * Rejects values outside the integer bounds, naming the variable. Applied to
+ * both the process environment and the kernel-loaded environment.
+ */
+export function validatePigeonEnvironment(
+  environment: Partial<Record<string, unknown>>,
+): void {
+  for (const [name, range] of Object.entries(pigeonEnvironmentIntegerRanges)) {
+    const value = environment[name];
+
+    if (
+      value !== undefined &&
+      !(
+        typeof value === 'number' &&
+        Number.isSafeInteger(value) &&
+        value >= range.min &&
+        value <= range.max
+      )
+    ) {
+      throw new Error(
+        `Environment variable "${name}" must be an integer from ${range.min} to ${range.max}.`,
+      );
+    }
+  }
+}
+
 function fallbackEnvironment(): PigeonEnvironment {
-  return Object.fromEntries(
+  const environment = Object.fromEntries(
     Object.entries(pigeonEnvironmentSchema).map(([key, definition]) => [
       key,
       parseEnvironmentValue(process.env[key], definition),
     ]),
   ) as PigeonEnvironment;
+  validatePigeonEnvironment(environment);
+
+  return environment;
 }
 
 function environmentOverrides(): Partial<PigeonEnvironment> {
