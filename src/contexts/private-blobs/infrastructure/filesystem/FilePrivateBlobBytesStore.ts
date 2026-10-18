@@ -25,26 +25,6 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
     return path.resolve(pigeonEnvironment().PRIVATE_BLOB_STORAGE_PATH);
   }
 
-  /**
-   * Proves at startup that uploads can be written: creates the folder, then
-   * writes and removes a probe. Throws with only the errno code, because the
-   * OS message would carry the resolved path.
-   */
-  public async ensureWritable(): Promise<void> {
-    const directory = this.directory();
-    const probe = path.join(directory, `.writable-${randomUUID()}`);
-
-    try {
-      await mkdir(directory, { mode: 0o700, recursive: true });
-      await writeFile(probe, '', { flag: 'wx', mode: 0o600 });
-      await rm(probe, { force: true });
-    } catch (error: unknown) {
-      throw new PrivateBlobStorageNotWritableError(
-        (error as NodeJS.ErrnoException).code ?? 'UNKNOWN',
-      );
-    }
-  }
-
   private pathFor(id: PrivateBlobId, suffix: string): string {
     const name = id.valueOf();
 
@@ -75,6 +55,26 @@ export default class FilePrivateBlobBytesStore extends PrivateBlobBytesStore {
     });
 
     return { counter, received: () => received };
+  }
+
+  /**
+   * Proves at startup that uploads can be written: creates the folder, then
+   * writes and removes a probe. Throws with only the errno code, because the
+   * OS message would carry the resolved path.
+   */
+  public async ensureWritable(): Promise<void> {
+    const directory = this.directory();
+    const probe = path.join(directory, `.writable-${randomUUID()}`);
+
+    try {
+      await mkdir(directory, { mode: 0o700, recursive: true });
+      await writeFile(probe, '', { flag: 'wx', mode: 0o600 });
+      await rm(probe, { force: true });
+    } catch (error: unknown) {
+      throw new PrivateBlobStorageNotWritableError(
+        (error as NodeJS.ErrnoException).code ?? 'UNKNOWN',
+      );
+    }
   }
 
   public async delete(id: PrivateBlobId): Promise<void> {
