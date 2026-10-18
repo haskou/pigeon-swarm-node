@@ -73,3 +73,30 @@ describe('PigeonApplication initializers', () => {
     expect(finishing.ensure).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('PigeonApplication kernel-loaded environment', () => {
+  const previous = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...previous };
+  });
+
+  it.each([['0'], ['-1'], ['1.5'], ['2147483648']])(
+    'should fail loading the environment when NODE_INITIALIZER_TIMEOUT_MS is %s',
+    (raw) => {
+      process.env.NODE_INITIALIZER_TIMEOUT_MS = raw;
+
+      expect(() => new PigeonApplication().loadEnvironmentVariables()).toThrow(
+        'Environment variable "NODE_INITIALIZER_TIMEOUT_MS" must be an integer from 1 to 2147483647.',
+      );
+    },
+  );
+
+  it('should load the environment when NODE_INITIALIZER_TIMEOUT_MS is 2147483647', () => {
+    process.env.NODE_INITIALIZER_TIMEOUT_MS = '2147483647';
+
+    expect(() =>
+      new PigeonApplication().loadEnvironmentVariables(),
+    ).not.toThrow();
+  });
+});
