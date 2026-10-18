@@ -60,6 +60,7 @@ Nodes that ran before identity ids had to be canonical may hold alias ids (a DER
 
 - If the node owner was stored under an alias, the purge clears the owner and the node refuses every owner claim until it is reset. Stop the node and run `yarn node:reset-owner <canonical owner identity id>` before starting the upgraded node, as described above; the command names the new owner and lifts the refusal.
 - If the node's own signed block list names an alias, the list is kept and enforced locally but is not published. Re-sign it with a higher version to publish it again.
+- If the stored owner reset marker cannot be read (for example, it was edited to a value other than `true` or `false`), the node refuses to start with the error `The stored owner reset marker cannot be read, so the node cannot start.` Stop the node and run `yarn node:reset-owner <new owner identity id>` with the same `PIGEON_LOCAL_DB_PATH`. The command installs the new owner and overwrites the marker, then start the node.
 
 The full upgrade behaviour is described in [docs/design/node-owner-registration-and-blocking.md](design/node-owner-registration-and-blocking.md). No endpoint or response shape changed; requests that use an alias id now get `401` with code `401020` or `400` with code `400080`, as described in [api.md](api.md).
 
