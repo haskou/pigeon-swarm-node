@@ -1,3 +1,4 @@
+import { PageCursor } from '@app/apps/apis/shared/pagination/PageCursor';
 import CallRelayRecordRegistry from '@app/apps/apis/calls-api/CallRelayRecordRegistry';
 import IdentityAdmissionSourceRateLimiter from '@app/apps/apis/identities-api/IdentityAdmissionSourceRateLimiter';
 import { PrivateAuthorizationRequestBodyLimit } from '@app/apps/apis/private-authorization-api/routes/PrivateAuthorizationRequestBodyLimit';
@@ -4015,6 +4016,26 @@ export default class Definitions {
     );
   }
 
+  @given(
+    'the community member signs the current community channel messages request',
+  )
+  public async theCommunityMemberSignsTheCurrentCommunityChannelMessagesRequest(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const keyPair = await this.ensureOtherIdentityKeyPair();
+
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
+      String(Date.now()),
+      keyPair,
+      this.otherIdentityId,
+    );
+  }
+
   @given('I sign the current community channel message search request')
   public async iSignTheCurrentCommunityChannelMessageSearchRequest(): Promise<void> {
     if (!this.communityId || !this.communityChannelId) {
@@ -7601,6 +7622,25 @@ export default class Definitions {
 
     this.response = await this.restClient.get(
       `/communities/${this.communityId}/channels/${this.communityChannelId}/messages${resolved}`,
+      this.headers,
+    );
+  }
+
+  @when(
+    'I GET messages from the current community text channel with a forged cursor',
+  )
+  public async iGETMessagesFromTheCurrentCommunityTextChannelWithAForgedCursor(): Promise<void> {
+    if (!this.communityId || !this.communityChannelId) {
+      throw new Error('Community and channel must be created first.');
+    }
+
+    const cursor = PageCursor.encode({
+      position: 'forged-message-id-that-does-not-exist',
+      resource: `communities/${this.communityId}/channels/${this.communityChannelId}/messages`,
+    });
+
+    this.response = await this.restClient.get(
+      `/communities/${this.communityId}/channels/${this.communityChannelId}/messages?limit=1&cursor=${encodeURIComponent(cursor)}`,
       this.headers,
     );
   }
