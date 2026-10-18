@@ -84,13 +84,14 @@ describe('PageSlice', () => {
   });
 
   it('pages every item once across same-millisecond ties', () => {
-    const rows = [
+    const rows: { created: string; id: string }[] = [
       { created: '1|c', id: 'c' },
       { created: '1|a', id: 'a' },
       { created: '2|b', id: 'b' },
       { created: '1|b', id: 'b1' },
     ];
-    const position = (row: { created: string }): string => row.created;
+    const position = (row: { created: string; id: string }): string =>
+      row.created;
     const seen: string[] = [];
     let after: string | undefined;
 
