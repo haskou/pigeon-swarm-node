@@ -30,7 +30,7 @@ export class PublicRelayConfiguration {
       relayDiscoveryEnabled: settings.publicRelay.discoveryEnabled,
       relayEnabled: settings.publicRelay.enabled,
       relayPort: settings.publicRelay.port,
-      relayRecordTtlSeconds: environment.PIGEON_RELAY_RECORD_TTL_SECONDS,
+      relayRecordTtlMs: environment.PIGEON_RELAY_RECORD_TTL_MS,
     });
   }
 
@@ -65,7 +65,7 @@ export class PublicRelayConfiguration {
   }
 
   public getRelayRecordTtlMs(): number {
-    return this.options.relayRecordTtlSeconds * 1000;
+    return this.options.relayRecordTtlMs;
   }
 
   public getBootstrapRelayMultiaddrs(): string[] {

@@ -137,10 +137,6 @@ export const pigeonEnvironmentSchema = {
     defaultValue: 2 * 60 * 60 * 1000,
     type: 'number',
   },
-  PIGEON_RELAY_RECORD_TTL_SECONDS: {
-    defaultValue: 2 * 60 * 60,
-    type: 'number',
-  },
   PIGEON_STORED_RELAY_FALLBACK_MS: {
     defaultValue: 7 * 24 * 60 * 60 * 1000,
     type: 'number',
