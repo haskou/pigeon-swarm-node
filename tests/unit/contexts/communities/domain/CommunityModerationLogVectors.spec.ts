@@ -37,6 +37,7 @@ interface Vectors {
       createdAt: number;
       details: Record<string, unknown>;
       target: { id: string; type: string };
+      signer: string;
     };
     name: string;
   }[];
@@ -50,7 +51,8 @@ const vectors = JSON.parse(
   ),
 ) as Vectors;
 const cases = vectors.cases.map((vector) => [vector.name, vector] as const);
-const actor = vectors.keys.moderator.identityId;
+const actorOf = (vector: Vectors['cases'][number]): string =>
+  vectors.keys[vector.input.signer].identityId;
 
 describe('Community moderation log vectors', () => {
   const community = {
@@ -71,7 +73,7 @@ describe('Community moderation log vectors', () => {
     const { input } = vector;
     const entry = CommunityModerationLogEntry.create(
       new CommunityId(input.communityId),
-      new IdentityId(actor),
+      new IdentityId(actorOf(vector)),
       new CommunityModerationAction(input.action),
       CommunityModerationTarget.fromPrimitives(input.target),
       new CommunityModerationLogDetails(input.details),
@@ -90,7 +92,7 @@ describe('Community moderation log vectors', () => {
     expect(
       JSON.stringify([
         input.communityId,
-        actor,
+        actorOf(vector),
         input.action,
         input.target.type,
         input.target.id,
@@ -106,7 +108,7 @@ describe('Community moderation log vectors', () => {
     expect(
       CommunityModerationLogId.derive(
         input.communityId,
-        actor,
+        actorOf(vector),
         input.action,
         input.target.type,
         input.target.id,
@@ -136,7 +138,7 @@ describe('Community moderation log vectors', () => {
       verify(
         null,
         Buffer.from(derived.signingContent),
-        createPublicKey(vectors.keys.moderator.publicKeyPem),
+        createPublicKey(vectors.keys[vector.input.signer].publicKeyPem),
         Buffer.from(derived.signature, 'base64'),
       ),
     ).toBe(true);
@@ -171,7 +173,7 @@ describe('Community moderation log vectors', () => {
           ...record,
           id: CommunityModerationLogId.derive(
             vector.input.communityId,
-            actor,
+            actorOf(vector),
             vector.input.action,
             vector.input.target.type,
             vector.input.target.id,
