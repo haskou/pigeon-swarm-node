@@ -79,6 +79,25 @@ describe('NonCanonicalIdentityIdsPurger', () => {
     );
   });
 
+  it('should not report an owner cleared when the stored node no longer names a non-canonical one', async () => {
+    const loaded = storedNode(IdentityIdMother.reencoded(a));
+    const latest = storedNode(a);
+
+    nodes.loadLocalNode.mockResolvedValue(loaded);
+    nodes.updateLocalNode.mockImplementation(async (change) => {
+      await change(latest);
+
+      return latest;
+    });
+    exceptions.find.mockResolvedValue(new NodeBlockEntries([], []));
+    sources.findAll.mockResolvedValue([]);
+
+    const purge = await purger.purge();
+
+    expect(purge.ownerCleared).toBe(false);
+    expect(latest.hasOwner()).toBe(true);
+  });
+
   it('should clear a non-canonical owner and drop non-canonical exceptions and approvals', async () => {
     const node = storedNode(IdentityIdMother.reencoded(a));
     const source = await adopted([a, IdentityIdMother.aliasPrefix(a)]);
