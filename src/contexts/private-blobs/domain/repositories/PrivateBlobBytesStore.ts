@@ -5,6 +5,9 @@ import { PrivateBlobId } from '../value-objects/PrivateBlobId';
 import { PrivateBlobSize } from '../value-objects/PrivateBlobSize';
 
 export default abstract class PrivateBlobBytesStore {
+  /** Throws when bytes cannot be written; the node refuses to start then. */
+  public abstract ensureWritable(): Promise<void>;
+
   public abstract delete(id: PrivateBlobId): Promise<void>;
 
   /** Ids that have a stored blob or a partial upload on disk. */

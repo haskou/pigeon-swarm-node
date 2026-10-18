@@ -260,6 +260,10 @@ services:
     arguments:
       - >-
         @contexts/nodes/application/purge-non-canonical-identity-ids/NonCanonicalIdentityIdsPurger
+  apps/initializers/private-blobs/PrivateBlobStorageInitializer:
+    class: /apps/initializers/private-blobs/PrivateBlobStorageInitializer
+    arguments:
+      - '@contexts/private-blobs/domain/repositories/PrivateBlobBytesStore'
   apps/initializers/public-mutations/CallMutationPolicies:
     class: /apps/initializers/public-mutations/CallMutationPolicies
     arguments:
