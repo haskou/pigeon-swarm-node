@@ -265,7 +265,6 @@ package "nodes" {
     class NodeBlockPolicy {
       +load(): Promise<void>
       +reapply(): Promise<void>
-      +ownerChanged(node: Node): Promise<void>
       +isIdentityBlocked(identityId: IdentityId): Promise<boolean>
     }
 

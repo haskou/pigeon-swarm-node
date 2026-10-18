@@ -35,6 +35,6 @@ describe('NodeOwnerAssigner', () => {
 
     expect(nodes.updateLocalNode).toHaveBeenCalledTimes(1);
     expect(node.toPrimitives().owner).toBe(owner.valueOf());
-    expect(blockPolicy.ownerChanged).toHaveBeenCalledWith(node);
+    expect(blockPolicy.reapply).toHaveBeenCalledTimes(1);
   });
 });

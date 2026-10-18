@@ -99,11 +99,6 @@ export default class NodeBlockPolicy {
     return applied;
   }
 
-  /** Re-applies the entries after the owner changed, so a listed new owner is unblocked. */
-  public async ownerChanged(node: Node): Promise<void> {
-    await this.enforce(await this.currentEntries(), node);
-  }
-
   public async isIdentityBlocked(identityId: IdentityId): Promise<boolean> {
     const entries = await this.currentEntries();
 

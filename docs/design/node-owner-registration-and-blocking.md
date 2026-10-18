@@ -115,6 +115,12 @@ Both tools reuse the existing node owner unchanged:
   itself. `IdentityCreationGate` shares the queue, so a publication nested in a
   publication of the same identity is refused the same way.
 
+- **Racing a handover.** Canonical-id checks run before the owner hold, so a
+  request that names a non-canonical identity id and races a handover answers
+  `400080`, not `403010`: the answer depends on the id alone. A handover that
+  lands during the slow verification of an owner-only write still fails the
+  commit with `403010`, because the in-section check refuses it.
+
 ### Owner loss and reset
 
 There is no key-based recovery protocol. Control of the host is ownership: an

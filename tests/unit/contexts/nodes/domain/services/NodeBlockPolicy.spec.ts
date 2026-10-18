@@ -312,9 +312,35 @@ describe('NodeBlockPolicy', () => {
   });
 
   it('should lift the block of a listed identity that becomes owner', async () => {
-    await policy.ownerChanged(new NodeMother().withOwner(blocked).build());
+    loader.loadNode.mockResolvedValue(
+      new NodeMother().withOwner(blocked).build(),
+    );
+
+    await policy.reapply();
 
     expect(ids(enforcer.enforce.mock.calls[0][0])).toEqual([ownerId.valueOf()]);
+  });
+
+  it('should enforce the new owner when a handover lands during a slow reapply', async () => {
+    const slowRead = Promise.withResolvers<void>();
+    repository.findLocal.mockImplementationOnce(async () => {
+      await slowRead.promise;
+
+      return new NodeBlockListMother(owner)
+        .blockingIdentities([blocked, ownerId])
+        .build();
+    });
+    loader.loadNode
+      .mockResolvedValueOnce(new NodeMother().withOwner(ownerId).build())
+      .mockResolvedValue(new NodeMother().withOwner(blocked).build());
+
+    const slow = policy.reapply();
+    const handover = policy.reapply();
+    slowRead.resolve();
+    await Promise.all([slow, handover]);
+
+    const calls = enforcer.enforce.mock.calls;
+    expect(ids(calls[calls.length - 1][0])).toEqual([ownerId.valueOf()]);
   });
 
   it('should retry loading after a failed load', async () => {

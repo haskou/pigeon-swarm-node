@@ -9,10 +9,10 @@ export default class NodeOwnerAssigner {
   ) {}
 
   public async assignOwner(message: NodeOwnerAssignerMessage): Promise<void> {
-    const node = await this.nodes.updateLocalNode((latest) =>
+    await this.nodes.updateLocalNode((latest) =>
       latest.assignOwner(message.owner, message.authenticatedIdentityId),
     );
 
-    await this.blockPolicy.ownerChanged(node);
+    await this.blockPolicy.reapply();
   }
 }
