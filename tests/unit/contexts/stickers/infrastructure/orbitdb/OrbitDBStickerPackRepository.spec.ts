@@ -135,7 +135,7 @@ describe('OrbitDBStickerPackRepository', () => {
   it('skips stored packs with ids this build cannot construct', async () => {
     await repository.save(packOf('Moods'), await proof(1));
 
-    const storeUnreadable = (id: string, stickerId: string) => {
+    const storeUnreadable = async (id: string, stickerId: string) => {
       const document = PublicMutationRecord.withProof(
         {
           ...StickerPackMother.create().toPrimitives(),
@@ -144,7 +144,7 @@ describe('OrbitDBStickerPackRepository', () => {
           scopeType: 'sticker_pack',
           stickers: [{ id: stickerId }],
         },
-        signedMutation({
+        await signedMutation({
           identityId: owner.valueOf(),
           kind: 'put',
           recordId: id,
@@ -161,8 +161,8 @@ describe('OrbitDBStickerPackRepository', () => {
       });
     };
 
-    storeUnreadable('pack.with.dots', 'sticker-1');
-    storeUnreadable('pack-two', 'sticker with spaces');
+    await storeUnreadable('pack.with.dots', 'sticker-1');
+    await storeUnreadable('pack-two', 'sticker with spaces');
 
     expect(
       (await repository.findAll()).map((pack) => pack.toPrimitives().name),

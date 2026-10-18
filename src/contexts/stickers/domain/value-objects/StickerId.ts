@@ -1,9 +1,4 @@
-import {
-  assert,
-  ShortId,
-  StringValueObject,
-  UUID,
-} from '@haskou/value-objects';
+import { assert, ShortId, StringValueObject } from '@haskou/value-objects';
 
 import { InvalidStickerIdError } from '../errors/InvalidStickerIdError';
 
@@ -14,7 +9,7 @@ import { InvalidStickerIdError } from '../errors/InvalidStickerIdError';
  * cursor cap.
  */
 export class StickerId extends StringValueObject {
-  private static readonly MAX_LENGTH = UUID.LENGTH;
+  private static readonly MAX_LENGTH = 36;
   private static readonly PATTERN = /^[A-Za-z0-9_-]+$/;
 
   public static isValid(value: string): boolean {
