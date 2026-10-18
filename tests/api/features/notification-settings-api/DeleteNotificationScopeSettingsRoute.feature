@@ -29,7 +29,7 @@ Feature: DELETE /notification-settings/scopes
       """
     And I sign the current notification scope settings reset request
     When I DELETE "/notification-settings/scopes"
-    Then response code is equal to 200
+    Then response code is equal to 204
     And I sign the current notification settings request
     When I GET "/notification-settings"
     Then response code is equal to 200
