@@ -9,6 +9,17 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 export class GetNotificationsRequest {
   private static readonly RESOURCE = 'notifications';
 
+  /** Only the ids a notification can carry: an invitation or a missed call. */
+  private static isNotificationId(position: string): boolean {
+    try {
+      const id = new NotificationId(position);
+
+      return id.isInvitation() || id.isMissedCall();
+    } catch {
+      return false;
+    }
+  }
+
   constructor(
     private readonly recipientIdentityId: IdentityId,
     private readonly limit: unknown,
@@ -29,17 +40,6 @@ export class GetNotificationsRequest {
     }
 
     return position;
-  }
-
-  /** Only the ids a notification can carry: an invitation or a missed call. */
-  private static isNotificationId(position: string): boolean {
-    try {
-      const id = new NotificationId(position);
-
-      return id.isInvitation() || id.isMissedCall();
-    } catch {
-      return false;
-    }
   }
 
   public getMessage(): NotificationsFindMessage {
