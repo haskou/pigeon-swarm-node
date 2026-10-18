@@ -1,3 +1,4 @@
+import NodeOwnerWriteHolder from '@app/contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder';
 import { NodeBlockSourceRemoverMessage } from '@app/contexts/nodes/application/remove-block-source/messages/NodeBlockSourceRemoverMessage';
 import NodeBlockSourceRemover from '@app/contexts/nodes/application/remove-block-source/NodeBlockSourceRemover';
 import { NodeBlockSourceNotFoundError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceNotFoundError';
@@ -15,8 +16,10 @@ describe('NodeBlockSourceRemover', () => {
   beforeEach(() => {
     repository = mock<NodeBlockSourceRepository>();
     policy = mock<NodeBlockPolicy>();
-    policy.change.mockImplementation((mutation) => mutation());
-    remover = new NodeBlockSourceRemover(repository, policy);
+    const ownerWrites = mock<NodeOwnerWriteHolder>();
+
+    ownerWrites.hold.mockImplementation(async (_message, write) => write());
+    remover = new NodeBlockSourceRemover(repository, policy, ownerWrites);
   });
 
   it('should delete the source through the policy so its effect ends at once', async () => {
@@ -25,10 +28,13 @@ describe('NodeBlockSourceRemover', () => {
     repository.exists.mockResolvedValue(true);
 
     await remover.remove(
-      new NodeBlockSourceRemoverMessage(ownerIdentityId.valueOf()),
+      new NodeBlockSourceRemoverMessage(
+        ownerIdentityId.valueOf(),
+        ownerIdentityId.valueOf(),
+      ),
     );
 
-    expect(policy.change).toHaveBeenCalledTimes(1);
+    expect(policy.reapply).toHaveBeenCalledTimes(1);
     expect(repository.delete).toHaveBeenCalledWith(ownerIdentityId);
   });
 
@@ -39,7 +45,10 @@ describe('NodeBlockSourceRemover', () => {
 
     await expect(
       remover.remove(
-        new NodeBlockSourceRemoverMessage(ownerIdentityId.valueOf()),
+        new NodeBlockSourceRemoverMessage(
+          ownerIdentityId.valueOf(),
+          ownerIdentityId.valueOf(),
+        ),
       ),
     ).rejects.toThrow(NodeBlockSourceNotFoundError);
     expect(repository.delete).not.toHaveBeenCalled();

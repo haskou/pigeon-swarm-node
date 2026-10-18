@@ -1,5 +1,6 @@
 import { NodeBlockSourceEntriesApproverMessage } from '@app/contexts/nodes/application/approve-block-source-entries/messages/NodeBlockSourceEntriesApproverMessage';
 import NodeBlockSourceEntriesApprover from '@app/contexts/nodes/application/approve-block-source-entries/NodeBlockSourceEntriesApprover';
+import NodeOwnerWriteHolder from '@app/contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder';
 import { InvalidNodeBlockSourceApprovalError } from '@app/contexts/nodes/domain/errors/InvalidNodeBlockSourceApprovalError';
 import { NodeBlockSourceVersionHasChangedError } from '@app/contexts/nodes/domain/errors/NodeBlockSourceVersionHasChangedError';
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
@@ -39,6 +40,7 @@ describe('NodeBlockSourceEntriesApprover', () => {
       blockedIdentityIds: [],
       blockedNodePeerIds: [],
       ownerIdentityId: publisher.toPrimitives().publicKey,
+      authenticatedIdentityId: publisher.toPrimitives().publicKey,
       version: 4,
       ...params,
     });
@@ -67,14 +69,20 @@ describe('NodeBlockSourceEntriesApprover', () => {
     repository = mock<NodeBlockSourceRepository>();
     repository.find.mockResolvedValue(source);
     policy = mock<NodeBlockPolicy>();
-    policy.change.mockImplementation((mutation) => mutation());
-    approver = new NodeBlockSourceEntriesApprover(repository, policy);
+    const ownerWrites = mock<NodeOwnerWriteHolder>();
+
+    ownerWrites.hold.mockImplementation(async (_message, write) => write());
+    approver = new NodeBlockSourceEntriesApprover(
+      repository,
+      policy,
+      ownerWrites,
+    );
   });
 
   it('should approve every pending entry of the reviewed version through the policy', async () => {
     const approved = await approver.approve(message({ all: true }));
 
-    expect(policy.change).toHaveBeenCalledTimes(1);
+    expect(policy.reapply).toHaveBeenCalledTimes(1);
     expect(repository.save).toHaveBeenCalledWith(source);
     expect(approved.applied().count()).toBe(3);
     expect(approved.pending().count()).toBe(0);

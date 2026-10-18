@@ -98,7 +98,6 @@ describe('Concurrent node block list uploads and owner handovers', () => {
     networkRegistry = mock<IPFSNetworkRegistry>();
     networkRegistry.getAll.mockReturnValue([]);
     policy = mock<NodeBlockPolicy>();
-    policy.change.mockImplementation(async (mutation) => mutation());
     next = IdentityIdMother.canonical().valueOf();
 
     await new NodeOwnerAssigner(freshRepository(), policy).assignOwner(

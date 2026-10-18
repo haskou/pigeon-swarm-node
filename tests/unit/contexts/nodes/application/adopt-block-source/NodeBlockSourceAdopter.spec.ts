@@ -1,5 +1,6 @@
 import { NodeBlockSourceAdopterMessage } from '@app/contexts/nodes/application/adopt-block-source/messages/NodeBlockSourceAdopterMessage';
 import NodeBlockSourceAdopter from '@app/contexts/nodes/application/adopt-block-source/NodeBlockSourceAdopter';
+import NodeOwnerWriteHolder from '@app/contexts/nodes/application/hold-owner-write/NodeOwnerWriteHolder';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { NodeBlockSourceFetchOutcome } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceFetchOutcome';
@@ -26,9 +27,10 @@ describe('NodeBlockSourceAdopter', () => {
       new NodeBlockSourceVersionFloor(5),
     );
     const policy = mock<NodeBlockPolicy>();
+    const ownerWrites = mock<NodeOwnerWriteHolder>();
 
-    policy.change.mockImplementation((mutation) => mutation());
-    adopter = new NodeBlockSourceAdopter(repository, policy);
+    ownerWrites.hold.mockImplementation(async (_message, write) => write());
+    adopter = new NodeBlockSourceAdopter(repository, policy, ownerWrites);
   });
 
   it('should not accept again a list older than one accepted before the publisher was removed', async () => {
@@ -38,6 +40,7 @@ describe('NodeBlockSourceAdopter', () => {
         owner.valueOf(),
         'https://publisher.example',
         true,
+        owner.valueOf(),
       ),
     );
 

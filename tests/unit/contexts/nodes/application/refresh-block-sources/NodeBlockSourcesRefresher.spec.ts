@@ -3,6 +3,7 @@ import { NodeBlockSourceFetchFailedError } from '@app/contexts/nodes/domain/erro
 import { NodeBlockSource } from '@app/contexts/nodes/domain/NodeBlockSource';
 import { NodeBlockSourceFetchLimits } from '@app/contexts/nodes/domain/NodeBlockSourceFetchLimits';
 import NodeBlockSourceRepository from '@app/contexts/nodes/domain/repositories/NodeBlockSourceRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import NodeBlockListDownloader from '@app/contexts/nodes/domain/services/NodeBlockListDownloader';
 import NodeBlockPolicy from '@app/contexts/nodes/domain/services/NodeBlockPolicy';
 import { NodeBlockSourceFetchOutcome } from '@app/contexts/nodes/domain/value-objects/NodeBlockSourceFetchOutcome';
@@ -15,6 +16,7 @@ import { Duration, Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { NodeBlockListMother } from '../../../../mothers/NodeBlockListMother';
+import { NodeMother } from '../../../../mothers/NodeMother';
 
 describe('NodeBlockSourcesRefresher', () => {
   const now = new Timestamp(1770000000000);
@@ -58,7 +60,11 @@ describe('NodeBlockSourcesRefresher', () => {
     repository = mock<NodeBlockSourceRepository>();
     downloader = mock<NodeBlockListDownloader>();
     policy = mock<NodeBlockPolicy>();
-    policy.change.mockImplementation((mutation) => mutation());
+    const nodes = mock<NodeRepository>();
+
+    nodes.holdLocalNode.mockImplementation(async (action) =>
+      action(new NodeMother().build()),
+    );
     stored = adopted();
     repository.findAll.mockImplementation(async () => [copy(stored)]);
     repository.exists.mockResolvedValue(true);
@@ -72,6 +78,7 @@ describe('NodeBlockSourcesRefresher', () => {
         4096,
         Duration.fromSeconds(30),
       ),
+      nodes,
     );
   });
 
@@ -81,7 +88,7 @@ describe('NodeBlockSourcesRefresher', () => {
     await refresher.refresh(now);
 
     expect(downloader.download).toHaveBeenCalledWith(origin);
-    expect(policy.change).toHaveBeenCalledTimes(1);
+    expect(policy.reapply).toHaveBeenCalledTimes(1);
     expect(saved().toPrimitives().list?.version).toBe(2);
     expect(saved().toPrimitives().lastFetch).toEqual({
       at: now.valueOf(),
@@ -107,9 +114,7 @@ describe('NodeBlockSourcesRefresher', () => {
     await refresher.refresh(now);
 
     expect(saved().toPrimitives().list?.version).toBe(2);
-    expect(saved().toPrimitives().lastFetch?.outcome).toBe(
-      'invalid-signature',
-    );
+    expect(saved().toPrimitives().lastFetch?.outcome).toBe('invalid-signature');
   });
 
   it('should keep the last valid list on a rollback to an older version', async () => {
