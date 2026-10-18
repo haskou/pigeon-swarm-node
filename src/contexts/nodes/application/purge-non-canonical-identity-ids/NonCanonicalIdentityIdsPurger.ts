@@ -29,11 +29,13 @@ export default class NonCanonicalIdentityIdsPurger {
       return false;
     }
 
+    let cleared = false;
+
     await this.nodeRepository.updateLocalNode((latest) => {
-      latest.clearNonCanonicalOwner();
+      cleared = latest.clearNonCanonicalOwner();
     });
 
-    return true;
+    return cleared;
   }
 
   private async purgeExceptions(): Promise<number> {
