@@ -8,10 +8,14 @@ import {
 
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { MissingSignedRequestHeaderError } from './errors/MissingSignedRequestHeaderError';
+import { SignedRequestTargetIsTooLongError } from './errors/SignedRequestTargetIsTooLongError';
 import { SignedHttpRequest } from './SignedHttpRequest';
 import { SignedRequestBodyHash } from './SignedRequestBodyHash';
 
 export type { SignedHttpRequest } from './SignedHttpRequest';
+
+/** Matches the crypto package's signed path bound (8192 characters), measured here in UTF-8 bytes. */
+const MAX_TARGET_BYTES = 8192;
 
 export class SignedHttpRequestVerifier {
   private verifyOver(
@@ -37,6 +41,17 @@ export class SignedHttpRequestVerifier {
       return parsed;
     } catch {
       throw new InvalidSignedRequestError();
+    }
+  }
+
+  /**
+   * Refuses an oversized raw request target before any header is read, hashed
+   * or verified: the crypto package never verifies a longer path, so this only
+   * answers earlier and says why.
+   */
+  private assertTargetWithinLimit(request: SignedHttpRequest): void {
+    if (Buffer.byteLength(request.originalUrl, 'utf8') > MAX_TARGET_BYTES) {
+      throw new SignedRequestTargetIsTooLongError(MAX_TARGET_BYTES);
     }
   }
 
@@ -101,6 +116,8 @@ export class SignedHttpRequestVerifier {
     signature: string,
     key: PublicKey,
   ): Signature {
+    this.assertTargetWithinLimit(request);
+
     return this.verifyOver(
       request,
       request.body as SignedHttpRequestBody,
@@ -115,6 +132,8 @@ export class SignedHttpRequestVerifier {
     signature: Signature;
     timestamp: string;
   } {
+    this.assertTargetWithinLimit(request);
+
     return this.verifyIdentitySignature(
       request,
       request.body as SignedHttpRequestBody,
@@ -132,6 +151,7 @@ export class SignedHttpRequestVerifier {
     signature: Signature;
     timestamp: string;
   } {
+    this.assertTargetWithinLimit(request);
     const bodyHash = this.declaredBodyHash(request);
 
     return {

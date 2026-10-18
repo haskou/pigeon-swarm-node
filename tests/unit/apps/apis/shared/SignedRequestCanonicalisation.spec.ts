@@ -259,21 +259,21 @@ describe('signed request canonicalisation', () => {
           verifier.verifyDeclaredBodySignature(request),
       ],
     ])(
-      'refuses a validly signed target over 8192 bytes with 414 before %s checks it',
+      'refuses an oversized target with 414 before %s checks any signature',
       async (_entry, verifyEntry) => {
         const keyPair = await KeyPair.generate();
         const oversized = `/resource?q=${'a'.repeat(8192)}`;
         const signed = sign(keyPair, {
           method: 'GET',
-          target: oversized,
+          target: TARGET,
           timestamp: TIMESTAMP,
         });
         const verifySpy = jest.spyOn(SignedHttpRequestSignature, 'verify');
 
         try {
-          expect(() => verifyEntry(verifier, toRequest(signed))).toThrow(
-            SignedRequestTargetIsTooLongError,
-          );
+          expect(() =>
+            verifyEntry(verifier, toRequest({ ...signed, target: oversized })),
+          ).toThrow(SignedRequestTargetIsTooLongError);
           expect(verifySpy).not.toHaveBeenCalled();
         } finally {
           verifySpy.mockRestore();
