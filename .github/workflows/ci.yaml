@@ -71,6 +71,19 @@ jobs:
         run: yarn test:e2e:container:init-failure
         timeout-minutes: 3
 
+      - name: Init failure repeated 30 times (diagnostic for #653)
+        run: |
+          failed=0
+          for run in $(seq 1 30); do
+            if ! yarn test:e2e:container:init-failure; then
+              failed=$((failed + 1))
+              echo "::error::init-failure run ${run} failed"
+            fi
+          done
+          echo "init-failure: $((30 - failed))/30 runs passed"
+          test "${failed}" -eq 0
+        timeout-minutes: 6
+
       - name: Owner reset command
         run: yarn test:e2e:container:node-reset-owner
         timeout-minutes: 3
