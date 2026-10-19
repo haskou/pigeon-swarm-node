@@ -1777,6 +1777,8 @@ Implemented:
 - `privateNetwork` is visible to any identity that can sign a request. Anyone
   can mint a signature, so this is not a secrecy boundary; the private key is
   the owner's secret and stays owner-only
+- absent `privateNetwork` = unknown, not public: clients fail closed and must
+  not offer the network for private placement
 
 ### Add local node network
 
