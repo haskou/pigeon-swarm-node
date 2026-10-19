@@ -55,7 +55,6 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
-import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { StickerId } from '@app/contexts/stickers/domain/value-objects/StickerId';
 import { StickerPackId } from '@app/contexts/stickers/domain/value-objects/StickerPackId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -320,6 +319,12 @@ export default class Definitions {
     return this.identityRecoveryKeyPair;
   }
 
+  /**
+   * Waits until the replicated state is open, the state readiness reports.
+   * Reads succeed as soon as a network is registered, which happens before its
+   * stores finish replaying, so they can answer while readiness still says not
+   * ready.
+   */
   private async waitForReplicatedState(): Promise<void> {
     const registry = Kernel.di.getService<OrbitDBReplicatedStateRegistry>(
       OrbitDBReplicatedStateRegistry,
@@ -327,19 +332,8 @@ export default class Definitions {
     const deadline = Date.now() + 5_000;
 
     while (Date.now() < deadline) {
-      try {
-        await registry.findHead('api-test-readiness');
-
+      if (registry.isOpen()) {
         return;
-      } catch (error: unknown) {
-        const code =
-          typeof error === 'object' && error !== null && 'code' in error
-            ? error.code
-            : undefined;
-
-        if (code !== ReplicatedStateNotReadyError.CODE) {
-          throw error;
-        }
       }
 
       await new Promise((resolve) => setTimeout(resolve, 10));
