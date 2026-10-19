@@ -59,9 +59,11 @@ Both responses carry `Cache-Control: no-store` and contain only the status,
 never details of the replicated state. The 503 body is a status response, not
 the error shape used elsewhere in this API.
 
-While a subscriber replay waits for a block that is missing locally, the
-replicated state counts as not open for up to 60 seconds after the replay was
-deferred.
+The replicated state is not open while a store of a registered network has not
+finished replaying its documents, and while a subscriber replay waits for a
+block that is missing locally. Neither lifts with time: readiness stays
+`not_ready` until the replay succeeds. A replay that failed at registration is
+retried on the next peer head exchange.
 
 Liveness is separate. `GET /health` and `GET /` keep answering while the node
 starts, so a poller that checks liveness is unaffected. Use readiness to decide

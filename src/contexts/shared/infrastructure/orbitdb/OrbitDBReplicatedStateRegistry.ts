@@ -152,6 +152,13 @@ export default class OrbitDBReplicatedStateRegistry {
     { outstanding: number; since: number }
   >();
 
+  /**
+   * Stores whose documents a register() has not yet replayed. A store whose
+   * replay fails stays here until a later replay of it succeeds, so readiness
+   * cannot open over state that was never replayed.
+   */
+  private readonly storesAwaitingReplay = new Set<OrbitDBDatabase>();
+
   private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
     string
@@ -245,10 +252,18 @@ export default class OrbitDBReplicatedStateRegistry {
     return history;
   }
 
-  private refreshDocumentHistory(history: OrbitDBDocumentHistory): void {
-    void history.refresh().catch(() => {
-      Kernel.logger.warn?.('OrbitDB document history projection failed');
-    });
+  private refreshDocumentHistory(
+    store: OrbitDBDatabase,
+    history: OrbitDBDocumentHistory,
+  ): void {
+    void history
+      .refresh()
+      .then(() => {
+        this.storesAwaitingReplay.delete(store);
+      })
+      .catch(() => {
+        Kernel.logger.warn?.('OrbitDB document history projection failed');
+      });
   }
 
   private assertReady(): void {
@@ -262,6 +277,21 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
   ): OrbitDBDatabase | undefined {
     return stores[storeName];
+  }
+
+  /** The stores of `stores` that have document listeners to replay into. */
+  private listenedStores(
+    stores: OrbitDBPrivateNetworkStores,
+  ): OrbitDBDatabase[] {
+    const listened: OrbitDBDatabase[] = [];
+
+    for (const storeName of this.documentUpdateListeners.keys()) {
+      const store = this.getStore(stores, storeName);
+
+      if (store) listened.push(store);
+    }
+
+    return listened;
   }
 
   private isBootstrapDeferredAt(store: OrbitDBDatabase, now: number): boolean {
@@ -764,6 +794,7 @@ export default class OrbitDBReplicatedStateRegistry {
       store,
       listeners,
     );
+    this.storesAwaitingReplay.delete(store);
     const elapsedMilliseconds =
       Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
@@ -790,7 +821,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
       this.retryPendingSubscriberBootstraps(storeName, store);
 
-      if (history) this.refreshDocumentHistory(history);
+      if (history) this.refreshDocumentHistory(store, history);
       else
         void this.notifyDocumentUpdated(storeName, store, entry.payload?.value);
     });
@@ -799,7 +830,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
       this.retryPendingSubscriberBootstraps(storeName, store);
 
-      if (history) this.refreshDocumentHistory(history);
+      if (history) this.refreshDocumentHistory(store, history);
       else this.reconcileDocumentProjection(storeName, store, heads);
     });
     registeredStores.add(store);
@@ -1001,6 +1032,7 @@ export default class OrbitDBReplicatedStateRegistry {
       else {
         await this.bootstrapDocumentUpdateListener(storeName, store, listeners);
       }
+      this.storesAwaitingReplay.delete(store);
     }
   }
 
@@ -2224,6 +2256,9 @@ export default class OrbitDBReplicatedStateRegistry {
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
     this.storesByNetworkId.set(networkId, stores);
+    for (const store of this.listenedStores(stores)) {
+      this.storesAwaitingReplay.add(store);
+    }
     this.registerDocumentUpdateListeners(stores);
     this.registerHeadCacheListeners(networkId, stores);
 
@@ -2281,11 +2316,17 @@ export default class OrbitDBReplicatedStateRegistry {
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
 
+    if (stores) {
+      for (const store of this.listenedStores(stores)) {
+        this.storesAwaitingReplay.delete(store);
+      }
+    }
     await stores?.stop();
   }
 
   public clear(): void {
     this.storesByNetworkId.clear();
+    this.storesAwaitingReplay.clear();
     this.persistedHeadKeysByNetworkId.clear();
     this.replicatedHeadsByNetworkId.clear();
     this.rebuildingHeadsByNetworkId.clear();
@@ -2480,20 +2521,22 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   /**
-   * Whether the replicated state is open to reads: a network is registered and
-   * no store still waits on a subscriber replay that a missing local block
-   * deferred. The deferral answer is bounded in time, so a store cannot hold
-   * the node not ready for long.
+   * Whether the replicated state is open to reads: a network is registered,
+   * every store has finished the replay its registration started, and no
+   * store still waits on a subscriber replay that a missing local block
+   * deferred. None of these conditions lapses with time, so a store that never
+   * replays keeps the node not open.
    */
   public isOpen(): boolean {
-    if (this.storesByNetworkId.size === 0) return false;
-
-    const now = Date.now();
+    if (this.storesByNetworkId.size === 0 || this.storesAwaitingReplay.size > 0)
+      return false;
 
     return ![...this.storesByNetworkId.values()].some((stores) =>
       stores
         .getSynchronizationStores()
-        .some(({ database }) => this.isBootstrapDeferredAt(database, now)),
+        .some(({ database }) =>
+          this.deferredSubscriberBootstraps.has(database),
+        ),
     );
   }
 
