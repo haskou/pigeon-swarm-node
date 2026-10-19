@@ -2540,7 +2540,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       networkId: 'network-1',
       updatedAt: 1,
     });
-    await headCache.markWarm('network-1');
+    await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+    firstNetwork.heads.log = {
+      heads: jest.fn(async () => [{ hash: 'head-1' }]),
+    };
 
     await registry.register('network-1', firstNetwork.stores);
 
@@ -2618,6 +2621,85 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     await expect(
       headCache.findReconciledHeadSignature('network-1'),
     ).resolves.toBe(JSON.stringify(['head-2']));
+  });
+
+  it('rebuilds a warm head cache whose heads log cannot be compared', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const restarted = createStores();
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1');
+    restarted.heads.all.mockResolvedValue([
+      {
+        key: 'community:community-1',
+        value: {
+          id: 'community-1',
+          networkId: 'network-1',
+          updatedAt: 2,
+        },
+      },
+    ]);
+
+    await registry.register('network-1', restarted.stores);
+
+    expect(restarted.heads.all).toHaveBeenCalledTimes(1);
+    expect(registry.findCachedHead('community:community-1')).toEqual({
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 2,
+    });
+  });
+
+  it('stays not open when a warm head cache whose heads log cannot be compared fails to rebuild', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const restarted = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    await headCache.save('network-1', 'community:community-1', {
+      id: 'community-1',
+      networkId: 'network-1',
+      updatedAt: 1,
+    });
+    await headCache.markWarm('network-1');
+    restarted.heads.all.mockRejectedValueOnce(missingBlock);
+
+    await expect(
+      registry.register('network-1', restarted.stores),
+    ).rejects.toThrow();
+    expect(registry.isOpen()).toBe(false);
+    registry.clear();
+  });
+
+  it('stays not open when a peer join rebuild fails after a successful rebuild', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const { heads, stores } = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    await registry.register('network-1', stores);
+    expect(registry.isOpen()).toBe(true);
+
+    heads.all.mockRejectedValueOnce(missingBlock);
+    heads.emitJoin('peer-1', []);
+    await flushPromises();
+    expect(registry.isOpen()).toBe(false);
+
+    heads.emitJoin('peer-2', []);
+    await flushPromises();
+    expect(registry.isOpen()).toBe(true);
+    registry.clear();
   });
 
   it('keeps serving cached heads while a peer join rebuilds the head cache', async () => {
