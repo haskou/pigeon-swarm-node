@@ -69,6 +69,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CommunityResource'
+        '409':
+          description: PrivateNetworkRequiredError. A private community is refused on a public network; public communities are accepted on any network.
   /discoverable-communities:
     get:
       tags:

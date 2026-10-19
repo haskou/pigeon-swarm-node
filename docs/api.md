@@ -3236,6 +3236,11 @@ hold exactly two identities. Any other field (such as the `type`, `name` and `no
 older clients sent for groups) is ignored, and a group genesis is refused with `409`
 `InvalidConversationOperationError`.
 
+A direct conversation is private by nature, so the node refuses one on a public
+network with `409` `PrivateNetworkRequiredError`, before it stores anything. This
+holds for an existing 1:1 too: the refusal comes before the lookup, so a public
+1:1 is never returned. Only a private network carries a direct conversation.
+
 Response:
 
 ```json
@@ -3769,6 +3774,10 @@ POST /communities
 ```
 
 Returns `201 Created` with `Location: /communities/{communityId}`.
+
+A private community is refused on a public network with `409`
+`PrivateNetworkRequiredError`, before anything is stored. A public community is
+accepted on any network.
 
 Request:
 

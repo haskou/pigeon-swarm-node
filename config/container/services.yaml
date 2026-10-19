@@ -712,6 +712,7 @@ services:
     arguments:
       - '@contexts/communities/domain/repositories/CommunityRepository'
       - '@shared/infrastructure/messageBus/DomainEventPublisher'
+      - '@contexts/shared/domain/networks/NetworkPrivacyDirectory'
   contexts/communities/application/create-invitation/CommunityInvitationCreator:
     class: >-
       /contexts/communities/application/create-invitation/CommunityInvitationCreator
@@ -1341,6 +1342,7 @@ services:
       - '@contexts/keychains/domain/repositories/KeychainRepository'
       - >-
         @contexts/keychains/domain/services/KeychainCandidateValidationDomainService
+      - '@contexts/shared/domain/networks/NetworkPrivacyDirectory'
   contexts/conversations/application/find-conversations/ConversationsFinder:
     class: /contexts/conversations/application/find-conversations/ConversationsFinder
     arguments:
@@ -2552,6 +2554,7 @@ services:
     class: >-
       /contexts/push-notifications/infrastructure/web-push/WebPushPayloadEnvelope
     arguments: []
+  contexts/shared/domain/networks/NetworkPrivacyDirectory: '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory'
   contexts/shared/infrastructure/ipfs/IPFS:
     class: /contexts/shared/infrastructure/ipfs/IPFS
     arguments:
@@ -2566,6 +2569,11 @@ services:
   contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer:
     class: /contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer
     arguments: []
+  contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory:
+    class: /contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory
+    arguments:
+      - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
+    parent: contexts/shared/domain/networks/NetworkPrivacyDirectory
   contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry:
     class: /contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry
     arguments:
