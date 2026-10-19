@@ -1,6 +1,8 @@
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
+import { PrivateNetworkRequiredError } from '@app/contexts/shared/domain/errors/PrivateNetworkRequiredError';
+import NetworkPrivacyDirectory from '@app/contexts/shared/domain/networks/NetworkPrivacyDirectory';
 import { assert } from '@haskou/value-objects';
 
 import { Conversation } from '../../domain/Conversation';
@@ -15,6 +17,7 @@ export default class ConversationCreator {
     private readonly keychainRepository: KeychainRepository,
 
     private readonly keychainValidator: KeychainCandidateValidationDomainService,
+    private readonly networkPrivacy: NetworkPrivacyDirectory,
   ) {}
 
   private async assertKeychainBelongsToOwner(
@@ -58,6 +61,10 @@ export default class ConversationCreator {
     message: ConversationCreateMessage,
   ): Promise<Conversation> {
     await this.assertKeychainBelongsToOwner(message);
+
+    if (!this.networkPrivacy.isPrivate(message.genesis.getNetworkId())) {
+      throw new PrivateNetworkRequiredError();
+    }
 
     const conversationId = message.genesis.getConversationId();
 

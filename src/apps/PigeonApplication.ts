@@ -79,7 +79,9 @@ import { PrivateBlobLimitsFromEnvironment } from '../contexts/private-blobs/infr
 import FilePrivateBlobBytesStore from '../contexts/private-blobs/infrastructure/filesystem/FilePrivateBlobBytesStore';
 import LocalPrivateBlobOwnerKeyDeriver from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobOwnerKeyDeriver';
 import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure/local-db/LocalPrivateBlobRepository';
+import NetworkPrivacyDirectory from '../contexts/shared/domain/networks/NetworkPrivacyDirectory';
 import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
+import IPFSNetworkPrivacyDirectory from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory';
 import {
   pigeonEnvironmentSchema,
   validatePigeonEnvironment,
@@ -344,6 +346,10 @@ export default class PigeonApplication {
         {
           token: CommunityRepository,
           useClass: CommunityRepositoryRouter,
+        },
+        {
+          token: NetworkPrivacyDirectory,
+          useClass: IPFSNetworkPrivacyDirectory,
         },
         {
           token: NotificationScopeSettingsRepository,

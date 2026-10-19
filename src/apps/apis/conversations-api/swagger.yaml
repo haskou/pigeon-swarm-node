@@ -31,6 +31,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ConversationResource'
+        '409':
+          description: PrivateNetworkRequiredError. Direct conversations are refused on a public network; only a private network can carry them.
     get:
       tags:
         - conversations
