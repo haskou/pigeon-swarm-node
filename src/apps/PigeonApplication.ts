@@ -107,6 +107,7 @@ import { ApiSwaggerRegistrar } from './apis/ApiSwaggerRegistrar';
 import { applicationRoutes } from './ApplicationRoutes';
 import { ApplicationServiceClass } from './ApplicationServiceClass';
 import NodeOwnerResetCommand from './commands/nodes/NodeOwnerResetCommand';
+import NodeReadiness from './NodeReadiness';
 
 export default class PigeonApplication {
   private readonly logger = new WinstonLogger();
@@ -519,6 +520,11 @@ export default class PigeonApplication {
     const nodeLoader = this.kernel.di.getService<NodeLoader>(NodeLoader);
 
     await nodeLoader.loadNode();
+  }
+
+  /** Marks startup finished; the node is ready once its replicated state is open. */
+  public markStarted(): void {
+    this.kernel.di.getService<NodeReadiness>(NodeReadiness).markStarted();
   }
 
   /** Runs `yarn node:reset-owner <new owner identity id>`; returns the report for the operator. */

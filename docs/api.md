@@ -48,6 +48,27 @@ OPTIONS preflight. It does not grant browser permissions or bypass browser
 mixed-content or local-network restrictions. Clients must use a node URL that
 their browser can reach.
 
+## Node readiness
+
+`GET /node/readiness` is public and requires no identity or signed request.
+Apply the configured `ROUTE_PREFIX`, for example `/api/node/readiness`.
+It answers HTTP 200 with `{ "status": "ready" }` once the node has finished
+starting and its replicated state is open. Until then it answers HTTP 503 with
+`{ "status": "not_ready" }`. A node with no registered network is not ready.
+Both responses carry `Cache-Control: no-store` and contain only the status,
+never details of the replicated state. The 503 body is a status response, not
+the error shape used elsewhere in this API.
+
+The replicated state is not open while a store of a registered network has not
+finished replaying its documents, and while a subscriber replay waits for a
+block that is missing locally. Neither lifts with time: readiness stays
+`not_ready` until the replay succeeds. A replay that failed at registration is
+retried on the next peer head exchange.
+
+Liveness is separate. `GET /health` and `GET /` keep answering while the node
+starts, so a poller that checks liveness is unaffected. Use readiness to decide
+whether the node can serve replicated state.
+
 ## Authentication
 
 Authenticated endpoints use a canonical request signature:
@@ -309,7 +330,7 @@ spec against the route handlers and the OpenAPI documents:
   group and `invitation-preview`, an invitation `revocation`, a channel
   `draft`, a message `pin` and `thread`, a sticker pack `saved` mark, a
   sticker `favorite` mark, a sticker `usage` mark, the sticker `library`, the
-  node block-list `publication`, `/client-contract`,
+  node block-list `publication`, `/client-contract`, `/node/readiness`,
   `/ipfs/replication-status` and `/push/vapid-public-key`. The namespaces
   `/ipfs`, `/push`, `/realtime` and
   `/private-authorization` are singletons too.

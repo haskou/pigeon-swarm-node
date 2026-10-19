@@ -199,7 +199,7 @@ function createStores(): {
   const messages = createStore();
   const notifications = createStore();
   const heads = createStore();
-  const storeSet = {
+  const databases = {
     calls,
     communityOperations,
     contentReplication,
@@ -211,6 +211,16 @@ function createStores(): {
     notifications,
     reactions: createStore(),
     requests: createStore(),
+  };
+  const storeSet = {
+    ...databases,
+    getSynchronizationStores: () =>
+      Object.entries(databases).map(([name, database]) => ({
+        database,
+        name,
+        getSynchronizedPeerIds: (): string[] => [],
+      })),
+    stop: async (): Promise<void> => undefined,
   };
 
   return {
@@ -487,6 +497,143 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(stillDeferred).toBe(true);
     expect(registry.isSubscriberBootstrapDeferred('calls')).toBe(false);
     expect(registry.isSubscriberBootstrapDeferred('messages')).toBe(false);
+    registry.clear();
+  });
+
+  it('is open once a network is registered and no subscriber replay is deferred', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    expect(registry.isOpen()).toBe(false);
+
+    await registry.register('network-1', stores);
+    expect(registry.isOpen()).toBe(true);
+
+    calls.all
+      .mockRejectedValueOnce(missingBlock)
+      .mockRejectedValueOnce(missingBlock);
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    expect(registry.isOpen()).toBe(false);
+
+    calls.emitUpdate({ payload: { value: { id: 'call', updatedAt: 1 } } });
+    await flushPromises();
+    expect(registry.isOpen()).toBe(false);
+
+    calls.emitUpdate({ payload: { value: { id: 'call', updatedAt: 2 } } });
+    await flushPromises();
+    expect(registry.isOpen()).toBe(true);
+    registry.clear();
+  });
+
+  it('is not open while a registration still replays its subscriber history', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const first = createStores();
+    const second = createStores();
+    let releaseReplay = (): void => undefined;
+    const replayGate = new Promise<void>((resolve) => {
+      releaseReplay = () => resolve();
+    });
+
+    await registry.register('network-1', first.stores);
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    second.calls.all.mockImplementationOnce(async () => {
+      await replayGate;
+
+      return [];
+    });
+
+    const registration = registry.register('network-2', second.stores);
+    await flushPromises();
+    expect(registry.isOpen()).toBe(false);
+
+    releaseReplay();
+    await registration;
+    expect(registry.isOpen()).toBe(true);
+    registry.clear();
+  });
+
+  it('stays not open after a degraded registration until a peer join replays the store', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    calls.all.mockRejectedValueOnce(missingBlock);
+
+    await expect(registry.register('network-1', stores)).rejects.toThrow();
+    expect(registry.isOpen()).toBe(false);
+
+    calls.emitJoin('peer-1', []);
+    await flushPromises();
+    expect(registry.isOpen()).toBe(true);
+    registry.clear();
+  });
+
+  it('stops waiting on a degraded network once it is unregistered', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const degraded = createStores();
+    const healthy = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    degraded.calls.all.mockRejectedValueOnce(missingBlock);
+
+    await expect(
+      registry.register('network-1', degraded.stores),
+    ).rejects.toThrow();
+    await registry.register('network-2', healthy.stores);
+    expect(registry.isOpen()).toBe(false);
+
+    await registry.unregister('network-1');
+    expect(registry.isOpen()).toBe(true);
+    registry.clear();
+  });
+
+  it('keeps the node not ready while a deferred subscriber replay is outstanding, however long it waits', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { calls, stores } = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+    const deferredAt = 1_000_000;
+    const now = jest.spyOn(Date, 'now').mockReturnValue(deferredAt);
+
+    await registry.register('network-1', stores);
+    calls.all
+      .mockRejectedValueOnce(missingBlock)
+      .mockRejectedValueOnce(missingBlock);
+    await registry.onDocumentUpdated('calls', () => undefined, {
+      includeHistory: true,
+    });
+    expect(registry.isOpen()).toBe(false);
+
+    now.mockReturnValue(
+      deferredAt +
+        OrbitDBReplicatedStateRegistry.DEFERRED_BOOTSTRAP_NOT_READY_MS,
+    );
+    expect(registry.isSubscriberBootstrapDeferred('calls')).toBe(false);
+    expect(registry.isOpen()).toBe(false);
+
+    now.mockRestore();
     registry.clear();
   });
 
