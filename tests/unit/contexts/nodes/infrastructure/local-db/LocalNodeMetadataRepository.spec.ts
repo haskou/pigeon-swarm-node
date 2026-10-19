@@ -377,6 +377,34 @@ describe('LocalNodeMetadataRepository', () => {
       expect(stored.get('local')).toBe(original);
     });
 
+    it('should tell the operator how to recover an unreadable configuration', async () => {
+      storeIn(new Map([['local', unreadableDocument()]]));
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        'The stored node configuration cannot be read, so the node cannot start, and nothing was changed. To keep this node, stop it and restore the PIGEON_LOCAL_DB_PATH folder from a backup. To start over instead, stop it and delete that folder explicitly: the node then starts as a new, unclaimed node without its networks.',
+      );
+    });
+
+    it('should refuse a configuration whose networks are stored as an array', async () => {
+      const original: Record<string, unknown> = {
+        ...unreadableDocument(),
+        networks: [],
+      };
+      const stored = new Map([['local', original]]);
+      storeIn(stored);
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        NodeMetadataIsUnreadableError,
+      );
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+      expect(database.save).not.toHaveBeenCalled();
+      expect(stored.get('local')).toBe(original);
+    });
+
     it('should not report a node as empty after a restart over an unreadable configuration', async () => {
       const original = unreadableDocument();
       const stored = new Map([['local', original]]);

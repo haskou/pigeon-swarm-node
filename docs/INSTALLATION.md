@@ -56,7 +56,14 @@ To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folde
 
 ## Unreadable Node Configuration
 
-If the stored node configuration cannot be read, the node refuses to start with the error `The stored node configuration cannot be read, so the node cannot start.` The configuration is left as stored and is never regenerated, because a new one would drop the stored networks and give the node a new node id. Restore the `PIGEON_LOCAL_DB_PATH` folder from a copy, or delete it to start over as described under Resetting the Node Owner, then start the node.
+If the stored node configuration cannot be read, the node logs `Application error` followed by `The stored node configuration cannot be read, so the node cannot start, and nothing was changed.`, then exits with status `1`. The configuration is never regenerated: a new one would drop the stored networks and give the node a new node id.
+
+Choose one recovery:
+
+- To keep this node, stop it and restore the `PIGEON_LOCAL_DB_PATH` folder from a backup, then start the node.
+- To start over, stop it and delete the `PIGEON_LOCAL_DB_PATH` folder explicitly, then start the node. It starts as a new, unclaimed node without its networks, as described under Resetting the Node Owner.
+
+With a Docker restart policy such as `unless-stopped` or `on-failure`, the container restarts and logs the same error on every attempt. Read the reason with `docker compose logs backend`. Run `docker compose stop backend` while you restore or delete the folder, so the container stops retrying.
 
 ## Upgrading from Alias Identity Ids
 
