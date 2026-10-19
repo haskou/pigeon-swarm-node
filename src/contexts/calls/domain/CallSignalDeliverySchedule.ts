@@ -3,17 +3,16 @@ import { Timestamp } from '@haskou/value-objects';
 import { CallSignalDeliveryAttempt } from './value-objects/CallSignalDeliveryAttempt';
 
 export class CallSignalDeliverySchedule {
-  private static readonly DELIVERY_TTL_MS = 20_000;
-
-  public static first(sentAt: Timestamp): CallSignalDeliverySchedule {
+  public static first(
+    sentAt: Timestamp,
+    expiresAt: Timestamp,
+  ): CallSignalDeliverySchedule {
     const attempt = CallSignalDeliveryAttempt.first();
 
     return new CallSignalDeliverySchedule(
       attempt,
       sentAt,
-      new Timestamp(
-        sentAt.valueOf() + CallSignalDeliverySchedule.DELIVERY_TTL_MS,
-      ),
+      expiresAt,
       new Timestamp(sentAt.valueOf() + attempt.getRetryDelayMs()),
     );
   }

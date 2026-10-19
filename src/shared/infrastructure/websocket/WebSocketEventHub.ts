@@ -711,13 +711,18 @@ export class WebSocketEventHub {
             [
               'attempt',
               'callId',
+              'createdAt',
               'expiresAt',
-              'payload',
+              'networkId',
               'recipientIdentityId',
+              'scopeType',
+              'sealedEntries',
+              'senderDeviceCredential',
               'senderIdentityId',
               'sentAt',
               'signalId',
               'signalType',
+              'signature',
             ].map((key) => [key, event.attributes[key]]),
           )
         : {

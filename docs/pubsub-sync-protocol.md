@@ -250,8 +250,9 @@ Members of a network can observe:
   types of each media connection. Leases are not stored. For a group call this
   reveals who is connected to a call id, not which group it belongs to.
 - Signal events (`calls.v1.signal.sent`): sender and recipient identity ids,
-  `signalType` and `payload`. The node treats `payload` as opaque and does not
-  encrypt it, so network members can read it.
+  sender device credential, `signalId`, `signalType`, `scopeType`, the clock
+  fields, the sealed entries and the `signature`. The node treats the sealed
+  entries and the signature as opaque: it does not open or verify them.
 - Signal acknowledgements (`calls.v1.signal.acknowledged`): the signal id and
   both identity ids.
 
@@ -295,18 +296,28 @@ Signal event attributes are:
 {
   "attempt": 1,
   "callId": "<callId>",
+  "createdAt": 1770000000000,
   "expiresAt": 1770000020000,
   "networkId": "<networkId>",
   "ownerNodeId": "<nodeId>",
   "participantIds": ["<senderIdentityId>", "<recipientIdentityId>"],
-  "payload": {},
   "recipientIdentityId": "<recipientIdentityId>",
+  "scopeType": "conversation",
+  "sealedEntries": [{"envelope": "<envelope>", "recipientDeviceCredential": "<deviceCredential>"}],
+  "senderDeviceCredential": "<deviceCredential>",
   "senderIdentityId": "<senderIdentityId>",
   "sentAt": 1770000000000,
   "signalId": "<signalId>",
-  "signalType": "offer"
+  "signalType": "offer",
+  "signature": "<signature>"
 }
 ```
+
+The signature covers the bytes `pigeon:call-signal:v1` and a newline, followed by
+RFC 8785 canonical JSON of every field except `signature`. No field that changes
+the meaning of the signal, including `callId`, the identities, `signalType`,
+`scopeType`, `sealedEntries`, `createdAt` and `expiresAt`, can be altered after
+signing. The node does not verify the signature; the recipient UI does.
 
 After successfully applying the signal, the recipient sends
 `{"type":"call_signal_ack","signalId":"<signalId>"}` through its
@@ -1130,8 +1141,9 @@ clients do not receive these raw documents or lease attributes. They receive
 current conversation/community/channel access at delivery time. Browser event
 aggregate IDs identify the call, never the composite participant/owner lease. The revision
 is local to the connected server; clients reset tracking after reconnect.
-Signal delivery retains only recipient/sender, signal payload/type/id, attempt
-and expiry timing; it omits the historical participant list and owning-node ID.
+Signal delivery retains the signed wire object (identity ids, device credential,
+signal type and id, sealed entries, signature and clock fields), the attempt and
+the expiry timing; it omits the historical participant list and owning-node ID.
 
 Projection changes emit local snapshot notifications after OrbitDB state is
 merged. Applying a remote lease compares the local before/after connection

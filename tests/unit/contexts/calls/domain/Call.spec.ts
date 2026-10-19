@@ -11,8 +11,9 @@ import { CallParticipantMissedEvent } from '@app/contexts/calls/domain/events/Ca
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
 import { CallStartedEvent } from '@app/contexts/calls/domain/events/CallStartedEvent';
 import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
+import { CallSignal } from '@app/contexts/calls/domain/CallSignal';
+import { CallSignalMismatchError } from '@app/contexts/calls/domain/errors/CallSignalMismatchError';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
-import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
@@ -40,6 +41,24 @@ describe('Call', () => {
   const scope = CallScope.conversation(
     new ConversationId('one-to-one:call-test'),
   );
+  const signalAttributes = {
+    createdAt: 1_770_000_000_000,
+    expiresAt: 1_770_000_020_000,
+    networkId: networkId.valueOf(),
+    recipientIdentityId: recipient.valueOf(),
+    scopeType: 'conversation',
+    sealedEntries: [
+      {
+        envelope: 'sealed-envelope-for-recipient-device',
+        recipientDeviceCredential: 'recipient-device-credential',
+      },
+    ],
+    senderDeviceCredential: 'sender-device-credential',
+    senderIdentityId: creator.valueOf(),
+    signalId: signalId.valueOf(),
+    signalType: 'offer',
+    signature: 'ed25519-signature-over-signed-bytes',
+  };
 
   it('should start a call and emit a started event', () => {
     const call = Call.start(
@@ -169,24 +188,24 @@ describe('Call', () => {
 
     call.pullDomainEvents();
     const delivery = call.sendSignal(
-      signalId,
+      CallSignal.fromPrimitives({
+        ...signalAttributes,
+        callId: call.getId().valueOf(),
+      }),
       nodeId,
-      creator,
-      recipient,
-      new CallSignalType('offer'),
-      { sdp: 'offer-sdp' },
     );
 
     const events = delivery.pullDomainEvents();
 
     expect(events[0]).toBeInstanceOf(CallSignalSentEvent);
     expect(events[0].attributes).toMatchObject({
-      payload: { sdp: 'offer-sdp' },
       recipientIdentityId: recipient.valueOf(),
       senderIdentityId: creator.valueOf(),
       signalId: signalId.valueOf(),
       signalType: 'offer',
+      signature: 'ed25519-signature-over-signed-bytes',
     });
+    expect(events[0].attributes).not.toHaveProperty('payload');
   });
 
   it('should end a call and reject more signals', () => {
@@ -203,16 +222,35 @@ describe('Call', () => {
 
     expect(call.toPrimitives().status).toBe('ended');
     expect(call.pullDomainEvents()[0]).toBeInstanceOf(CallEndedEvent);
+    const answer = CallSignal.fromPrimitives({
+      ...signalAttributes,
+      callId: call.getId().valueOf(),
+      signalType: 'answer',
+    });
+
+    expect(() => call.sendSignal(answer, nodeId)).toThrow(InactiveCallError);
+  });
+
+  it('should refuse a signal that belongs to another call', () => {
+    const call = Call.start(
+      creator,
+      networkId,
+      scope,
+      [recipient],
+      ...callStartArgs(),
+    );
+
+    call.pullDomainEvents();
+
     expect(() =>
       call.sendSignal(
-        signalId,
+        CallSignal.fromPrimitives({
+          ...signalAttributes,
+          callId: '550e8400-e29b-41d4-a716-446655440009',
+        }),
         nodeId,
-        creator,
-        recipient,
-        new CallSignalType('answer'),
-        { sdp: 'answer-sdp' },
       ),
-    ).toThrow(InactiveCallError);
+    ).toThrow(CallSignalMismatchError);
   });
 
   it('should reject ending an active call by a declined participant', () => {

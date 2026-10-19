@@ -632,11 +632,25 @@ Call signal acknowledgement:
 }
 ```
 
-Send it only after the corresponding `calls.v1.signal.sent` payload has been
+Send it only after the corresponding `calls.v1.signal.sent` event has been
 successfully applied to the local `RTCPeerConnection`. The backend derives the
 recipient from the authenticated WebSocket and ignores client-supplied identity
 fields. A retry uses the same `signalId`: acknowledge it again, but do not
-apply its SDP or ICE payload twice.
+apply its SDP or ICE content twice.
+
+Call signal send (`POST /calls/{callId}/signals`): the body is the signed wire
+object and has no `payload` field. It carries `signalId`, `callId`, `networkId`,
+`senderIdentityId`, `senderDeviceCredential`, `recipientIdentityId`,
+`signalType` (`offer`, `answer` or `ice_candidate`), `scopeType`
+(`conversation` or `community_channel`; `group_capability` is refused),
+`sealedEntries` (one or more `{envelope, recipientDeviceCredential}` objects),
+`createdAt`, `expiresAt` and `signature`. The node checks presence, the path
+`callId`, the `networkId` and the sender against the call, refuses a reused
+`signalId`, and applies the clock rules: `expiresAt` must equal `createdAt` plus
+20000 ms and be later than the node clock, and `createdAt` must be no more than
+5000 ms ahead of the node clock. The node does not verify `signature`; the
+recipient UI verifies it over `pigeon:call-signal:v1` and a newline, followed by
+RFC 8785 canonical JSON of every field except `signature`.
 
 Ephemeral typing indicators:
 
@@ -746,7 +760,7 @@ Event contracts used by frontend:
 | `calls.v1.participant.missed`                         | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `calls.v1.call.ended`                                 | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `calls.v1.call.missed`                                | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
-| `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `senderIdentityId`, `recipientIdentityId`, `signalType`, `payload`, `attempt`, `sentAt`, `expiresAt` |
+| `calls.v1.signal.sent`                                | call id           | `signalId`, `callId`, `networkId`, `senderIdentityId`, `senderDeviceCredential`, `recipientIdentityId`, `signalType`, `scopeType`, `sealedEntries`, `createdAt`, `expiresAt`, `signature`, `attempt`, `ownerNodeId`, `participantIds`, `sentAt` |
 | `calls.v1.participant_lease.was_updated`              | call id           | `callId`, `liveCallRevision`, `liveCall`                                                                                   |
 | `communities.v1.community.was_created`                | community id      | `communityId`, `networkId`, `ownerIdentityId`, `memberIds`, `community`                                                    |
 | `communities.v1.channel.was_created`                  | community id      | `communityId`, `networkId`, `memberIds`, `channel`                                                                         |

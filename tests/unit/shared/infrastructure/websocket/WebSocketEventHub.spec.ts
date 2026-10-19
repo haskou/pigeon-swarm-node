@@ -645,6 +645,44 @@ describe('WebSocketEventHub', () => {
     expect(otherParticipantClient.send).not.toHaveBeenCalled();
   });
 
+  it('forwards call signal wire fields and no payload to the signal recipient', async () => {
+    const hub = new WebSocketEventHub();
+    const senderIdentityId = await generateIdentityId();
+    const recipientIdentityId = await generateIdentityId();
+    const recipientClient = buildClient();
+    const event = new TestDomainEvent('call-id', {
+      callId: 'call-id',
+      createdAt: 1_770_000_000_000,
+      expiresAt: 1_770_000_020_000,
+      networkId: 'network-id',
+      participantIds: [senderIdentityId.valueOf(), recipientIdentityId.valueOf()],
+      payload: { sdp: 'not-on-the-wire' },
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      scopeType: 'conversation',
+      sealedEntries: [
+        { envelope: 'sealed-envelope', recipientDeviceCredential: 'device' },
+      ],
+      senderDeviceCredential: 'sender-device-credential',
+      senderIdentityId: senderIdentityId.valueOf(),
+      signalId: 'signal-id',
+      signalType: 'offer',
+      signature: 'signature-over-signed-bytes',
+    });
+
+    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.signal.sent');
+    hub.register(recipientIdentityId, recipientClient);
+    jest.clearAllMocks();
+
+    authorizeCallAudience(hub);
+    hub.publish([event]);
+    await flushPromises();
+
+    const sent = (recipientClient.send as jest.Mock).mock.calls[0][0] as string;
+    expect(sent).toContain('"signature":"signature-over-signed-bytes"');
+    expect(sent).toContain('"sealedEntries"');
+    expect(sent).not.toContain('"payload"');
+  });
+
   it('sends call lease connection transitions to call participants', async () => {
     const hub = new WebSocketEventHub();
     const participantIdentityId = await generateIdentityId();

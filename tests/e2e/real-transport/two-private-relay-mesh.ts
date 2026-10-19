@@ -407,16 +407,25 @@ async function assertPostDiscoveryPubSub(
   const payload = new CallSignalSentEvent(callId, {
     attempt: 1,
     callId,
-    expiresAt: now + WAIT_TIMEOUT_MS,
+    createdAt: now,
+    expiresAt: now + 20_000,
     networkId: NETWORK_ID,
     ownerNodeId: randomUUID(),
     participantIds: ['sender', 'recipient'],
-    payload: { candidate: `candidate:${randomUUID()}` },
     recipientIdentityId: 'recipient',
+    scopeType: 'conversation',
+    sealedEntries: [
+      {
+        envelope: `envelope-${randomUUID()}`,
+        recipientDeviceCredential: 'recipient-device',
+      },
+    ],
+    senderDeviceCredential: 'sender-device',
     senderIdentityId: 'sender',
     sentAt: now,
     signalId: randomUUID(),
-    signalType: 'ice-candidate',
+    signalType: 'ice_candidate',
+    signature: `signature-${randomUUID()}`,
   }).decode();
   const subscriberReady = (await subscriber.waitFor(
     'subscriber relay identity',

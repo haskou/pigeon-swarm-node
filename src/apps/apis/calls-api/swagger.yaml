@@ -287,7 +287,7 @@ paths:
         '429':
           description: Signal rate limit exceeded (code 429010, CALLS_SIGNAL_RATE_LIMIT_PER_MINUTE signals per call and sender per minute).
         '413':
-          description: Signal payload exceeds 64 KiB.
+          description: Signed signal body exceeds 64 KiB.
         '503':
           description: Replicated state not ready (code 503020). The node holds the start of the call, or the sender's or recipient's own participant record of it, but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
   /call-ice-servers:
@@ -455,22 +455,65 @@ components:
           description: Creator-signed PublicMutationProof (store calls, kind put, record call_start). See docs/api.md for the byte-exact contract.
     PostCallSignalBody:
       type: object
+      additionalProperties: false
+      description: Signed call signal wire object. The node checks presence, expiry and clock bounds and does not verify the signature. The recipient UI verifies signature over pigeon:call-signal:v1 followed by RFC 8785 canonical JSON of every field except signature.
       required:
+        - callId
+        - createdAt
+        - expiresAt
+        - networkId
         - recipientIdentityId
+        - scopeType
+        - sealedEntries
+        - senderDeviceCredential
+        - senderIdentityId
+        - signalId
         - signalType
-        - payload
+        - signature
       properties:
+        callId:
+          type: string
+          format: uuid
+        createdAt:
+          type: integer
+          description: Sender clock in epoch milliseconds. Refused if more than 5000 ms ahead of the node clock.
+        expiresAt:
+          type: integer
+          description: Must equal createdAt + 20000 and be later than the node clock.
+        networkId:
+          type: string
+          format: uuid
         recipientIdentityId:
           type: string
+        scopeType:
+          type: string
+          enum: [conversation, community_channel]
+        sealedEntries:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - envelope
+              - recipientDeviceCredential
+            properties:
+              envelope:
+                type: string
+              recipientDeviceCredential:
+                type: string
+        senderDeviceCredential:
+          type: string
+        senderIdentityId:
+          type: string
+        signalId:
+          type: string
+          format: uuid
         signalType:
           type: string
-          enum:
-            - offer
-            - answer
-            - ice_candidate
-        payload:
-          type: object
-          additionalProperties: true
+          enum: [offer, answer, ice_candidate]
+        signature:
+          type: string
     CallSignalDeliveryResource:
       type: object
       required:

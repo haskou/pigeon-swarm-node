@@ -10,11 +10,12 @@ import { CallSignalDeliveryRegisterMessage } from '@app/contexts/calls/applicati
 import CallSignalDeliveryRetrier from '@app/contexts/calls/application/retry-signal-deliveries/CallSignalDeliveryRetrier';
 import { Call } from '@app/contexts/calls/domain/Call';
 import { CallParticipantNotFoundError } from '@app/contexts/calls/domain/errors/CallParticipantNotFoundError';
+import { CallSignalAlreadySentError } from '@app/contexts/calls/domain/errors/CallSignalAlreadySentError';
+import { CallSignalMismatchError } from '@app/contexts/calls/domain/errors/CallSignalMismatchError';
 import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import CallRepository from '@app/contexts/calls/domain/repositories/CallRepository';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
-import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import InMemoryCallSignalDeliveryRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
 import CallSignalSender from '@app/contexts/calls/application/send-signal/CallSignalSender';
 import { CallSignalSendMessage } from '@app/contexts/calls/application/send-signal/messages/CallSignalSendMessage';
@@ -36,27 +37,82 @@ describe('Call signal delivery applications', () => {
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
   const recipientIdentityId =
     'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=';
+  const createdAt = 1_770_000_000_000;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(createdAt);
+  });
 
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
+
+  function signalFor(
+    callIdValue: string = callId,
+    overrides: Record<string, unknown> = {},
+  ) {
+    return {
+      callId: callIdValue,
+      createdAt,
+      expiresAt: createdAt + 20_000,
+      networkId,
+      recipientIdentityId,
+      scopeType: 'conversation',
+      sealedEntries: [
+        {
+          envelope: 'sealed-envelope-for-recipient-device',
+          recipientDeviceCredential: 'recipient-device-credential',
+        },
+      ],
+      senderDeviceCredential: 'sender-device-credential',
+      senderIdentityId,
+      signalId,
+      signalType: 'offer',
+      signature: 'ed25519-signature-over-signed-bytes',
+      ...overrides,
+    };
+  }
+
+  function callFor(networkIdValue: string = networkId) {
+    return Call.start(
+      new IdentityId(senderIdentityId),
+      new NetworkId(networkIdValue),
+      CallScope.conversation(new ConversationId('one-to-one:signal-test')),
+      [new IdentityId(recipientIdentityId)],
+      ...callStartArgs(),
+    );
+  }
+
+  function senderFor(
+    call: Call,
+    deliveryRepository = new InMemoryCallSignalDeliveryRepository(),
+  ): CallSignalSender {
+    const callRepository = mock<CallRepository>();
+    const nodeRepository = mock<NodeRepository>();
+
+    callRepository.requireById.mockResolvedValue(call);
+    nodeRepository.loadLocalNodeId.mockResolvedValue(new NodeId(ownerNodeId));
+
+    return new CallSignalSender(
+      callRepository,
+      deliveryRepository,
+      mock<DomainEventPublisher>(),
+      nodeRepository,
+      mock<CallAccessAuthorizer>(),
+    );
+  }
 
   function registerMessage(
     attempt: number = 1,
   ): CallSignalDeliveryRegisterMessage {
     return new CallSignalDeliveryRegisterMessage({
+      ...signalFor(),
       attempt,
-      callId,
-      expiresAt: 1_770_000_020_000,
-      networkId,
       ownerNodeId,
       participantIds: [senderIdentityId, recipientIdentityId],
-      payload: { sdp: 'offer-sdp' },
-      recipientIdentityId,
-      senderIdentityId,
-      sentAt: 1_770_000_000_000,
-      signalId,
-      signalType: 'offer',
+      sentAt: createdAt,
     });
   }
 
@@ -196,9 +252,7 @@ describe('Call signal delivery applications', () => {
       new CallSignalSendMessage(
         call.getId().valueOf(),
         senderIdentityId,
-        recipientIdentityId,
-        new CallSignalType('offer').valueOf(),
-        { sdp: 'offer-sdp' },
+        signalFor(call.getId().valueOf()),
       ),
     );
 
@@ -207,6 +261,101 @@ describe('Call signal delivery applications', () => {
     await expect(
       deliveryRepository.requireById(delivery.getId()),
     ).resolves.toBeDefined();
+  });
+
+  it('stores the sealed entries and signature without a payload', async () => {
+    const call = callFor();
+
+    const delivery = await senderFor(call).send(
+      new CallSignalSendMessage(
+        call.getId().valueOf(),
+        senderIdentityId,
+        signalFor(call.getId().valueOf()),
+      ),
+    );
+
+    expect(delivery.toPrimitives()).toMatchObject({
+      expiresAt: createdAt + 20_000,
+      signature: 'ed25519-signature-over-signed-bytes',
+      sealedEntries: [
+        {
+          envelope: 'sealed-envelope-for-recipient-device',
+          recipientDeviceCredential: 'recipient-device-credential',
+        },
+      ],
+    });
+    expect(delivery.toPrimitives()).not.toHaveProperty('payload');
+  });
+
+  it('refuses a call id that does not match the path', () => {
+    expect(
+      () =>
+        new CallSignalSendMessage(
+          '6b3b7e0e-8b8a-4d0a-9f5e-2c1d3a4b5c6d',
+          senderIdentityId,
+          signalFor(),
+        ),
+    ).toThrow(CallSignalMismatchError);
+  });
+
+  it('refuses a signal sent by someone other than the authenticated caller', () => {
+    expect(
+      () => new CallSignalSendMessage(callId, recipientIdentityId, signalFor()),
+    ).toThrow(CallSignalMismatchError);
+  });
+
+  it('refuses a scope that does not match the call before spending rate budget', async () => {
+    const call = callFor();
+    const onCallFound = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      senderFor(call).send(
+        new CallSignalSendMessage(
+          call.getId().valueOf(),
+          senderIdentityId,
+          signalFor(call.getId().valueOf(), { scopeType: 'community_channel' }),
+        ),
+        onCallFound,
+      ),
+    ).rejects.toBeInstanceOf(CallSignalMismatchError);
+    expect(onCallFound).not.toHaveBeenCalled();
+  });
+
+  it('refuses a network that does not match the call before spending rate budget', async () => {
+    const call = callFor();
+    const onCallFound = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      senderFor(call).send(
+        new CallSignalSendMessage(
+          call.getId().valueOf(),
+          senderIdentityId,
+          signalFor(call.getId().valueOf(), {
+            networkId: '0b8f7a9e-3c1d-4e2f-8a6b-5d4c3b2a1f0e',
+          }),
+        ),
+        onCallFound,
+      ),
+    ).rejects.toBeInstanceOf(CallSignalMismatchError);
+    expect(onCallFound).not.toHaveBeenCalled();
+  });
+
+  it('refuses a signal id already in use before spending rate budget', async () => {
+    const call = callFor();
+    const sender = senderFor(call);
+    const onCallFound = jest.fn().mockResolvedValue(undefined);
+    const message = new CallSignalSendMessage(
+      call.getId().valueOf(),
+      senderIdentityId,
+      signalFor(call.getId().valueOf()),
+    );
+
+    await sender.send(message, onCallFound);
+
+    await expect(sender.send(message, onCallFound)).rejects.toBeInstanceOf(
+      CallSignalAlreadySentError,
+    );
+    expect(onCallFound).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -242,9 +391,10 @@ describe('Call signal delivery applications', () => {
         new CallSignalSendMessage(
           call.getId().valueOf(),
           recipientIdentityId,
-          senderIdentityId,
-          new CallSignalType('offer').valueOf(),
-          { sdp: 'offer-sdp' },
+          signalFor(call.getId().valueOf(), {
+            recipientIdentityId: senderIdentityId,
+            senderIdentityId: recipientIdentityId,
+          }),
         ),
       );
 

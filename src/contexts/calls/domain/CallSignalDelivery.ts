@@ -13,20 +13,17 @@ import { CallSignalSentEvent } from './events/CallSignalSentEvent';
 import { CallId } from './value-objects/CallId';
 import { CallSignalDeliveryAttempt } from './value-objects/CallSignalDeliveryAttempt';
 import { CallSignalId } from './value-objects/CallSignalId';
-import { CallSignalType } from './value-objects/CallSignalType';
 
 export class CallSignalDelivery extends AggregateRoot {
   public static send(
-    signalId: CallSignalId,
     route: CallSignalDeliveryRoute,
     signal: CallSignal,
     sentAt: Timestamp = Timestamp.now(),
   ): CallSignalDelivery {
     const delivery = new CallSignalDelivery(
-      signalId,
       route,
       signal,
-      CallSignalDeliverySchedule.first(sentAt),
+      CallSignalDeliverySchedule.first(sentAt, signal.getExpiresAt()),
     );
 
     delivery.recordSent();
@@ -38,7 +35,6 @@ export class CallSignalDelivery extends AggregateRoot {
     primitives: PrimitiveOf<CallSignalDelivery>,
   ): CallSignalDelivery {
     return new CallSignalDelivery(
-      new CallSignalId(primitives.signalId),
       new CallSignalDeliveryRoute(
         new CallId(primitives.callId),
         new NodeId(primitives.ownerNodeId),
@@ -47,12 +43,7 @@ export class CallSignalDelivery extends AggregateRoot {
           (participantId) => new IdentityId(participantId),
         ),
       ),
-      new CallSignal(
-        new IdentityId(primitives.senderIdentityId),
-        new IdentityId(primitives.recipientIdentityId),
-        new CallSignalType(primitives.signalType),
-        primitives.payload,
-      ),
+      CallSignal.fromPrimitives(primitives),
       new CallSignalDeliverySchedule(
         new CallSignalDeliveryAttempt(primitives.attempt),
         new Timestamp(primitives.sentAt),
@@ -66,7 +57,6 @@ export class CallSignalDelivery extends AggregateRoot {
   }
 
   constructor(
-    private readonly signalId: CallSignalId,
     private readonly route: CallSignalDeliveryRoute,
     private readonly signal: CallSignal,
     private readonly schedule: CallSignalDeliverySchedule,
@@ -86,18 +76,11 @@ export class CallSignalDelivery extends AggregateRoot {
 
     this.record(
       new CallSignalSentEvent(primitives.callId, {
+        ...this.signal.toPrimitives(),
         attempt: primitives.attempt,
-        callId: primitives.callId,
-        expiresAt: primitives.expiresAt,
-        networkId: primitives.networkId,
         ownerNodeId: primitives.ownerNodeId,
         participantIds: primitives.participantIds,
-        payload: primitives.payload,
-        recipientIdentityId: primitives.recipientIdentityId,
-        senderIdentityId: primitives.senderIdentityId,
         sentAt: primitives.sentAt,
-        signalId: primitives.signalId,
-        signalType: primitives.signalType,
       }),
     );
   }
@@ -149,7 +132,7 @@ export class CallSignalDelivery extends AggregateRoot {
   }
 
   public getId(): CallSignalId {
-    return this.signalId;
+    return this.signal.getId();
   }
 
   public getNextMaintenanceAt(ownerNodeId: NodeId): Timestamp | undefined {
@@ -193,7 +176,6 @@ export class CallSignalDelivery extends AggregateRoot {
       ...this.route.toPrimitives(),
       ...this.schedule.toPrimitives(),
       ...this.signal.toPrimitives(),
-      signalId: this.signalId.valueOf(),
     };
   }
 }

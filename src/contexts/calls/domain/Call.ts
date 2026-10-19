@@ -13,6 +13,7 @@ import { CallSignal } from './CallSignal';
 import { CallSignalDelivery } from './CallSignalDelivery';
 import { CallSignalDeliveryRoute } from './CallSignalDeliveryRoute';
 import { CallParticipantNotFoundError } from './errors/CallParticipantNotFoundError';
+import { CallSignalMismatchError } from './errors/CallSignalMismatchError';
 import { InactiveCallError } from './errors/InactiveCallError';
 import { CallEndedEvent } from './events/CallEndedEvent';
 import { CallMissedEvent } from './events/CallMissedEvent';
@@ -24,8 +25,6 @@ import { CallStartedEvent } from './events/CallStartedEvent';
 import { CallId } from './value-objects/CallId';
 import { CallNonce } from './value-objects/CallNonce';
 import { CallSessionEpoch } from './value-objects/CallSessionEpoch';
-import { CallSignalId } from './value-objects/CallSignalId';
-import { CallSignalType } from './value-objects/CallSignalType';
 import { CallStatus } from './value-objects/CallStatus';
 
 export class Call extends AggregateRoot {
@@ -287,36 +286,37 @@ export class Call extends AggregateRoot {
   }
 
   public sendSignal(
-    signalId: CallSignalId,
+    signal: CallSignal,
     ownerNodeId: NodeId,
-    senderIdentityId: IdentityId,
-    recipientIdentityId: IdentityId,
-    signalType: CallSignalType,
-    payload: unknown,
     sentAt: Timestamp = Timestamp.now(),
   ): CallSignalDelivery {
     this.assertActive();
-    const sender = this.findParticipant(senderIdentityId);
-    const recipient = this.findParticipant(recipientIdentityId);
+    this.assertCanCarrySignal(signal);
+    const sender = this.findParticipant(signal.getSenderIdentityId());
+    const recipient = this.findParticipant(signal.getRecipientIdentityId());
 
     assert(sender?.isJoined(), new CallParticipantNotFoundError());
     assert(recipient?.canReceiveSignal(), new CallParticipantNotFoundError());
 
     return CallSignalDelivery.send(
-      signalId,
       new CallSignalDeliveryRoute(
         this.origin.getId(),
         ownerNodeId,
         this.networkId,
         this.participants.map((participant) => participant.getIdentityId()),
       ),
-      new CallSignal(
-        senderIdentityId,
-        recipientIdentityId,
-        signalType,
-        payload,
-      ),
+      signal,
       sentAt,
+    );
+  }
+
+  /** A signal carries this call's id, network, and scope; a group-capability call carries none. */
+  public assertCanCarrySignal(signal: CallSignal): void {
+    assert(
+      signal.getCallId().isEqual(this.origin.getId()) &&
+        signal.getNetworkId().isEqual(this.networkId) &&
+        signal.getScopeType().isEqual(this.scope.getType()),
+      new CallSignalMismatchError(),
     );
   }
 

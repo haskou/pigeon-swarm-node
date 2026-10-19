@@ -1,27 +1,29 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 
+import { CallSignal, CallSignalAttributes } from '../../../domain/CallSignal';
+import { CallSignalMismatchError } from '../../../domain/errors/CallSignalMismatchError';
 import { CallId } from '../../../domain/value-objects/CallId';
-import { CallSignalType } from '../../../domain/value-objects/CallSignalType';
 
 export class CallSignalSendMessage {
   public readonly callId: CallId;
-  public readonly payload: unknown;
-  public readonly recipientIdentityId: IdentityId;
   public readonly senderIdentityId: IdentityId;
-  public readonly signalType: CallSignalType;
+  public readonly signal: CallSignal;
 
   constructor(
     callId: string,
     senderIdentityId: string,
-    recipientIdentityId: string,
-    signalType: string,
-    payload: unknown,
+    wire: CallSignalAttributes,
     public readonly capability?: string,
   ) {
     this.callId = new CallId(callId);
     this.senderIdentityId = new IdentityId(senderIdentityId);
-    this.recipientIdentityId = new IdentityId(recipientIdentityId);
-    this.signalType = new CallSignalType(signalType);
-    this.payload = payload;
+    this.signal = CallSignal.fromPrimitives(wire);
+
+    if (
+      !this.signal.getCallId().isEqual(this.callId) ||
+      !this.signal.getSenderIdentityId().isEqual(this.senderIdentityId)
+    ) {
+      throw new CallSignalMismatchError();
+    }
   }
 }

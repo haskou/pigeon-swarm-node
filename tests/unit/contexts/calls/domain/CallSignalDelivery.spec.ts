@@ -8,7 +8,6 @@ import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSigna
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CallSignalDeliveryAttempt } from '@app/contexts/calls/domain/value-objects/CallSignalDeliveryAttempt';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
-import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
@@ -28,17 +27,29 @@ describe('CallSignalDelivery', () => {
 
   function send(at: number = 1_770_000_000_000): CallSignalDelivery {
     return CallSignalDelivery.send(
-      signalId,
       new CallSignalDeliveryRoute(callId, ownerNodeId, networkId, [
         senderIdentityId,
         recipientIdentityId,
       ]),
-      new CallSignal(
-        senderIdentityId,
-        recipientIdentityId,
-        new CallSignalType('offer'),
-        { sdp: 'offer-sdp' },
-      ),
+      CallSignal.fromPrimitives({
+        callId: callId.valueOf(),
+        createdAt: at,
+        expiresAt: at + 20_000,
+        networkId: networkId.valueOf(),
+        recipientIdentityId: recipientIdentityId.valueOf(),
+        scopeType: 'conversation',
+        sealedEntries: [
+          {
+            envelope: 'sealed-envelope-for-recipient-device',
+            recipientDeviceCredential: 'recipient-device-credential',
+          },
+        ],
+        senderDeviceCredential: 'sender-device-credential',
+        senderIdentityId: senderIdentityId.valueOf(),
+        signalId: signalId.valueOf(),
+        signalType: 'offer',
+        signature: 'ed25519-signature-over-signed-bytes',
+      }),
       new Timestamp(at),
     );
   }
@@ -56,6 +67,7 @@ describe('CallSignalDelivery', () => {
       ownerNodeId: ownerNodeId.valueOf(),
       signalId: signalId.valueOf(),
     });
+    expect(event.attributes).not.toHaveProperty('payload');
   });
 
   it('retries with the same signal id and increasing attempts', () => {
