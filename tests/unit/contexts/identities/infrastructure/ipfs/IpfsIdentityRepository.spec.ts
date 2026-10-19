@@ -935,6 +935,33 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalled();
     });
 
+    it('should throw ReplicatedStateNotReadyError instead of local candidates when the remote race is not ready', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCid = new IPFSId('bafyidentity-v1');
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: previousCid.valueOf(),
+          identity: previousIdentity,
+          identityId: previousPrimitives.id,
+          previousCid: previousPrimitives.previousIdentityExternalIdentifier,
+          version: previousPrimitives.version,
+        },
+      ]);
+      ipfsManager.calculateJSONId.mockResolvedValue(previousCid);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+      ipfsManager.getRecordCandidates.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(
+        repository.findFreshCandidateReferencesById(
+          new IdentityId(previousPrimitives.id),
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+    });
+
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();

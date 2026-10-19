@@ -211,21 +211,31 @@ describe('IPFSContentRacer', () => {
       );
     });
 
-    it('should ignore missing and failed record lookups', async () => {
+    it('should ignore missing record lookups when every network answers', async () => {
       const network1 = mock<IPFSNetwork>();
       const network2 = mock<IPFSNetwork>();
-      const network3 = mock<IPFSNetwork>();
 
       network1.getRecord.mockResolvedValue(undefined);
-      network2.getRecord.mockRejectedValue(new Error('timeout'));
-      network3.getRecord.mockResolvedValue('cid-b');
+      network2.getRecord.mockResolvedValue('cid-b');
 
       const result = await racer.raceGetRecordCandidates(
-        [network1, network2, network3],
+        [network1, network2],
         'my-key',
       );
 
       expect(result).toEqual(['cid-b']);
+    });
+
+    it('should throw ReplicatedStateNotReadyError when a record lookup fails even if another network found a candidate', async () => {
+      const network1 = mock<IPFSNetwork>();
+      const network2 = mock<IPFSNetwork>();
+
+      network1.getRecord.mockResolvedValue('cid-b');
+      network2.getRecord.mockRejectedValue(new Error('transport failed'));
+
+      await expect(
+        racer.raceGetRecordCandidates([network1, network2], 'my-key'),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
     });
 
     it('should throw ReplicatedStateNotReadyError when record lookups time out before any answer', async () => {
@@ -246,23 +256,21 @@ describe('IPFSContentRacer', () => {
       }
     });
 
-    it('should keep candidates found before the timeout', async () => {
+    it('should throw ReplicatedStateNotReadyError instead of keeping candidates when a network times out', async () => {
       const previousTimeout = process.env.IPFS_CONTENT_TIMEOUT_MS;
       const network1 = mock<IPFSNetwork>();
       const network2 = mock<IPFSNetwork>();
 
       process.env.IPFS_CONTENT_TIMEOUT_MS = '1';
-      network1.getRecord.mockResolvedValue('cid-a');
+      network1.getRecord.mockResolvedValue('planted-cid');
       network2.getRecord.mockReturnValue(never());
 
       try {
         const timeoutRacer = new IPFSContentRacer();
-        const result = await timeoutRacer.raceGetRecordCandidates(
-          [network1, network2],
-          'my-key',
-        );
 
-        expect(result).toEqual(['cid-a']);
+        await expect(
+          timeoutRacer.raceGetRecordCandidates([network1, network2], 'my-key'),
+        ).rejects.toThrow(ReplicatedStateNotReadyError);
       } finally {
         restoreTimeout(previousTimeout);
       }
