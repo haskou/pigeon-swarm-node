@@ -54,6 +54,17 @@ It keeps the node id, networks, relay configuration, identities, content and key
 
 To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives. Such a node is unclaimed, like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API.
 
+## Unreadable Node Configuration
+
+If the stored node configuration cannot be read, the node logs `Application error` followed by `The stored node configuration cannot be read, so the node cannot start, and nothing was changed.`, then exits with status `1`. The configuration is never regenerated: a new one would drop the stored networks and give the node a new node id.
+
+Choose one recovery:
+
+- To keep this node, stop it and restore the `PIGEON_LOCAL_DB_PATH` folder from a backup, then start the node.
+- To start over, stop it and delete the `PIGEON_LOCAL_DB_PATH` folder explicitly, then start the node. It starts as a new, unclaimed node without its networks, as described under Resetting the Node Owner.
+
+With a Docker restart policy such as `unless-stopped` or `on-failure`, the container restarts and logs the same error on every attempt. Read the reason with `docker compose logs backend`. Run `docker compose stop backend` while you restore or delete the folder, so the container stops retrying.
+
 ## Upgrading from Alias Identity Ids
 
 Nodes that ran before identity ids had to be canonical may hold alias ids (a DER prefix with a different first byte, or base64 with non-zero padding bits). Such an id is refused on every signed route and in block lists, and it cannot be stored again. On each start, before the API listens, the node purges alias ids from its local exceptions and from adopted block sources, and it logs only counts: `Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n>`.

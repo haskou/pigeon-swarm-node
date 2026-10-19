@@ -40,7 +40,7 @@ export class GetKeychainRoute extends Route {
 
     // Not ready means the node is still starting or has not opened its replicated
     // state, so a missing keychain cannot be told apart from one still replaying.
-    if (!this.readiness.isReady()) {
+    if (!this.readiness.isServingReplicatedState()) {
       throw new ReplicatedStateNotReadyError();
     }
 

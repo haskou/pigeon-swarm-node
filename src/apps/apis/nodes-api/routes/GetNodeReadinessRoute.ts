@@ -10,8 +10,8 @@ export class GetNodeReadinessRoute extends Route {
     this.get<NodeReadiness>(NodeReadiness);
 
   @Get()
-  public getNodeReadiness(@Res() response: Response): Response {
-    const ready = this.readiness.isReady();
+  public async getNodeReadiness(@Res() response: Response): Promise<Response> {
+    const ready = await this.readiness.isReady();
 
     return response
       .status(

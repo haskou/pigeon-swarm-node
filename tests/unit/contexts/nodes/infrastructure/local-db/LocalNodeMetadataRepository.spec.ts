@@ -1,3 +1,4 @@
+import { NodeMetadataIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeMetadataIsUnreadableError';
 import { NodeOwnerResetFlagIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetFlagIsUnreadableError';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
 import { NetworkKey } from '@app/contexts/nodes/domain/value-objects/NetworkKey';
@@ -277,6 +278,169 @@ describe('LocalNodeMetadataRepository', () => {
       await expect(
         repository.isLocalNodeOwnedBy(IdentityIdMother.canonical()),
       ).resolves.toBe(false);
+    });
+  });
+
+  describe('isLocalNodeConfigurationEmpty', () => {
+    const emptyDocument = () => ({
+      _id: 'local',
+      networks: {},
+      nodeId: canonicalNodeId,
+      relayConfiguration: defaultRelayConfiguration,
+    });
+
+    it('should report a persisted node without networks as empty, without touching the runtime networks', async () => {
+      database.findOne.mockResolvedValue(emptyDocument());
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        true,
+      );
+      expect(networkRegistry.initialize).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+    });
+
+    it('should report a persisted node with networks as not empty', async () => {
+      database.findOne.mockResolvedValue({
+        ...emptyDocument(),
+        networks: {
+          [privateNetworkId.valueOf()]: new NetworkMother()
+            .withId(privateNetworkId)
+            .withName(new NetworkName('private_0'))
+            .withPrivateKey()
+            .build()
+            .toPrimitives(),
+        },
+      });
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+    });
+
+    it('should not report a node without a readable persisted configuration as empty', async () => {
+      database.findOne.mockResolvedValue(undefined);
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+
+      database.findOne.mockResolvedValue({
+        ...emptyDocument(),
+        networks: 'unreadable',
+      });
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+    });
+
+    it('should report a fresh node whose configuration was generated at boot as empty', async () => {
+      database.findOne.mockResolvedValue(undefined);
+      networkRegistry.getAll.mockReturnValue([]);
+      await repository.loadLocalNode();
+
+      database.findOne.mockResolvedValue(emptyDocument());
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        true,
+      );
+    });
+  });
+
+  describe('unreadable persisted configuration', () => {
+    const unreadableDocument = (): Record<string, unknown> => ({
+      _id: 'local',
+      networks: 'unreadable',
+      nodeId: canonicalNodeId,
+      relayConfiguration: defaultRelayConfiguration,
+    });
+
+    /** Serves `stored` as the database, so a repository built later reads the same documents. */
+    const storeIn = (stored: Map<string, Record<string, unknown>>) => {
+      database.findOne.mockImplementation(async (_namespace, id) =>
+        stored.get(id),
+      );
+      database.save.mockImplementation(async (_namespace, id, document) => {
+        stored.set(id, document);
+      });
+    };
+
+    it('should refuse to boot over an unreadable configuration and keep it as stored', async () => {
+      const original = unreadableDocument();
+      const stored = new Map([['local', original]]);
+      storeIn(stored);
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        NodeMetadataIsUnreadableError,
+      );
+
+      expect(database.save).not.toHaveBeenCalled();
+      expect(stored.get('local')).toBe(original);
+    });
+
+    it('should tell the operator how to recover an unreadable configuration', async () => {
+      storeIn(new Map([['local', unreadableDocument()]]));
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        'The stored node configuration cannot be read, so the node cannot start, and nothing was changed. To keep this node, stop it and restore the PIGEON_LOCAL_DB_PATH folder from a backup. To start over instead, stop it and delete that folder explicitly: the node then starts as a new, unclaimed node without its networks.',
+      );
+    });
+
+    it('should refuse a configuration whose networks are stored as an array', async () => {
+      const original: Record<string, unknown> = {
+        ...unreadableDocument(),
+        networks: [],
+      };
+      const stored = new Map([['local', original]]);
+      storeIn(stored);
+      networkRegistry.getAll.mockReturnValue([]);
+
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        NodeMetadataIsUnreadableError,
+      );
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+      expect(database.save).not.toHaveBeenCalled();
+      expect(stored.get('local')).toBe(original);
+    });
+
+    it('should not report a node as empty after a restart over an unreadable configuration', async () => {
+      const original = unreadableDocument();
+      const stored = new Map([['local', original]]);
+      storeIn(stored);
+      networkRegistry.getAll.mockReturnValue([]);
+      await expect(repository.loadLocalNode()).rejects.toThrow(
+        NodeMetadataIsUnreadableError,
+      );
+
+      const restarted = new LocalNodeMetadataRepository(
+        database,
+        networkRegistry,
+        new LocalNodeMetadataMapper(),
+      );
+
+      await expect(restarted.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+      await expect(restarted.loadLocalNode()).rejects.toThrow(
+        NodeMetadataIsUnreadableError,
+      );
+      expect(database.save).not.toHaveBeenCalled();
+      expect(stored.get('local')).toBe(original);
+    });
+
+    it('should refuse to change an unreadable configuration and save nothing', async () => {
+      const original = unreadableDocument();
+      const stored = new Map([['local', original]]);
+      storeIn(stored);
+
+      await expect(
+        repository.updateLocalNode(() => undefined),
+      ).rejects.toThrow(NodeMetadataIsUnreadableError);
+
+      expect(database.save).not.toHaveBeenCalled();
+      expect(stored.get('local')).toBe(original);
     });
   });
 

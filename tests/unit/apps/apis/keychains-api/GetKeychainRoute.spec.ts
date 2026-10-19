@@ -2,11 +2,13 @@ import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequ
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import NodeReadiness from '@app/apps/NodeReadiness';
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { generateKeyPairSync } from 'crypto';
 import { Server } from 'http';
+import { mock } from 'jest-mock-extended';
 import { AddressInfo } from 'net';
 import { createExpressServer } from 'routing-controllers';
 
@@ -26,9 +28,15 @@ describe('Get keychain route readiness gate', () => {
       .replace(/-----[^-]+-----|\s/g, '');
 
     replicatedStateOpen = false;
-    readiness = new NodeReadiness({
-      isOpen: () => replicatedStateOpen,
-    } as unknown as OrbitDBReplicatedStateRegistry);
+    const nodeRepository = mock<NodeRepository>();
+    nodeRepository.isLocalNodeConfigurationEmpty.mockResolvedValue(true);
+    readiness = new NodeReadiness(
+      {
+        isOpen: () => replicatedStateOpen,
+        hasNetworks: () => false,
+      } as unknown as OrbitDBReplicatedStateRegistry,
+      nodeRepository,
+    );
     find = jest.fn().mockRejectedValue(new Error('finder reached'));
 
     const services = new Map<unknown, unknown>([
@@ -73,6 +81,13 @@ describe('Get keychain route readiness gate', () => {
 
     readiness.markStarted();
     expect((await getKeychain()).status).not.toBe(503);
+    expect(find).toHaveBeenCalledTimes(1);
+
+    // A started fresh node is ready for probes even while its replicated state
+    // is closed. Keychain reads must still wait for the open state.
+    replicatedStateOpen = false;
+    await expect(readiness.isReady()).resolves.toBe(true);
+    expect((await getKeychain()).status).toBe(503);
     expect(find).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,3 +9,12 @@ Feature: Node readiness
       {"status":"ready"}
       """
     And response header "Cache-Control" should be "no-store"
+
+  Scenario: A started node with no configured network reports ready without credentials
+    When I GET "/node/readiness"
+    Then response code is equal to 200
+    And response data should match exactly
+      """
+      {"status":"ready"}
+      """
+    And response header "Cache-Control" should be "no-store"

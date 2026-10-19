@@ -1,4 +1,5 @@
 import { LocalNodeNotFoundError } from '@app/contexts/nodes/domain/errors/LocalNodeNotFoundError';
+import { NodeMetadataIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeMetadataIsUnreadableError';
 import { NodeOwnerResetFlagIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetFlagIsUnreadableError';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
@@ -92,8 +93,12 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       LocalNodeMetadataRepository.LOCAL_NODE_ID,
     );
 
-    if (!document || !this.isDocument(document)) {
+    if (!document) {
       return undefined;
+    }
+
+    if (!this.isDocument(document)) {
+      throw new NodeMetadataIsUnreadableError();
     }
 
     return {
@@ -123,7 +128,11 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     );
   }
 
-  /** Generates and saves the metadata of a new node; run inside `exclusively`. */
+  /**
+   * Generates and saves the metadata of a new node. Runs inside `exclusively`
+   * after `findMetadata` found no stored document, so a stored document, whether
+   * readable or not, is never replaced.
+   */
   private async createMetadata(): Promise<LocalNodeMetadataDocument> {
     const generatedMetadata = this.metadataMapper.generate();
 
@@ -293,6 +302,19 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   public async isLocalNodeOwnedBy(identityId: IdentityId): Promise<boolean> {
     return this.nodeFromMetadata(await this.loadOrCreateMetadata()).isOwnedBy(
       identityId,
+    );
+  }
+
+  public async isLocalNodeConfigurationEmpty(): Promise<boolean> {
+    const document = await this.database.findOne(
+      LocalNodeMetadataRepository.NAMESPACE,
+      LocalNodeMetadataRepository.LOCAL_NODE_ID,
+    );
+
+    return (
+      !!document &&
+      this.isDocument(document) &&
+      Object.keys(document.networks).length === 0
     );
   }
 

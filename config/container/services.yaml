@@ -3,6 +3,7 @@ services:
     class: /apps/NodeReadiness
     arguments:
       - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
   apps/PigeonApplication:
     class: /apps/PigeonApplication
     arguments: []
