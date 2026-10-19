@@ -3181,6 +3181,11 @@ Implemented:
 - resolve the latest valid candidate from OrbitDB metadata
 - return encrypted payload as-is for client-side unlock/decryption
 
+Errors:
+
+- `409` code `KeychainNotFoundError`: the node holds no valid keychain candidate for the identity
+- `503` code `503020` (`ReplicatedStateNotReadyError`): the node is not ready: it has not finished startup or has not opened its replicated state yet, for example right after a restart while it replays. The keychain is not reported missing, so retry. A client must not publish a keychain version, or a first version, on this response.
+
 ## Conversation HTTP API
 
 Implemented mutating endpoints use signed HTTP requests with `X-Identity-Id`,

@@ -1,8 +1,10 @@
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import OrbitDBKeychainMetadataIndex from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataIndex';
+import OrbitDBKeychainMetadataProjection from '@app/contexts/keychains/infrastructure/orbitdb/OrbitDBKeychainMetadataProjection';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
 
@@ -344,6 +346,62 @@ describe('OrbitDBKeychainMetadataIndex', () => {
       }),
     );
   });
+
+  describe('while the replicated state is not open', () => {
+    async function pendingKeychainReplay(): Promise<{
+      index: OrbitDBKeychainMetadataIndex;
+      registry: OrbitDBReplicatedStateRegistry;
+      release(): Promise<void>;
+    }> {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const index = new OrbitDBKeychainMetadataIndex(registry);
+      const replay = deferred<unknown[]>();
+      const stores = keychainStores([], new Map()) as unknown as {
+        keychains: { all: jest.Mock };
+      };
+
+      stores.keychains.all = jest.fn(() => replay.promise);
+      await new OrbitDBKeychainMetadataProjection(registry, index).start();
+      const registration = registry.register(networkId, stores as never);
+
+      await flushBackgroundTasks();
+
+      return {
+        index,
+        registry,
+        async release(): Promise<void> {
+          replay.resolve([]);
+          await registration;
+          registry.clear();
+        },
+      };
+    }
+
+    it('rejects owner lookups with ReplicatedStateNotReadyError instead of reporting no keychain', async () => {
+      const mother = await KeychainMother.create();
+      const pending = await pendingKeychainReplay();
+
+      expect(pending.registry.isOpen()).toBe(false);
+      await expect(
+        pending.index.findByOwnerIdentityId(mother.ownerIdentityId),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+
+      await pending.release();
+    });
+
+    it('rejects external identifier lookups with ReplicatedStateNotReadyError instead of reporting no keychain', async () => {
+      const pending = await pendingKeychainReplay();
+
+      expect(pending.registry.isOpen()).toBe(false);
+      await expect(
+        pending.index.findByExternalIdentifier(
+          new KeychainExternalIdentifier('bafykeychain-pending'),
+        ),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+
+      await pending.release();
+    });
+  });
 });
 
 function keychainStores(
@@ -368,6 +426,7 @@ function keychainStores(
         return Promise.resolve('ok');
       }),
     },
+    getSynchronizationStores: (): never[] => [],
     keychains: {
       put: jest.fn((document: Record<string, unknown>) => {
         upsertDocument(currentDocuments, document);

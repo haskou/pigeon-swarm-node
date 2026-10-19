@@ -1,8 +1,10 @@
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
+import NodeReadiness from '@app/apps/NodeReadiness';
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -14,6 +16,9 @@ import { KeychainViewModel } from '../view-model/KeychainViewModel';
 export class GetKeychainRoute extends Route {
   private readonly finder: CurrentKeychainFinder =
     this.get<CurrentKeychainFinder>(CurrentKeychainFinder);
+
+  private readonly readiness: NodeReadiness =
+    this.get<NodeReadiness>(NodeReadiness);
 
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
@@ -31,6 +36,12 @@ export class GetKeychainRoute extends Route {
 
     if (!ownerIdentityId.isEqual(requesterIdentityId)) {
       throw new InvalidSignedRequestError();
+    }
+
+    // Not ready means the node is still starting or has not opened its replicated
+    // state, so a missing keychain cannot be told apart from one still replaying.
+    if (!this.readiness.isReady()) {
+      throw new ReplicatedStateNotReadyError();
     }
 
     const keychain = await this.finder.find(

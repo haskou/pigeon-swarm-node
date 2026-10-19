@@ -755,6 +755,12 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   participant it cannot find as `503020` instead of `CallNotFoundError` or
   `CallParticipantNotFoundError`. The cause is local block availability, and the
   bound keeps a block no peer serves from holding reads off.
+- Keychain lookups (`GET /keychains/{identityId}` and the keychain publication
+  consumers) answer `503020` while the node is not ready: startup has not
+  finished, or the replicated state is not open, for example no network is
+  registered yet, a store still awaits replay, or a subscriber bootstrap is
+  deferred (as above). A keychain is not reported missing in that state. The
+  consumers complete as for a miss, as described below.
 
 ### Replicated store audit
 
@@ -816,11 +822,12 @@ the owner identity. The register and synchronize consumers resolve the keychain
 through `CurrentKeychainFinder`, the lookup that also serves `GetKeychainRoute`:
 local replicated metadata first, then the routing records. When the lookup
 reports `KeychainNotFoundError` because the replicated document or routing
-record has not arrived yet, the consumer completes without an error and logs one
-debug line without identifiers. The event is not retried. The keychain is
-recorded when the replicated document is projected into the metadata index or by
-a later lookup, and the WebSocket fanout of the event still runs. Other lookup
-errors still fail the handler.
+record has not arrived yet, or `ReplicatedStateNotReadyError` (`503020`)
+because the replicated state is still replaying after a restart, the consumer
+completes without an error and logs one debug line without identifiers. The
+event is not retried. The keychain is recorded when the replicated document is
+projected into the metadata index or by a later lookup, and the WebSocket
+fanout of the event still runs. Other lookup errors still fail the handler.
 
 `yarn test:integration:forged-keychains` runs four real private Helia/OrbitDB
 nodes (two with the gate, one malicious without it, one ungated control). It

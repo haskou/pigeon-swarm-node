@@ -102,7 +102,15 @@ async function open(replica: Replica, gated: boolean): Promise<void> {
   replica.index = new OrbitDBKeychainMetadataIndex(registry);
   await registry.register(
     networkId,
-    replica.stores as unknown as OrbitDBPrivateNetworkStores,
+    {
+      ...replica.stores,
+      getSynchronizationStores: () =>
+        Object.entries(replica.stores!).map(([name, database]) => ({
+          database,
+          getSynchronizedPeerIds: (): string[] => [],
+          name,
+        })),
+    } as unknown as OrbitDBPrivateNetworkStores,
   );
   await new OrbitDBKeychainMetadataProjection(registry, replica.index).start();
 }

@@ -754,7 +754,15 @@ async function assertProjectedMetadataIndexes(
   await assertMetadataHeadsAreAbsent(stores);
   await registry.register(
     NETWORK_ID,
-    stores as unknown as OrbitDBPrivateNetworkStores,
+    {
+      ...stores,
+      getSynchronizationStores: () =>
+        Object.entries(stores).map(([name, database]) => ({
+          database,
+          getSynchronizedPeerIds: (): string[] => [],
+          name,
+        })),
+    } as unknown as OrbitDBPrivateNetworkStores,
   );
   await Promise.all([
     new OrbitDBIdentityMetadataProjection(registry, identityIndex).start(),
