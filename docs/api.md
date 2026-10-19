@@ -1774,6 +1774,9 @@ Implemented:
 - omit `privateNetwork` and private network `key` values for anonymous callers,
   spoofed owner headers, or malformed signatures
 - omit private network `key` values for non-owner identities
+- `privateNetwork` is visible to any identity that can sign a request. Anyone
+  can mint a signature, so this is not a secrecy boundary; the private key is
+  the owner's secret and stays owner-only
 
 ### Add local node network
 
