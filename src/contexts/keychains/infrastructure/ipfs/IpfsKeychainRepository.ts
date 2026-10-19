@@ -12,6 +12,7 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import Kernel from '@haskou/ddd-kernel';
+import { DomainError } from '@haskou/value-objects';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
@@ -19,6 +20,9 @@ import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly MAX_ROUTED_CANDIDATES = 20;
+  // Above the 100 kB publish body limit (body-parser default), so every
+  // keychain a publish can store is readable. Larger records fail closed.
+  private readonly MAX_ROUTED_DOCUMENT_BYTES = 256 * 1024;
   private readonly OVERFLOW_LOG_INTERVAL_MS = 60_000;
   private lastOverflowLogAt = 0;
   private readonly keychainByCid = new Map<string, Keychain>();
@@ -328,17 +332,21 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   // Fetching a routed document is not definitive: a timeout, an unreachable
   // provider, or a record that does not resolve says nothing about the owner,
   // so it fails closed. Bytes that arrive but are not JSON are definitive.
+  // The fetch cap refuses an oversized record, which fails closed the same way.
   private async readRoutedDocument(cidString: string): Promise<unknown> {
     const cid = new IPFSId(cidString);
 
     try {
-      return await this.ipfsManager.getJSON<unknown>(cid);
+      return await this.ipfsManager.getJSON<unknown>(
+        cid,
+        this.MAX_ROUTED_DOCUMENT_BYTES,
+      );
     } catch {
       // Not a JSON block: the raw bytes may still be a keychain document.
     }
 
     const bytes = await this.ipfsManager
-      .getBytes(cid)
+      .getBytes(cid, this.MAX_ROUTED_DOCUMENT_BYTES)
       .catch((error: unknown) => {
         throw new KeychainOwnershipUnverifiedError(error);
       });
@@ -350,9 +358,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
-  // Routed bytes that are not a keychain document, or do not map to one, are
-  // not the owner's keychain and are skipped. A document that cannot be
-  // fetched is not definitive: readRoutedDocument throws for it.
+  // Routed bytes that are not a keychain document, or that the domain rejects,
+  // are not the owner's keychain and are skipped. Any other mapping failure is
+  // not definitive and throws. A document that cannot be fetched is not
+  // definitive either: readRoutedDocument throws for it.
   private async readRoutedKeychain(
     cidString: string,
   ): Promise<Keychain | undefined> {
@@ -364,8 +373,12 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
     try {
       return this.mapper.toDomain(document);
-    } catch {
-      return undefined;
+    } catch (error: unknown) {
+      if (error instanceof DomainError) {
+        return undefined;
+      }
+
+      throw new KeychainOwnershipUnverifiedError(error);
     }
   }
 

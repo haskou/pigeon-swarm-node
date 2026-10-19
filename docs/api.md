@@ -3149,16 +3149,27 @@ Implemented:
 An owner keychain check that cannot prove the owner's keychain fails closed with
 `KeychainOwnershipUnverifiedError`, which the route answers as `503` with code
 `503020` (retry later). The check fails closed when a routing record cannot be
-fetched, when the routing lookup or a local keychain index read fails, or when
-more than 20 routing record candidates exist per owner and none of the first 20
-proves the owner's keychain. A routing record whose bytes are readable but are not
-a keychain of this owner does not block the publish. A count-only warning is logged
-at most once per minute when candidates overflow the cap.
+fetched or is larger than the 256 KiB routed-document limit, when the routing
+lookup or a local keychain index read or write fails, when a keychain document
+fails to map for a reason other than a domain rejection, or when more than 20
+routing record candidates exist per owner and none of the first 20 proves the
+owner's keychain. A routing record whose bytes are readable but are not a keychain
+of this owner, or that the domain rejects, does not block the publish. A
+count-only warning is logged at most once per minute when candidates overflow the
+cap.
 
-This is a liveness trade-off. While an unreadable or unresolvable routing record
-sits under the owner's key, a first-version publish waits with `503` until the
-record becomes readable or is removed. Publishing the next version from the current
-head is not affected by this check.
+This is a liveness trade-off. While an unreadable, unresolvable, or oversized
+routing record sits under the owner's key, a first-version publish waits with
+`503` until the record becomes readable within the limit or is removed. Publishing
+the next version from the current head is not affected by this check.
+
+A domain rejection answers `409` with the error class name as `code`. The publish
+path raises these rejections:
+
+- `InvalidKeychainCandidateError`: the candidate is not valid.
+- `KeychainOwnerNetworksNotFoundError`: the owner identity has no networks.
+- `KeychainOwnerAlreadyHasKeychainError`: the owner already has a keychain and the
+  candidate is a first version. Publish the next version from the current head.
 
 `signature` is the owner identity key's base64 Ed25519 signature, built by
 `KeychainSignature` from `@haskou/pigeon-swarm-crypto`, over
