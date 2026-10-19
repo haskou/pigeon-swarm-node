@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { ContentGetResult } from '@app/contexts/content-replication/application/get-content/ContentGetResult';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Response } from 'express';
 
 function responseDouble(): {
@@ -70,5 +71,23 @@ describe('GetIPFSContentRoute headers', () => {
     expect(headers['Content-Type']).toBe('application/octet-stream');
     expect(headers['X-Content-Type-Options']).toBe('nosniff');
     expect(headers['Content-Disposition']).toBe('attachment');
+  });
+});
+
+describe('GetIPFSContentRoute errors', () => {
+  it('rethrows unavailable content so the error handler answers 503020', async () => {
+    const { response } = responseDouble();
+    const route = Object.create(GetIPFSContentRoute.prototype) as {
+      getter: unknown;
+    };
+
+    route.getter = {
+      get: jest.fn().mockRejectedValue(new ReplicatedStateNotReadyError()),
+    };
+
+    await expect(
+      (route as unknown as GetIPFSContentRoute).request('cid', response),
+    ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    expect(response.status).not.toHaveBeenCalled();
   });
 });

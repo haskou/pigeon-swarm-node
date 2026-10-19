@@ -3,6 +3,7 @@ import ContentGetter from '@app/contexts/content-replication/application/get-con
 import { ContentGetMessage } from '@app/contexts/content-replication/application/get-content/messages/ContentGetMessage';
 import { ReplicatedContentNotFoundError } from '@app/contexts/content-replication/domain/errors/ReplicatedContentNotFoundError';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ContentGetter', () => {
@@ -54,5 +55,31 @@ describe('ContentGetter', () => {
       ReplicatedContentNotFoundError,
     );
     expect(contentStorage.findJSON).not.toHaveBeenCalled();
+  });
+
+  it('does not treat unavailable bytes as absent, so the JSON fallback is not tried', async () => {
+    contentStorage.findBytes.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+
+    await expect(
+      getter.get(new ContentGetMessage('bafkreiacontent')),
+    ).rejects.toThrow(ReplicatedStateNotReadyError);
+    expect(contentStorage.findJSON).not.toHaveBeenCalled();
+  });
+
+  it('does not treat unavailable JSON as absent after the bytes are missing', async () => {
+    const cid = 'bafkreieo66jyunrnk3e462w4gzwtyjyfubkv6actsx5jcdgm6xwnmoq73y';
+
+    contentStorage.findBytes.mockRejectedValue(
+      new ReplicatedContentNotFoundError(new ContentId(cid)),
+    );
+    contentStorage.findJSON.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+
+    await expect(getter.get(new ContentGetMessage(cid))).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
   });
 });

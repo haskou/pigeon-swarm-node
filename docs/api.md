@@ -2527,7 +2527,10 @@ document, because identities and keychains are stored as JSON. Reading a CID
 may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
-Unknown CIDs return `404` with body `{ "error": "CID not found in any network" }`.
+A read that no reachable network can serve answers `503` with code `503020`
+(`ReplicatedStateNotReadyError`) once the lookup times out. A CID that no
+network holds gets the same answer: a block read cannot prove that content is
+absent, so this endpoint never answers `404` for an unknown CID. Retry.
 
 ### Register content replication
 

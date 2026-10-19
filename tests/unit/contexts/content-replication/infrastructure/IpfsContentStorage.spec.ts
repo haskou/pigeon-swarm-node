@@ -2,7 +2,9 @@ import IpfsContentStorage from '@app/contexts/content-replication/infrastructure
 import { ReplicatedContentNotFoundError } from '@app/contexts/content-replication/domain/errors/ReplicatedContentNotFoundError';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('IpfsContentStorage', () => {
@@ -34,5 +36,23 @@ describe('IpfsContentStorage', () => {
       storage.provideInNetwork(new ContentId(cid), new NetworkId(networkId)),
     ).rejects.toThrow(ReplicatedContentNotFoundError);
     expect(ipfs.provideContentFromNetwork).not.toHaveBeenCalled();
+  });
+
+  it('passes unavailable content through instead of reporting it absent', async () => {
+    ipfs.getBytes.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+
+    await expect(storage.findBytes(new ContentId(cid))).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
+  });
+
+  it('reports content that a network proved absent as not found', async () => {
+    ipfs.getBytes.mockRejectedValue(new IPFSContentNotFoundError(cid));
+
+    await expect(storage.findBytes(new ContentId(cid))).rejects.toThrow(
+      ReplicatedContentNotFoundError,
+    );
   });
 });

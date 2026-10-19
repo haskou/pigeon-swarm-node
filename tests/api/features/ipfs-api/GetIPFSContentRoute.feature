@@ -22,13 +22,15 @@ Feature: Get IPFS content route
       }
       """
 
-  Scenario: Return not found when CID does not exist in any network
+  Scenario: Return not ready when CID is not held by any network
     Given I am an anonymous user
     When I GET "/ipfs/contents/bafybeihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
-    Then response code is equal to 404
+    Then response code is equal to 503
     And response data should match exactly
       """
       {
-        "error": "CID not found in any network"
+        "code": 503020,
+        "httpStatus": 503,
+        "message": "IPFS content is not reachable on every network yet. Retry shortly."
       }
       """
