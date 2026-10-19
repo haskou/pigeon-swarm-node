@@ -188,6 +188,98 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     return this.findCandidateFromCid(new IPFSId(externalIdentifier.valueOf()));
   }
 
+  private isOwnedMetadata(
+    record: KeychainMetadataRecord,
+    ownerIdentityId: IdentityId,
+  ): boolean {
+    if (record.ownerIdentityId !== ownerIdentityId.valueOf()) {
+      return false;
+    }
+
+    return record.keychain?.belongsTo(ownerIdentityId) ?? true;
+  }
+
+  // Fails closed, unlike listing: a routed keychain that cannot be fetched
+  // leaves the owner's keychain unproven, so its read error propagates.
+  private async hasRemoteKeychainForOwner(
+    ownerIdentityId: IdentityId,
+  ): Promise<boolean> {
+    const cidStrings = await this.ipfsManager.getRecordCandidates(
+      this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
+    );
+    const results = await Promise.allSettled(
+      cidStrings.map((cidString) =>
+        this.isRemoteKeychainOf(new IPFSId(cidString), ownerIdentityId),
+      ),
+    );
+
+    if (
+      results.some((result) => result.status === 'fulfilled' && result.value)
+    ) {
+      return true;
+    }
+
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+
+    if (failure) {
+      throw failure.reason;
+    }
+
+    return false;
+  }
+
+  private async isRemoteKeychainOf(
+    cid: IPFSId,
+    ownerIdentityId: IdentityId,
+  ): Promise<boolean> {
+    const keychain = await this.readRoutedKeychain(cid);
+
+    if (!keychain?.belongsTo(ownerIdentityId)) {
+      return false;
+    }
+
+    try {
+      await this.metadataIndex.save(
+        keychain,
+        new KeychainExternalIdentifier(cid.valueOf()),
+      );
+
+      return true;
+    } catch (error) {
+      // The gate refuses forged documents: they prove no owner keychain.
+      if (error instanceof InvalidPublicMutationError) {
+        return false;
+      }
+
+      throw error;
+    }
+  }
+
+  // Fetch failures propagate. Bytes that are not JSON or do not map to a
+  // keychain cannot be the owner's, so they are ignored: failing on them would
+  // let any routed garbage block the owner's first publish.
+  private async readRoutedKeychain(cid: IPFSId): Promise<Keychain | undefined> {
+    let document: IpfsKeychainDocument;
+
+    try {
+      document = await this.getDocumentFromCid(cid);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        return undefined;
+      }
+
+      throw error;
+    }
+
+    try {
+      return this.mapper.toDomain(document);
+    } catch {
+      return undefined;
+    }
+  }
+
   public async hasByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<boolean> {
@@ -250,99 +342,6 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
 
     return this.hasRemoteKeychainForOwner(ownerIdentityId);
-  }
-
-  private isOwnedMetadata(
-    record: KeychainMetadataRecord,
-    ownerIdentityId: IdentityId,
-  ): boolean {
-    if (record.ownerIdentityId !== ownerIdentityId.valueOf()) {
-      return false;
-    }
-
-    return record.keychain?.belongsTo(ownerIdentityId) ?? true;
-  }
-
-  // Fails closed, unlike listing: a routed keychain that cannot be fetched
-  // leaves the owner's keychain unproven, so its read error propagates.
-  private async hasRemoteKeychainForOwner(
-    ownerIdentityId: IdentityId,
-  ): Promise<boolean> {
-    const cidStrings = await this.ipfsManager.getRecordCandidates(
-      this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
-    );
-    const results = await Promise.allSettled(
-      cidStrings.map((cidString) =>
-        this.isRemoteKeychainOf(new IPFSId(cidString), ownerIdentityId),
-      ),
-    );
-
-    if (
-      results.some((result) => result.status === 'fulfilled' && result.value)
-    ) {
-      return true;
-    }
-
-    const failure = results.find(
-      (result): result is PromiseRejectedResult =>
-        result.status === 'rejected',
-    );
-
-    if (failure) {
-      throw failure.reason;
-    }
-
-    return false;
-  }
-
-  private async isRemoteKeychainOf(
-    cid: IPFSId,
-    ownerIdentityId: IdentityId,
-  ): Promise<boolean> {
-    const keychain = await this.readRoutedKeychain(cid);
-
-    if (!keychain?.belongsTo(ownerIdentityId)) {
-      return false;
-    }
-
-    try {
-      await this.metadataIndex.save(
-        keychain,
-        new KeychainExternalIdentifier(cid.valueOf()),
-      );
-
-      return true;
-    } catch (error) {
-      // The gate refuses forged documents: they prove no owner keychain.
-      if (error instanceof InvalidPublicMutationError) {
-        return false;
-      }
-
-      throw error;
-    }
-  }
-
-  // Fetch failures propagate. Bytes that are not JSON or do not map to a
-  // keychain cannot be the owner's, so they are ignored: failing on them would
-  // let any routed garbage block the owner's first publish.
-  private async readRoutedKeychain(cid: IPFSId): Promise<Keychain | undefined> {
-    let document: IpfsKeychainDocument;
-
-    try {
-      document = await this.getDocumentFromCid(cid);
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        return undefined;
-      }
-
-      throw error;
-    }
-
-    try {
-      return this.mapper.toDomain(document);
-    } catch {
-      return undefined;
-    }
   }
 
   public async save(
