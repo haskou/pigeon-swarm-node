@@ -28,11 +28,14 @@ describe('Get keychain route readiness gate', () => {
       .replace(/-----[^-]+-----|\s/g, '');
 
     replicatedStateOpen = false;
+    const nodeRepository = mock<NodeRepository>();
+    nodeRepository.isLocalNodeConfigurationEmpty.mockResolvedValue(true);
     readiness = new NodeReadiness(
       {
         isOpen: () => replicatedStateOpen,
+        hasNetworks: () => false,
       } as unknown as OrbitDBReplicatedStateRegistry,
-      mock<NodeRepository>(),
+      nodeRepository,
     );
     find = jest.fn().mockRejectedValue(new Error('finder reached'));
 
@@ -78,6 +81,13 @@ describe('Get keychain route readiness gate', () => {
 
     readiness.markStarted();
     expect((await getKeychain()).status).not.toBe(503);
+    expect(find).toHaveBeenCalledTimes(1);
+
+    // A started fresh node is ready for probes even while its replicated state
+    // is closed. Keychain reads must still wait for the open state.
+    replicatedStateOpen = false;
+    await expect(readiness.isReady()).resolves.toBe(true);
+    expect((await getKeychain()).status).toBe(503);
     expect(find).toHaveBeenCalledTimes(1);
   });
 });
