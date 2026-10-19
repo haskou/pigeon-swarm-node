@@ -2930,6 +2930,11 @@ Response:
 Use `identityExternalIdentifier` as the next update's
 `previousIdentityExternalIdentifier`.
 
+While the node is still starting or its replicated state is not open, the lookup
+answers HTTP 503 with code `503020` (`ReplicatedStateNotReadyError`) instead of
+409 `IdentityNotFoundError`. The identity is not reported missing, so retry. A
+409 means the node has opened its replicated state and does not know the identity.
+
 ### Publish identity
 
 ```http

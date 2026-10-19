@@ -1,5 +1,7 @@
+import NodeReadiness from '@app/apps/NodeReadiness';
 import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
 import { IdentityFinderMessage } from '@app/contexts/identities/application/find/messages/IdentityFinderMessage';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
@@ -12,11 +14,20 @@ export class GetIdentityRoute extends Route {
   private readonly finder: IdentityFinder =
     this.get<IdentityFinder>(IdentityFinder);
 
+  private readonly readiness: NodeReadiness =
+    this.get<NodeReadiness>(NodeReadiness);
+
   @Get('/:identityId')
   public async getIdentity(
     @Param('identityId') identityId: string,
     @Res() response: Response,
   ): Promise<Response> {
+    // Not ready means the node is still starting or has not opened its replicated
+    // state, so a missing identity cannot be told apart from one still replaying.
+    if (!this.readiness.isServingReplicatedState()) {
+      throw new ReplicatedStateNotReadyError();
+    }
+
     const candidate = await this.finder.findCandidate(
       new IdentityFinderMessage(decodeURIComponent(identityId)),
     );
