@@ -3232,8 +3232,8 @@ Implemented:
 
 Errors:
 
-- `409` code `KeychainNotFoundError`: the node holds no valid keychain candidate for the identity
-- `503` code `503020` (`ReplicatedStateNotReadyError`): the node is not ready: it has not finished startup or has not opened its replicated state yet, for example right after a restart while it replays. The keychain is not reported missing, so retry. A client must not publish a keychain version, or a first version, on this response.
+- `409` code `KeychainNotFoundError`: the node is ready and holds no valid keychain candidate for the identity. A ready node that stores no network answers this without a lookup, because keychains are per network and such a node holds none. On that node `POST /keychains` still answers `503` code `503020`, because publishing verifies ownership against the keychain index, which is not open without a registered network.
+- `503` code `503020` (`ReplicatedStateNotReadyError`): the node is not ready: it has not finished startup, a stored network has not finished opening its replicated state yet (for example right after a restart while it replays), or its stored configuration cannot be read. The keychain is not reported missing, so retry. A client must not publish a keychain version, or a first version, on this response.
 
 ## Conversation HTTP API
 

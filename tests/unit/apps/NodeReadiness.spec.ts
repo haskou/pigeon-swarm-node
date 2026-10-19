@@ -68,21 +68,12 @@ describe('NodeReadiness', () => {
     await expect(readiness.isReady()).resolves.toBe(false);
   });
 
-  it('is ready for a started fresh node without serving replicated state', async () => {
+  it('is ready for a started fresh node whose replicated state is not open', async () => {
     replicatedState.isOpen.mockReturnValue(false);
     replicatedState.hasNetworks.mockReturnValue(false);
     nodeRepository.isLocalNodeConfigurationEmpty.mockResolvedValue(true);
     readiness.markStarted();
 
     await expect(readiness.isReady()).resolves.toBe(true);
-    expect(readiness.isServingReplicatedState()).toBe(false);
-  });
-
-  it('serves replicated state only once started and open', () => {
-    replicatedState.isOpen.mockReturnValue(true);
-    expect(readiness.isServingReplicatedState()).toBe(false);
-
-    readiness.markStarted();
-    expect(readiness.isServingReplicatedState()).toBe(true);
   });
 });
