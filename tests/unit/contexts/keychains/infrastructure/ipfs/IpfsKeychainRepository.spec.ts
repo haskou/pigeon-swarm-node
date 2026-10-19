@@ -251,22 +251,118 @@ describe('IpfsKeychainRepository', () => {
     ).resolves.toBe(false);
   });
 
-  it('should fail closed without the routed reason when a keychain document cannot be read', async () => {
+  it('should skip a routed keychain document that cannot be read', async () => {
     const owner = await KeychainMother.create();
-    const missing = new Error('document not found');
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
-    ipfs.getRecordCandidates.mockResolvedValue(['bafy-missing-keychain']);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-unreadable-keychain']);
     ipfs.getJSON.mockRejectedValue(new Error('document not found'));
-    ipfs.getBytes.mockRejectedValue(missing);
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
+  it('should still report the owner keychain when another routed candidate cannot be read', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue([
+      'bafy-unreadable-candidate',
+      'bafy-keychain-v2',
+    ]);
+    ipfs.getJSON.mockImplementation((cid) =>
+      cid.valueOf() === 'bafy-keychain-v2'
+        ? Promise.resolve(mapper.toDocument(remote))
+        : Promise.reject(new Error('document not found')),
+    );
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should skip a routed document whose mapping fails with a non-domain error', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const repositoryWithFailingMapper = new IpfsKeychainRepository(
+      ipfs,
+      mapper,
+      metadataIndex,
+    );
+
+    jest.spyOn(mapper, 'toDomain').mockImplementation(() => {
+      throw new TypeError('mapping failed');
+    });
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-mapping-fails']);
+    ipfs.getJSON.mockResolvedValue(
+      mapper.toDocument(owner.withVersion(1).build()),
+    );
+
+    await expect(
+      repositoryWithFailingMapper.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
+  it('should examine at most the first routed candidates when checking for an owner keychain', async () => {
+    const owner = await KeychainMother.create();
+    const candidates = Array.from(
+      { length: 25 },
+      (_, index) => `bafy-unreadable-${index}`,
+    );
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(candidates);
+    ipfs.getJSON.mockRejectedValue(new Error('document not found'));
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+    expect(ipfs.getJSON).toHaveBeenCalledTimes(20);
+  });
+
+  it('should fail closed without the index reason when local metadata cannot be read', async () => {
+    const owner = await KeychainMother.create();
+    const indexFailure = new Error('index unavailable');
+
+    metadataIndex.findByOwnerIdentityId.mockRejectedValue(indexFailure);
 
     const error = await repository
       .hasKeychainForOwner(owner.ownerIdentityId)
       .catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(KeychainOwnershipUnverifiedError);
-    expect((error as Error).message).not.toContain('document not found');
-    expect((error as KeychainOwnershipUnverifiedError).cause).toBe(missing);
+    expect((error as Error).message).not.toContain('index unavailable');
+    expect((error as KeychainOwnershipUnverifiedError).cause).toBe(
+      indexFailure,
+    );
+  });
+
+  it('should fail closed without the write reason when a verified remote keychain cannot be indexed', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+    const writeFailure = new Error('disk full');
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-keychain-v2']);
+    ipfs.getJSON.mockResolvedValue(mapper.toDocument(remote));
+    metadataIndex.save.mockRejectedValue(writeFailure);
+
+    const error = await repository
+      .hasKeychainForOwner(mother.ownerIdentityId)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(KeychainOwnershipUnverifiedError);
+    expect((error as KeychainOwnershipUnverifiedError).cause).toBe(
+      writeFailure,
+    );
   });
 
   it('should fail closed without the routing reason when the routing lookup fails', async () => {

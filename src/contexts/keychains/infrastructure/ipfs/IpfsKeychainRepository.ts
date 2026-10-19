@@ -11,13 +11,13 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import { DomainError } from '@haskou/value-objects';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 
 export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
+  private readonly MAX_ROUTED_CANDIDATES = 20;
   private readonly keychainByCid = new Map<string, Keychain>();
 
   constructor(
@@ -204,8 +204,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  // Fails closed, unlike listing: a routed keychain that cannot be read leaves
-  // the owner's keychain unproven, so the check throws without the read reason.
+  // Routing records are writable under the owner's key, so a candidate that
+  // cannot be read, mapped, or proven to be the owner's is skipped: it must
+  // not block the owner's publish. Only a failed routing lookup or a failed
+  // local write fails the check closed.
   private async hasRemoteKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
@@ -214,34 +216,22 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       .catch((error: unknown) => {
         throw new KeychainOwnershipUnverifiedError(error);
       });
-    const results = await Promise.allSettled(
-      cidStrings.map((cidString) =>
-        this.isRemoteKeychainOf(new IPFSId(cidString), ownerIdentityId),
-      ),
+    const owned = await Promise.all(
+      cidStrings
+        .slice(0, this.MAX_ROUTED_CANDIDATES)
+        .map((cidString) =>
+          this.isRemoteKeychainOf(cidString, ownerIdentityId),
+        ),
     );
 
-    if (
-      results.some((result) => result.status === 'fulfilled' && result.value)
-    ) {
-      return true;
-    }
-
-    const failure = results.find(
-      (result): result is PromiseRejectedResult => result.status === 'rejected',
-    );
-
-    if (failure) {
-      throw new KeychainOwnershipUnverifiedError(failure.reason);
-    }
-
-    return false;
+    return owned.includes(true);
   }
 
   private async isRemoteKeychainOf(
-    cid: IPFSId,
+    cidString: string,
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
-    const keychain = await this.readRoutedKeychain(cid);
+    const keychain = await this.readRoutedKeychain(cidString);
 
     if (!keychain?.belongsTo(ownerIdentityId)) {
       return false;
@@ -250,7 +240,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     try {
       await this.metadataIndex.save(
         keychain,
-        new KeychainExternalIdentifier(cid.valueOf()),
+        new KeychainExternalIdentifier(cidString),
       );
 
       return true;
@@ -260,7 +250,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
         return false;
       }
 
-      throw error;
+      throw new KeychainOwnershipUnverifiedError(error);
     }
   }
 
@@ -285,21 +275,18 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     return value === undefined || value === null || typeof value === 'string';
   }
 
-  // Fetch failures propagate. Bytes that are not a keychain document, or that
-  // do not map to a keychain, cannot be the owner's, so they are ignored:
-  // failing on them would let any routed garbage block the owner's first
-  // publish.
-  private async readRoutedKeychain(cid: IPFSId): Promise<Keychain | undefined> {
+  // Routed bytes that cannot be fetched, parsed, or mapped are not a keychain.
+  // They cannot be the owner's, so they are skipped rather than failing the
+  // check.
+  private async readRoutedKeychain(
+    cidString: string,
+  ): Promise<Keychain | undefined> {
     let document: unknown;
 
     try {
-      document = await this.getDocumentFromCid(cid);
-    } catch (error) {
-      if (error instanceof SyntaxError) {
-        return undefined;
-      }
-
-      throw error;
+      document = await this.getDocumentFromCid(new IPFSId(cidString));
+    } catch {
+      return undefined;
     }
 
     if (!this.isKeychainDocument(document)) {
@@ -308,12 +295,8 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
     try {
       return this.mapper.toDomain(document);
-    } catch (error) {
-      if (error instanceof DomainError) {
-        return undefined;
-      }
-
-      throw error;
+    } catch {
+      return undefined;
     }
   }
 
@@ -369,8 +352,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   public async hasKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
-    const metadata =
-      await this.metadataIndex.findByOwnerIdentityId(ownerIdentityId);
+    const metadata = await this.metadataIndex
+      .findByOwnerIdentityId(ownerIdentityId)
+      .catch((error: unknown) => {
+        throw new KeychainOwnershipUnverifiedError(error);
+      });
 
     if (
       metadata.some((record) => this.isOwnedMetadata(record, ownerIdentityId))
