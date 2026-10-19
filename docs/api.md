@@ -2528,11 +2528,12 @@ may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
 A read that no reachable network can serve answers `503` with code `503020`
-(`ReplicatedStateNotReadyError`) once the lookup times out. A CID answers `404`
-only when every network the node attempted answered that it does not hold the
-content. If any attempted network fails or times out, the answer is `503` with
-code `503020`, even when another network reported the CID absent: one network's
-absence does not prove the content is absent everywhere. Retry.
+(`ReplicatedStateNotReadyError`) once the lookup times out. The endpoint never
+answers `404`: absence is not proven on this path, so a CID that no network
+holds also answers `503` with code `503020`. If any attempted network fails or
+times out, the answer is the same `503`, even when another network reported the
+CID absent: one network's absence does not prove the content is absent
+everywhere. Retry.
 
 ### Register content replication
 

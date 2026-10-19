@@ -38,9 +38,7 @@ paths:
                 type: object
                 additionalProperties: true
         '503':
-          description: Node not ready (code 503020). No reachable network served the CID before the lookup timed out, or a network failed to answer while another reported the CID absent. Retry.
-        '404':
-          description: Every attempted network answered that it does not hold the CID. Any failed attempt answers 503 instead, even when another network reported the CID absent.
+          description: Node not ready (code 503020). No reachable network served the CID before the lookup timed out, the CID could not be proven absent, or a network failed to answer. The endpoint never answers 404. Retry.
   /ipfs/contents:
     post:
       tags:
