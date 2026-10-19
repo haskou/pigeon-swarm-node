@@ -1,6 +1,11 @@
 import 'reflect-metadata';
 import DiagnosticsTraceInitializer from '@app/apps/initializers/diagnostics/DiagnosticsTraceInitializer';
 import PigeonApplication from '@app/apps/PigeonApplication';
+import { DEVICE_SEALING_RECORD_HEAD_PREFIX } from '@app/contexts/identity-devices/domain/DeviceSealingRecord';
+import OrbitDBDeviceSealingRecordRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository';
+import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Initializer } from '@app/shared/infrastructure/lifecycle/Initializer';
 import WinstonLogger from '@app/shared/infrastructure/logs/WinstonLogger';
 import { Kernel } from '@haskou/ddd-kernel';
@@ -211,5 +216,38 @@ describe('PigeonApplication kernel-loaded environment', () => {
     expect(() =>
       new PigeonApplication().loadEnvironmentVariables(),
     ).not.toThrow();
+  });
+});
+
+describe('PigeonApplication local node state', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('registers the sealing record merger before replicated state replays', async () => {
+    const registry = mock<OrbitDBReplicatedStateRegistry>();
+    const loadNode = jest.fn().mockResolvedValue(undefined);
+    jest.spyOn(Kernel.prototype, 'di', 'get').mockReturnValue({
+      getService: (ClassDefinition: unknown) => {
+        if (ClassDefinition === NodeLoader) return { loadNode };
+        if (ClassDefinition === OrbitDBDeviceSealingRecordRepository)
+          return new OrbitDBDeviceSealingRecordRepository(
+            registry,
+            mock<IPFSNetworkRegistry>(),
+          );
+        throw new Error('Unexpected service');
+      },
+    } as never);
+
+    await new PigeonApplication().loadLocalNodeState();
+
+    expect(registry.registerHeadRecordMerger).toHaveBeenCalledWith(
+      DEVICE_SEALING_RECORD_HEAD_PREFIX,
+      expect.any(Function),
+      expect.any(Function),
+    );
+    expect(
+      registry.registerHeadRecordMerger.mock.invocationCallOrder[0],
+    ).toBeLessThan(loadNode.mock.invocationCallOrder[0]);
   });
 });

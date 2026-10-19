@@ -1573,6 +1573,9 @@ services:
   contexts/identity-devices/domain/services/DeviceAuthorizationPolicy:
     class: /contexts/identity-devices/domain/services/DeviceAuthorizationPolicy
     arguments: []
+  contexts/identity-devices/domain/services/DeviceSealingRecordPolicy:
+    class: /contexts/identity-devices/domain/services/DeviceSealingRecordPolicy
+    arguments: []
   contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository:
     class: >-
       /contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository
@@ -1687,6 +1690,12 @@ services:
         @contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationDocumentShape
       - >-
         @contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationSources
+  contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository:
+    class: >-
+      /contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository
+    arguments:
+      - '@contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry'
+      - '@contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry'
   contexts/keychains/application/find-current/CurrentKeychainFinder:
     class: /contexts/keychains/application/find-current/CurrentKeychainFinder
     arguments:
