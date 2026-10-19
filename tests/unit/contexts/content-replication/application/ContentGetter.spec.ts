@@ -57,15 +57,28 @@ describe('ContentGetter', () => {
     expect(contentStorage.findJSON).not.toHaveBeenCalled();
   });
 
-  it('does not treat unavailable bytes as absent, so the JSON fallback is not tried', async () => {
+  it('serves JSON when the bytes read is unavailable, because a JSON block cannot be read as bytes', async () => {
     contentStorage.findBytes.mockRejectedValue(
       new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+    contentStorage.findJSON.mockResolvedValue({ kind: 'document' });
+
+    const result = await getter.get(new ContentGetMessage('bafkreiacontent'));
+
+    expect(result.getJsonResponse()).toEqual({ kind: 'document' });
+  });
+
+  it('answers not ready, not absent, when the bytes read is unavailable and JSON is absent', async () => {
+    contentStorage.findBytes.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+    contentStorage.findJSON.mockRejectedValue(
+      new ReplicatedContentNotFoundError(new ContentId('bafkreiacontent')),
     );
 
     await expect(
       getter.get(new ContentGetMessage('bafkreiacontent')),
     ).rejects.toThrow(ReplicatedStateNotReadyError);
-    expect(contentStorage.findJSON).not.toHaveBeenCalled();
   });
 
   it('does not treat unavailable JSON as absent after the bytes are missing', async () => {

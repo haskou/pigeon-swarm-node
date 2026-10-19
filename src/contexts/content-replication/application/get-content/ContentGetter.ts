@@ -5,18 +5,26 @@ import ReplicatedContentStorage from '../content-storage/ReplicatedContentStorag
 import { ContentGetResult } from './ContentGetResult';
 import { ContentGetMessage } from './messages/ContentGetMessage';
 
+interface PublicBytesRead {
+  bytes?: Buffer;
+  failure?: unknown;
+}
+
 export default class ContentGetter {
   constructor(private readonly contentStorage: ReplicatedContentStorage) {}
 
-  private async getPublicBytes(cid: ContentId): Promise<Buffer | undefined> {
+  private async readPublicBytes(cid: ContentId): Promise<PublicBytesRead> {
     try {
-      return await this.contentStorage.findBytes(cid);
+      return { bytes: await this.contentStorage.findBytes(cid) };
     } catch (error: unknown) {
       if (error instanceof ReplicatedContentNotFoundError) {
-        return undefined;
+        return {};
       }
 
-      throw error;
+      // A failed bytes read is not proof of absence: a JSON block cannot be
+      // read as bytes. Keep the failure so it decides the answer only when the
+      // JSON read finds nothing either.
+      return { failure: error };
     }
   }
 
@@ -34,25 +42,23 @@ export default class ContentGetter {
 
   public async get(message: ContentGetMessage): Promise<ContentGetResult> {
     const isRawCid = await this.contentStorage.isRawContent(message.cid);
-    const bytes = await this.getPublicBytes(message.cid);
+    const bytesRead = await this.readPublicBytes(message.cid);
 
-    if (bytes !== undefined) {
+    if (bytesRead.bytes !== undefined) {
       return ContentGetResult.binary({
-        bytes,
-        ...ContentTypeSniffer.sniff(bytes),
+        bytes: bytesRead.bytes,
+        ...ContentTypeSniffer.sniff(bytesRead.bytes),
       });
     }
 
-    if (isRawCid) {
-      throw new ReplicatedContentNotFoundError(message.cid);
+    if (!isRawCid) {
+      const content = await this.getPublicJSON(message.cid);
+
+      if (content !== undefined) {
+        return ContentGetResult.json(content);
+      }
     }
 
-    const content = await this.getPublicJSON(message.cid);
-
-    if (content !== undefined) {
-      return ContentGetResult.json(content);
-    }
-
-    throw new ReplicatedContentNotFoundError(message.cid);
+    throw bytesRead.failure ?? new ReplicatedContentNotFoundError(message.cid);
   }
 }
