@@ -44,6 +44,10 @@ export class KeychainCandidate {
     return this.keychain.isNewerThan(other.keychain);
   }
 
+  public hasSameVersionAs(other: KeychainCandidate): boolean {
+    return !this.isNewerThan(other) && !other.isNewerThan(this);
+  }
+
   // The newer version wins. On a version tie the smaller external identifier
   // wins, so the choice never depends on repository order.
   public takesPrecedenceOver(other: KeychainCandidate): boolean {
@@ -52,7 +56,7 @@ export class KeychainCandidate {
     }
 
     return (
-      !other.isNewerThan(this) &&
+      this.hasSameVersionAs(other) &&
       this.externalIdentifier.valueOf() < other.externalIdentifier.valueOf()
     );
   }
