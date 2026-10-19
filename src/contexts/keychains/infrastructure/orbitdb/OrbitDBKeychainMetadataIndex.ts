@@ -5,6 +5,7 @@ import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/m
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { OrbitDBKeychainMetadataDocument } from './documents/OrbitDBKeychainMetadataDocument';
 
@@ -135,6 +136,12 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
     return `keychain-cid:${cid}`;
   }
 
+  private assertReplicatedStateOpen(): void {
+    if (!this.registry.isOpen()) {
+      throw new ReplicatedStateNotReadyError();
+    }
+  }
+
   private async findHead(
     key: string,
   ): Promise<KeychainMetadataRecord | undefined> {
@@ -185,6 +192,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
   public async findByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<KeychainMetadataRecord | undefined> {
+    this.assertReplicatedStateOpen();
     const cid = externalIdentifier.valueOf();
     const head = await this.findHead(this.cidHeadKey(cid));
 
@@ -201,6 +209,7 @@ export default class OrbitDBKeychainMetadataIndex extends KeychainMetadataIndex 
   public async findByOwnerIdentityId(
     ownerIdentityId: IdentityId,
   ): Promise<KeychainMetadataRecord[]> {
+    this.assertReplicatedStateOpen();
     const head = await this.findHead(
       this.ownerHeadKey(ownerIdentityId.valueOf()),
     );

@@ -426,6 +426,7 @@ function keychainStores(
         return Promise.resolve('ok');
       }),
     },
+    getSynchronizationStores: (): never[] => [],
     keychains: {
       put: jest.fn((document: Record<string, unknown>) => {
         upsertDocument(currentDocuments, document);
