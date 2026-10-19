@@ -183,14 +183,18 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     }
   }
 
-  // Local candidates keep their metadata answer when a previous version is unreachable.
+  // A not-ready local read is rethrown. It never reads as "no previous identity".
   private async findLocalPreviousIdentity(
     externalIdentifier: IdentityExternalIdentifier,
     networkIds?: string[],
   ): Promise<Identity | undefined> {
     try {
       return await this.findPreviousIdentity(externalIdentifier, networkIds);
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       return undefined;
     }
   }
