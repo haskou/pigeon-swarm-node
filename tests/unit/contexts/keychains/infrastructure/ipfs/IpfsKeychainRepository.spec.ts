@@ -3,6 +3,7 @@ import IpfsKeychainRepository from '@app/contexts/keychains/infrastructure/ipfs/
 import IpfsKeychainMapper from '@app/contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper';
 import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -202,6 +203,90 @@ describe('IpfsKeychainRepository', () => {
     ipfs.getJSON.mockResolvedValue(
       mapper.toDocument(other.withVersion(1).build()),
     );
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
+  it('should not report another owner keychain held in local metadata', async () => {
+    const owner = await KeychainMother.create();
+    const other = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([
+      {
+        cid: 'bafy-other-keychain',
+        keychain: other.withVersion(1).build(),
+        ownerIdentityId: other.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 100,
+        version: 1,
+      },
+    ]);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
+  it('should fail the head-less check when a routed keychain document is missing', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-missing-keychain']);
+    ipfs.getJSON.mockRejectedValue(new Error('document not found'));
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toThrow('document not found');
+  });
+
+  it('should propagate a routing lookup error from the head-less check', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockRejectedValue(
+      new Error('routing unavailable'),
+    );
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toThrow('routing unavailable');
+  });
+
+  it('should report an owner keychain held in local metadata when its document is missing', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([
+      {
+        cid: 'bafy-keychain-v1',
+        ownerIdentityId: owner.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 100,
+        version: 1,
+      },
+    ]);
+    ipfs.getJSON.mockRejectedValue(new Error('document not found'));
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
+    expect(ipfs.getJSON).not.toHaveBeenCalled();
+    expect(ipfs.getBytes).not.toHaveBeenCalled();
+  });
+
+  it('should ignore a remote document that fails verification on write', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-forged-keychain']);
+    ipfs.getJSON.mockResolvedValue(
+      mapper.toDocument(owner.withVersion(1).build()),
+    );
+    metadataIndex.save.mockRejectedValue(new InvalidPublicMutationError());
 
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
