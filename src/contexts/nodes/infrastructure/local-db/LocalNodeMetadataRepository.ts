@@ -21,6 +21,8 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   private static readonly LOCAL_NODE_ID = 'local';
 
   private latestSavedMetadata?: LocalNodeMetadataDocument;
+  // Set when this boot regenerated the metadata over an unreadable document.
+  private regeneratedOverUnreadableDocument = false;
 
   constructor(
     private readonly database: EmbeddedLocalDatabase,
@@ -126,6 +128,17 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   /** Generates and saves the metadata of a new node; run inside `exclusively`. */
   private async createMetadata(): Promise<LocalNodeMetadataDocument> {
     const generatedMetadata = this.metadataMapper.generate();
+
+    // Only reached when no readable metadata exists, so a stored document here
+    // is an unreadable one.
+    if (
+      await this.database.findOne(
+        LocalNodeMetadataRepository.NAMESPACE,
+        LocalNodeMetadataRepository.LOCAL_NODE_ID,
+      )
+    ) {
+      this.regeneratedOverUnreadableDocument = true;
+    }
 
     await this.persistMetadata(generatedMetadata);
 
@@ -293,6 +306,23 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   public async isLocalNodeOwnedBy(identityId: IdentityId): Promise<boolean> {
     return this.nodeFromMetadata(await this.loadOrCreateMetadata()).isOwnedBy(
       identityId,
+    );
+  }
+
+  public async isLocalNodeConfigurationEmpty(): Promise<boolean> {
+    if (this.regeneratedOverUnreadableDocument) {
+      return false;
+    }
+
+    const document = await this.database.findOne(
+      LocalNodeMetadataRepository.NAMESPACE,
+      LocalNodeMetadataRepository.LOCAL_NODE_ID,
+    );
+
+    return (
+      !!document &&
+      this.isDocument(document) &&
+      Object.keys(document.networks).length === 0
     );
   }
 

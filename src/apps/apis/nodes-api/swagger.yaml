@@ -48,7 +48,7 @@ paths:
       tags:
         - nodes
       summary: Get node readiness
-      description: Reports whether the node is ready to serve replicated state. It is ready once startup has finished and the replicated state is open. The state is open once every store of a registered network has replayed its documents and no subscriber replay is still deferred; a replay that failed at registration is retried on the next peer head exchange. It does not reopen on a timer. Liveness is a separate check, served by /health. Responses must not be cached.
+      description: Reports whether the node is ready to serve replicated state. It is ready once startup has finished and either the replicated state is open or the node holds no network to replay, as a fresh node does. The state is open once every store of a registered network has replayed its documents and no subscriber replay is still deferred; a replay that failed at registration is retried on the next peer head exchange. It does not reopen on a timer. Liveness is a separate check, served by /health. Responses must not be cached.
       security: []
       operationId: getNodeReadiness
       responses:
@@ -66,7 +66,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/NodeReadinessResource'
         '503':
-          description: The node is not ready yet. Startup has not finished, or the replicated state is not open.
+          description: The node is not ready yet. Startup has not finished, the replicated state is not open, or the stored configuration names a network that is not registered yet or cannot be read.
           headers:
             Cache-Control:
               schema:

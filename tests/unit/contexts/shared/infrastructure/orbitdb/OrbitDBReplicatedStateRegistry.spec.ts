@@ -531,6 +531,20 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.clear();
   });
 
+  it('reports whether any network is registered', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { stores } = createStores();
+
+    expect(registry.hasNetworks()).toBe(false);
+
+    await registry.register('network-1', stores);
+    expect(registry.hasNetworks()).toBe(true);
+
+    await registry.unregister('network-1');
+    expect(registry.hasNetworks()).toBe(false);
+    registry.clear();
+  });
+
   it('is not open while a registration still replays its subscriber history', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const first = createStores();

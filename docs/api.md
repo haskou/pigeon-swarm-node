@@ -53,8 +53,10 @@ their browser can reach.
 `GET /node/readiness` is public and requires no identity or signed request.
 Apply the configured `ROUTE_PREFIX`, for example `/api/node/readiness`.
 It answers HTTP 200 with `{ "status": "ready" }` once the node has finished
-starting and its replicated state is open. Until then it answers HTTP 503 with
-`{ "status": "not_ready" }`. A node with no registered network is not ready.
+starting and either its replicated state is open or it holds no network to
+replay, as a fresh node does. Until then it answers HTTP 503 with
+`{ "status": "not_ready" }`. A node whose stored configuration names a network
+that is not registered yet, or that cannot be read, is not ready.
 Both responses carry `Cache-Control: no-store` and contain only the status,
 never details of the replicated state. The 503 body is a status response, not
 the error shape used elsewhere in this API.
@@ -64,6 +66,10 @@ finished replaying its documents, and while a subscriber replay waits for a
 block that is missing locally. Neither lifts with time: readiness stays
 `not_ready` until the replay succeeds. A replay that failed at registration is
 retried on the next peer head exchange.
+
+A node that stores no network has nothing to replay, so it is ready from its
+stored configuration alone. That configuration is read without starting any
+network, so a readiness poll does not change the node.
 
 Liveness is separate. `GET /health` and `GET /` keep answering while the node
 starts, so a poller that checks liveness is unaffected. Use readiness to decide

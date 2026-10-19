@@ -1,5 +1,6 @@
 import { applicationRoutes } from '@app/apps/ApplicationRoutes';
 import NodeReadiness from '@app/apps/NodeReadiness';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { Server } from 'http';
@@ -10,13 +11,21 @@ describe('Node readiness route', () => {
   let server: Server;
   let baseUrl: string;
   let replicatedStateOpen: boolean;
+  let configurationEmpty: boolean;
   let readiness: NodeReadiness;
 
   beforeAll(async () => {
     replicatedStateOpen = false;
-    readiness = new NodeReadiness({
-      isOpen: () => replicatedStateOpen,
-    } as unknown as OrbitDBReplicatedStateRegistry);
+    configurationEmpty = false;
+    readiness = new NodeReadiness(
+      {
+        hasNetworks: () => false,
+        isOpen: () => replicatedStateOpen,
+      } as unknown as OrbitDBReplicatedStateRegistry,
+      {
+        isLocalNodeConfigurationEmpty: async () => configurationEmpty,
+      } as unknown as NodeRepository,
+    );
     jest.spyOn(Route.prototype, 'get').mockImplementation(() => readiness);
 
     const app = createExpressServer({
@@ -38,7 +47,7 @@ describe('Node readiness route', () => {
     });
   });
 
-  it('answers ready only once startup has finished and the replicated state is open', async () => {
+  it('answers ready only once startup has finished and the node is open or has no networks', async () => {
     const notStarted = await fetch(`${baseUrl}/api/node/readiness`);
     expect(notStarted.status).toBe(503);
     expect(await notStarted.json()).toEqual({ status: 'not_ready' });
@@ -56,6 +65,14 @@ describe('Node readiness route', () => {
     expect(await ready.json()).toEqual({ status: 'ready' });
 
     replicatedStateOpen = false;
+    expect((await fetch(`${baseUrl}/api/node/readiness`)).status).toBe(503);
+
+    configurationEmpty = true;
+    const freshNode = await fetch(`${baseUrl}/api/node/readiness`);
+    expect(freshNode.status).toBe(200);
+    expect(await freshNode.json()).toEqual({ status: 'ready' });
+
+    configurationEmpty = false;
     expect((await fetch(`${baseUrl}/api/node/readiness`)).status).toBe(503);
     expect((await fetch(`${baseUrl}/node/readiness`)).status).toBe(404);
   });

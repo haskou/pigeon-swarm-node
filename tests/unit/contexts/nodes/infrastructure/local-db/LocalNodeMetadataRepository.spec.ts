@@ -280,6 +280,85 @@ describe('LocalNodeMetadataRepository', () => {
     });
   });
 
+  describe('isLocalNodeConfigurationEmpty', () => {
+    const emptyDocument = () => ({
+      _id: 'local',
+      networks: {},
+      nodeId: canonicalNodeId,
+      relayConfiguration: defaultRelayConfiguration,
+    });
+
+    it('should report a persisted node without networks as empty, without touching the runtime networks', async () => {
+      database.findOne.mockResolvedValue(emptyDocument());
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        true,
+      );
+      expect(networkRegistry.initialize).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+    });
+
+    it('should report a persisted node with networks as not empty', async () => {
+      database.findOne.mockResolvedValue({
+        ...emptyDocument(),
+        networks: {
+          [privateNetworkId.valueOf()]: new NetworkMother()
+            .withId(privateNetworkId)
+            .withName(new NetworkName('private_0'))
+            .withPrivateKey()
+            .build()
+            .toPrimitives(),
+        },
+      });
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+    });
+
+    it('should not report a node without a readable persisted configuration as empty', async () => {
+      database.findOne.mockResolvedValue(undefined);
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+
+      database.findOne.mockResolvedValue({
+        ...emptyDocument(),
+        networks: 'unreadable',
+      });
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+    });
+
+    it('should report a fresh node whose configuration was generated at boot as empty', async () => {
+      database.findOne.mockResolvedValue(undefined);
+      networkRegistry.getAll.mockReturnValue([]);
+      await repository.loadLocalNode();
+
+      database.findOne.mockResolvedValue(emptyDocument());
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        true,
+      );
+    });
+
+    it('should not report a node as empty when boot regenerated it over an unreadable configuration', async () => {
+      database.findOne.mockResolvedValue({
+        ...emptyDocument(),
+        networks: 'unreadable',
+      });
+      networkRegistry.getAll.mockReturnValue([]);
+      await repository.loadLocalNode();
+
+      database.findOne.mockResolvedValue(emptyDocument());
+
+      await expect(repository.isLocalNodeConfigurationEmpty()).resolves.toBe(
+        false,
+      );
+    });
+  });
+
   describe('unreadable owner reset mark', () => {
     it.each(['yes', 0, null, 'false'])(
       'should keep the node id when the stored mark %p cannot be read',

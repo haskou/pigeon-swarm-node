@@ -13,6 +13,13 @@ export default abstract class NodeRepository {
    */
   public abstract isLocalNodeOwnedBy(identityId: IdentityId): Promise<boolean>;
   /**
+   * Whether the local node has no networks as it is stored, read without
+   * generating a node or syncing the runtime networks, so it is cheap enough
+   * to ask on every readiness check. A node whose stored configuration could
+   * not be read, or was regenerated over an unreadable one, is not empty.
+   */
+  public abstract isLocalNodeConfigurationEmpty(): Promise<boolean>;
+  /**
    * Loads the latest local node, applies `change` and saves it, with no other
    * update of the local node in between, so concurrent owner writes never
    * revert each other. Nothing is saved when `change` throws. Returns the

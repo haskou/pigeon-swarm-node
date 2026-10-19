@@ -2540,6 +2540,11 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  /** Whether any network is registered, whether or not its stores have replayed. */
+  public hasNetworks(): boolean {
+    return this.storesByNetworkId.size > 0;
+  }
+
   public async replicateDocumentInBackground(
     storeName: OrbitDBReplicatedDocumentStoreName,
     document: Record<string, unknown>,
