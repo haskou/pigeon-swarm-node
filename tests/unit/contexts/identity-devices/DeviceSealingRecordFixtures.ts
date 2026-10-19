@@ -1,8 +1,6 @@
-import {
-  DeviceSealingRecord,
-  DeviceSealingRecordFields,
-  DeviceSealingRecordPrimitives,
-} from '@app/contexts/identity-devices/domain/DeviceSealingRecord';
+import { DeviceSealingRecord } from '@app/contexts/identity-devices/domain/DeviceSealingRecord';
+import { DeviceSealingRecordFields } from '@app/contexts/identity-devices/domain/DeviceSealingRecordFields';
+import { DeviceSealingRecordPrimitives } from '@app/contexts/identity-devices/domain/DeviceSealingRecordPrimitives';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import { OrbitDBPrivateNetworkStores } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBPrivateNetworkStores';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';

@@ -27,17 +27,76 @@ export default class OrbitDBDeviceSealingRecordRepository {
     );
   }
 
+  private merge(
+    current: Record<string, unknown> | undefined,
+    candidate: Record<string, unknown>,
+    key: string,
+  ): Record<string, unknown> | undefined {
+    const record = DeviceSealingRecord.fromStored(candidate);
+
+    if (!record || record.key() !== key) {
+      return undefined;
+    }
+    const admitted = this.policy.admits(
+      record,
+      this.authorizationOf(record.getIdentityId().valueOf()),
+      new Date(Date.now()),
+    );
+
+    if (!admitted) {
+      return undefined;
+    }
+
+    if (current && DeviceSealingRecord.fromStored(current)?.key() === key) {
+      return current;
+    }
+
+    return record.toPrimitives();
+  }
+
+  private authorizationOf(identityId: string): DeviceAuthorization | undefined {
+    const head = this.registry.findCachedHead(
+      `${DEVICE_AUTHORIZATION_HEAD_PREFIX}${identityId}`,
+    );
+
+    if (!head) {
+      return undefined;
+    }
+    try {
+      return DeviceAuthorization.fromPrimitives(
+        head.authorization as DeviceAuthorizationPrimitives,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private privateNetworkIds(): string[] {
+    return this.networkRegistry
+      .getAll()
+      .filter((network) => network.isPrivate())
+      .map((network) => network.getId());
+  }
+
+  private isPrivateNetwork(networkId: string): boolean {
+    return this.networkRegistry
+      .getAll()
+      .some((network) => network.getId() === networkId && network.isPrivate());
+  }
+
   public async publish(record: DeviceSealingRecord): Promise<void> {
     const admitted = this.policy.admits(
       record,
       this.authorizationOf(record.getIdentityId().valueOf()),
       new Date(Date.now()),
     );
+
     if (!admitted) {
       throw new DeviceSealingRecordRejectedError();
     }
     const key = record.key();
     const current = this.registry.findCachedHead(key);
+
     if (current) {
       if (
         DeviceSealingRecord.fromStored(current)?.getSealingPublicKey() ===
@@ -68,58 +127,5 @@ export default class OrbitDBDeviceSealingRecordRepository {
           record !== undefined &&
           this.policy.admits(record, authorization, now),
       );
-  }
-
-  private merge(
-    current: Record<string, unknown> | undefined,
-    candidate: Record<string, unknown>,
-    key: string,
-  ): Record<string, unknown> | undefined {
-    const record = DeviceSealingRecord.fromStored(candidate);
-    if (!record || record.key() !== key) {
-      return undefined;
-    }
-    const admitted = this.policy.admits(
-      record,
-      this.authorizationOf(record.getIdentityId().valueOf()),
-      new Date(Date.now()),
-    );
-    if (!admitted) {
-      return undefined;
-    }
-    if (current && DeviceSealingRecord.fromStored(current)?.key() === key) {
-      return current;
-    }
-
-    return record.toPrimitives();
-  }
-
-  private authorizationOf(identityId: string): DeviceAuthorization | undefined {
-    const head = this.registry.findCachedHead(
-      `${DEVICE_AUTHORIZATION_HEAD_PREFIX}${identityId}`,
-    );
-    if (!head) {
-      return undefined;
-    }
-    try {
-      return DeviceAuthorization.fromPrimitives(
-        head.authorization as DeviceAuthorizationPrimitives,
-      );
-    } catch {
-      return undefined;
-    }
-  }
-
-  private privateNetworkIds(): string[] {
-    return this.networkRegistry
-      .getAll()
-      .filter((network) => network.isPrivate())
-      .map((network) => network.getId());
-  }
-
-  private isPrivateNetwork(networkId: string): boolean {
-    return this.networkRegistry
-      .getAll()
-      .some((network) => network.getId() === networkId && network.isPrivate());
   }
 }

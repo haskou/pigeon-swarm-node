@@ -1,4 +1,7 @@
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
+import { DeviceSealingRecordFields } from '@app/contexts/identity-devices/domain/DeviceSealingRecordFields';
+import { DeviceSealingRecordKeyFields } from '@app/contexts/identity-devices/domain/DeviceSealingRecordKeyFields';
+import { DeviceSealingRecordPrimitives } from '@app/contexts/identity-devices/domain/DeviceSealingRecordPrimitives';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { CanonicalJson, Signature } from '@haskou/pigeon-swarm-crypto';
 
@@ -16,30 +19,115 @@ const RECORD_FIELDS = [
 const SEALING_PUBLIC_KEY_BYTES = 32;
 const UTC_DAY_FORMAT = /^\d{4}-\d{2}-\d{2}$/;
 
-export type DeviceSealingRecordFields = {
-  deviceCredential: string;
-  identityId: string;
-  sealingPublicKey: string;
-  utcDay: string;
-};
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-export type DeviceSealingRecordKeyFields = Pick<
-  DeviceSealingRecordFields,
-  'deviceCredential' | 'identityId' | 'utcDay'
->;
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expected: string[],
+): boolean {
+  const actual = Object.keys(value).sort();
 
-export type DeviceSealingRecordPrimitives = {
-  record: DeviceSealingRecordFields;
-  signature: string;
-};
+  return (
+    actual.length === expected.length &&
+    actual.every((key, index) => key === expected[index])
+  );
+}
 
-type UnknownRecord = Record<string, unknown>;
+function isSignatureFormat(value: unknown): value is string {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  try {
+    return new Signature(value).valueOf() === value;
+  } catch {
+    return false;
+  }
+}
+
+function isCanonicalKeyBody(value: unknown): value is string {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  try {
+    const identityId = new IdentityId(value);
+
+    return identityId.isCanonicalKey() && identityId.valueOf() === value;
+  } catch {
+    return false;
+  }
+}
+
+function isUtcDay(value: unknown): value is string {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const time = Date.parse(`${value}T00:00:00.000Z`);
+
+  return (
+    UTC_DAY_FORMAT.test(value) &&
+    !Number.isNaN(time) &&
+    new Date(time).toISOString().slice(0, 10) === value
+  );
+}
+
+function isSealingPublicKey(value: unknown): value is string {
+  if (typeof value !== 'string') {
+    return false;
+  }
+  const bytes = Buffer.from(value, 'base64url');
+
+  return (
+    bytes.length === SEALING_PUBLIC_KEY_BYTES &&
+    bytes.toString('base64url') === value
+  );
+}
+
+function recordFieldsOf(value: unknown): DeviceSealingRecordFields | undefined {
+  if (!isObject(value) || !hasExactKeys(value, RECORD_FIELDS)) {
+    return undefined;
+  }
+  const { deviceCredential, identityId, sealingPublicKey, utcDay } = value;
+
+  if (
+    !isCanonicalKeyBody(identityId) ||
+    !isCanonicalKeyBody(deviceCredential) ||
+    !isSealingPublicKey(sealingPublicKey) ||
+    !isUtcDay(utcDay)
+  ) {
+    return undefined;
+  }
+
+  return { deviceCredential, identityId, sealingPublicKey, utcDay };
+}
+
+function storedPrimitivesOf(
+  value: unknown,
+): DeviceSealingRecordPrimitives | undefined {
+  if (!isObject(value) || !hasExactKeys(value, STORED_FIELDS)) {
+    return undefined;
+  }
+  const { record, signature } = value;
+  const fields = recordFieldsOf(record);
+
+  if (fields === undefined || !isSignatureFormat(signature)) {
+    return undefined;
+  }
+
+  if (
+    Buffer.byteLength(JSON.stringify(value), 'utf8') >
+    MAX_DEVICE_SEALING_RECORD_BYTES
+  ) {
+    return undefined;
+  }
+
+  return { record: fields, signature };
+}
 
 export class DeviceSealingRecord {
-  private constructor(
-    private readonly primitives: DeviceSealingRecordPrimitives,
-  ) {}
-
   public static signingContent(fields: DeviceSealingRecordFields): string {
     return `${SIGNING_PREFIX}${CanonicalJson.serialize({
       deviceCredential: fields.deviceCredential,
@@ -54,43 +142,16 @@ export class DeviceSealingRecord {
   }
 
   public static fromStored(value: unknown): DeviceSealingRecord | undefined {
-    if (!isObject(value) || !hasExactKeys(value, STORED_FIELDS)) {
-      return undefined;
-    }
-    const { record, signature } = value;
-    if (!isObject(record) || !hasExactKeys(record, RECORD_FIELDS)) {
-      return undefined;
-    }
-    if (typeof signature !== 'string' || !isSignatureFormat(signature)) {
-      return undefined;
-    }
-    const { deviceCredential, identityId, sealingPublicKey, utcDay } = record;
-    if (
-      typeof deviceCredential !== 'string' ||
-      typeof identityId !== 'string' ||
-      typeof sealingPublicKey !== 'string' ||
-      typeof utcDay !== 'string'
-    ) {
-      return undefined;
-    }
-    if (!isCanonicalKeyBody(identityId) || !isCanonicalKeyBody(deviceCredential)) {
-      return undefined;
-    }
-    if (!isUtcDay(utcDay) || !isSealingPublicKey(sealingPublicKey)) {
-      return undefined;
-    }
-    if (
-      Buffer.byteLength(JSON.stringify(value), 'utf8') >
-      MAX_DEVICE_SEALING_RECORD_BYTES
-    ) {
-      return undefined;
-    }
+    const primitives = storedPrimitivesOf(value);
 
-    return new DeviceSealingRecord({
-      record: { deviceCredential, identityId, sealingPublicKey, utcDay },
-      signature,
-    });
+    return primitives === undefined
+      ? undefined
+      : new DeviceSealingRecord(primitives);
   }
+
+  private constructor(
+    private readonly primitives: DeviceSealingRecordPrimitives,
+  ) {}
 
   public key(): string {
     return DeviceSealingRecord.headKey(this.primitives.record);
@@ -129,54 +190,4 @@ export class DeviceSealingRecord {
       signature: this.primitives.signature,
     };
   }
-}
-
-function isObject(value: unknown): value is UnknownRecord {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasExactKeys(value: UnknownRecord, expected: string[]): boolean {
-  const actual = Object.keys(value).sort();
-
-  return (
-    actual.length === expected.length &&
-    actual.every((key, index) => key === expected[index])
-  );
-}
-
-function isSignatureFormat(value: string): boolean {
-  try {
-    return new Signature(value).valueOf() === value;
-  } catch {
-    return false;
-  }
-}
-
-function isCanonicalKeyBody(value: string): boolean {
-  try {
-    const identityId = new IdentityId(value);
-
-    return identityId.isCanonicalKey() && identityId.valueOf() === value;
-  } catch {
-    return false;
-  }
-}
-
-function isUtcDay(value: string): boolean {
-  const time = Date.parse(`${value}T00:00:00.000Z`);
-
-  return (
-    UTC_DAY_FORMAT.test(value) &&
-    !Number.isNaN(time) &&
-    new Date(time).toISOString().slice(0, 10) === value
-  );
-}
-
-function isSealingPublicKey(value: string): boolean {
-  const bytes = Buffer.from(value, 'base64url');
-
-  return (
-    bytes.length === SEALING_PUBLIC_KEY_BYTES &&
-    bytes.toString('base64url') === value
-  );
 }
