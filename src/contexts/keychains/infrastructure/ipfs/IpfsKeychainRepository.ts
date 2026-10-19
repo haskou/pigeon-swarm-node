@@ -11,6 +11,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import Kernel from '@haskou/ddd-kernel';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
@@ -18,6 +19,8 @@ import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly MAX_ROUTED_CANDIDATES = 20;
+  private readonly OVERFLOW_LOG_INTERVAL_MS = 60_000;
+  private lastOverflowLogAt = 0;
   private readonly keychainByCid = new Map<string, Keychain>();
 
   constructor(
@@ -207,7 +210,9 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   // Routing records are writable under the owner's key, so a candidate that
   // cannot be read, mapped, or proven to be the owner's is skipped: it must
   // not block the owner's publish. Only a failed routing lookup or a failed
-  // local write fails the check closed.
+  // local write fails the check closed. Candidates past the cap are not read;
+  // when any exist and no checked candidate proves the owner's keychain, the
+  // check fails closed rather than report that the owner has no keychain.
   private async hasRemoteKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
@@ -216,6 +221,12 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       .catch((error: unknown) => {
         throw new KeychainOwnershipUnverifiedError(error);
       });
+    const overflowed = cidStrings.length > this.MAX_ROUTED_CANDIDATES;
+
+    if (overflowed) {
+      this.logRoutedOverflow(cidStrings.length);
+    }
+
     const owned = await Promise.all(
       cidStrings
         .slice(0, this.MAX_ROUTED_CANDIDATES)
@@ -224,7 +235,30 @@ export default class IpfsKeychainRepository extends KeychainRepository {
         ),
     );
 
-    return owned.includes(true);
+    if (owned.includes(true)) {
+      return true;
+    }
+
+    if (overflowed) {
+      throw new KeychainOwnershipUnverifiedError(
+        new Error('routed keychain candidates exceed the check cap'),
+      );
+    }
+
+    return false;
+  }
+
+  private logRoutedOverflow(candidateCount: number): void {
+    const now = Date.now();
+
+    if (now - this.lastOverflowLogAt < this.OVERFLOW_LOG_INTERVAL_MS) {
+      return;
+    }
+
+    this.lastOverflowLogAt = now;
+    Kernel.logger.warn?.(
+      `Routed keychain candidates exceed the check cap: candidates=${candidateCount} checked=${this.MAX_ROUTED_CANDIDATES}`,
+    );
   }
 
   private async isRemoteKeychainOf(
@@ -245,7 +279,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
       return true;
     } catch (error) {
-      // The gate refuses forged documents: they prove no owner keychain.
+      // The replicated gate refuses a forged document with
+      // InvalidPublicMutationError whatever its internal failure, so the
+      // document proves no owner keychain. Any other failure is local
+      // (replicated state, storage) and fails the check closed.
       if (error instanceof InvalidPublicMutationError) {
         return false;
       }

@@ -6,6 +6,7 @@ import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metada
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
@@ -309,7 +310,7 @@ describe('IpfsKeychainRepository', () => {
     ).resolves.toBe(false);
   });
 
-  it('should examine at most the first routed candidates when checking for an owner keychain', async () => {
+  it('should fail closed when routed candidates overflow the check cap without identifying the owner', async () => {
     const owner = await KeychainMother.create();
     const candidates = Array.from(
       { length: 25 },
@@ -323,8 +324,91 @@ describe('IpfsKeychainRepository', () => {
 
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+    expect(ipfs.getJSON).toHaveBeenCalledTimes(20);
+  });
+
+  it('should still report an owner keychain found within the check cap when routed candidates overflow', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+    const candidates = Array.from(
+      { length: 25 },
+      (_, index) => `bafy-unreadable-${index}`,
+    );
+    candidates[3] = 'bafy-keychain-v2';
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(candidates);
+    ipfs.getJSON.mockImplementation((cid) =>
+      cid.valueOf() === 'bafy-keychain-v2'
+        ? Promise.resolve(mapper.toDocument(remote))
+        : Promise.reject(new Error('document not found')),
+    );
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should not fail closed when routed candidates exactly fill the check cap', async () => {
+    const owner = await KeychainMother.create();
+    const candidates = Array.from(
+      { length: 20 },
+      (_, index) => `bafy-unreadable-${index}`,
+    );
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(candidates);
+    ipfs.getJSON.mockRejectedValue(new Error('document not found'));
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
     ).resolves.toBe(false);
     expect(ipfs.getJSON).toHaveBeenCalledTimes(20);
+  });
+
+  describe('routed candidate overflow log', () => {
+    let warn: jest.Mock;
+
+    beforeEach(() => {
+      warn = jest.fn();
+      jest
+        .spyOn(Kernel, 'logger', 'get')
+        .mockReturnValue({ warn } as unknown as typeof Kernel.logger);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('should log overflow as a count only, at most once per interval', async () => {
+      const owner = await KeychainMother.create();
+      const candidates = Array.from(
+        { length: 25 },
+        (_, index) => `bafy-unreadable-${index}`,
+      );
+
+      metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+      ipfs.getRecordCandidates.mockResolvedValue(candidates);
+      ipfs.getJSON.mockRejectedValue(new Error('document not found'));
+      ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+      await expect(
+        repository.hasKeychainForOwner(owner.ownerIdentityId),
+      ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+      await expect(
+        repository.hasKeychainForOwner(owner.ownerIdentityId),
+      ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('candidates=25'),
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('bafy-unreadable');
+    });
   });
 
   it('should fail closed without the index reason when local metadata cannot be read', async () => {

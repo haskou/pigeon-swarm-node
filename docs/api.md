@@ -3127,6 +3127,12 @@ Implemented:
 - persist metadata in OrbitDB replicated metadata
 - publish keychain announcement through the domain event publisher
 
+An owner keychain check that cannot prove the owner's keychain fails closed with
+`KeychainOwnershipUnverifiedError` (409, retry later). The check examines at most
+20 routing record candidates per owner. When more exist and none of the examined
+candidates proves the owner's keychain, the publish fails the same way, and a
+count-only warning is logged at most once per minute.
+
 `signature` is the owner identity key's base64 Ed25519 signature, built by
 `KeychainSignature` from `@haskou/pigeon-swarm-crypto`, over
 `utf8("pigeon:keychain:v1\n")` followed by the RFC 8785 canonical JSON of
