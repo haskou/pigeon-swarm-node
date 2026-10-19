@@ -1558,7 +1558,7 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     if (!canCompareHeadSignatures) {
-      return true;
+      return false;
     }
 
     return (
@@ -1573,6 +1573,9 @@ export default class OrbitDBReplicatedStateRegistry {
     reconciledHeadSignature: string | undefined,
   ): Promise<void> {
     const startedAt = process.hrtime.bigint();
+
+    // The reset empties the cache, so stay not open until a rebuild succeeds.
+    this.networksAwaitingHeadReconciliation.add(networkId);
 
     if (!this.rebuildingHeadsByNetworkId.has(networkId)) {
       this.rebuildingHeadsByNetworkId.set(networkId, new Map());
@@ -2540,6 +2543,8 @@ export default class OrbitDBReplicatedStateRegistry {
    * subscriber replay that a missing local block deferred. None of these
    * conditions lapses with time, so a store that never replays, or a head
    * cache that never rebuilds, keeps the node not open.
+   * A rebuild that a peer join starts and fails keeps the node not open
+   * until a later join rebuilds the cache.
    */
   public isOpen(): boolean {
     if (

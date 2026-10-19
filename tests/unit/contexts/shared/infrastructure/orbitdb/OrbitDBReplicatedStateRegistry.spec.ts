@@ -1539,7 +1539,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       const mapper = new IpfsIdentityMapper();
       const headCache = new InMemoryOrbitDBReplicatedHeadCache();
       const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
-      const { stores } = createStores();
+      const { heads, stores } = createStores();
       const signer = await SignedIdentityMother.create();
       const aliasId = aliasOf(new IdentityId(signer.id)).valueOf();
       const recordOf = async (
@@ -1581,7 +1581,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         `identity:${signer.id}`,
         await recordOf(signer.build()),
       );
-      await headCache.markWarm('network-1');
+      await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+      heads.log = {
+        heads: jest.fn(async () => [{ hash: 'head-1' }]),
+      };
       registry.addMutationGate(new OrbitDBIdentityMutationGate(ipfs));
       await registry.register('network-1', stores);
 
@@ -2983,7 +2986,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       receivedAt: 1,
       version: 1,
     });
-    await headCache.markWarm('network-1');
+    await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+    firstNetwork.heads.log = {
+      heads: jest.fn(async () => [{ hash: 'head-1' }]),
+    };
     firstNetwork.heads.all.mockResolvedValue([]);
 
     await registry.register('network-1', firstNetwork.stores);
