@@ -1952,6 +1952,7 @@ Response `201`, with `Cache-Control: no-store`:
 Implemented:
 
 - require signed request auth from the current node owner (`403010` otherwise)
+- return `201` with `Location: /node/registration-codes/{codeId}`; `codeId` is the public `id`, and the secret `code` never appears in `Location`
 - `maxUses` is optional and defaults to `1`; it must be between `1` and
   `NODE_REGISTRATION_CODE_MAX_USES` (default `100`)
 - `expiresAt` (milliseconds since epoch) is required, must be in the future and
@@ -2504,6 +2505,7 @@ Implemented:
 - store the binary bytes directly in IPFS
 - limit content size to 50 MiB
 - return the CID to store in signed identity profiles or posts
+- return `201` with `Location: /ipfs/contents/{cid}`
 
 ### Get public IPFS content
 
@@ -2664,6 +2666,7 @@ Node-local queues of opaque ciphertext envelopes. Mailboxes are never written to
 | `DELETE /mailboxes/{mailboxId}/readers/{readTokenHash}` | `Bearer <readToken>`                                          | Revokes that reader. `204`. `404` for an unknown reader hash. `409` for the last reader, which cannot be revoked. Envelopes it was holding back are deleted once the remaining readers have acked them. Closes that reader's realtime subscriptions.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `DELETE /mailboxes/{mailboxId}`                         | `Bearer <readToken>`                                          | Deletes the mailbox and its envelopes. `204`. Closes every realtime subscription to it.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
+- `PUT /mailboxes/{mailboxId}` returns `201` with `Location: /mailboxes/{mailboxId}` when it creates the mailbox, and `POST /mailboxes/{mailboxId}/readers` returns `201` with `Location: /mailboxes/{mailboxId}/readers/{readTokenHash}` when it adds a reader. A `200` replay has no `Location`.
 - `mailboxId` is 32 bytes base64url; capabilities are sent only in `Authorization`, never the URL.
 - Creation proof: the `@haskou/pigeon-swarm-crypto` v2 mailbox-creation proof of work (`ProofOfWork.mailboxCreation(mailboxId, postTokenHash, readTokenHash)`): SHA-256 over a length-prefixed preimage (domain `pigeon-mailbox-creation:v2`). `creationNonce` is a canonical decimal string of 1 to 16 digits without leading zeros (`^(0|[1-9][0-9]{0,15})$`). A proof in any other encoding, including the retired v1 `domain:field:...:nonce` form, is refused with `400`. Byte-exact vectors are the library's `vectors/proof-of-work.json`, checked by the `MailboxCreationProofVectors` unit spec.
 - A wrong, swapped or missing capability, a malformed id and an unknown mailbox all return the same `404`.
@@ -2695,6 +2698,7 @@ Authorization is split so a streamed body never has to be buffered for signing:
 | `GET /private-blobs/{blobId}`    | `Authorization: Bearer <downloadToken>` | Single `Range: bytes=` supported (`206`/`416`). `Cache-Control: no-store`.                                                                                                    |
 | `DELETE /private-blobs/{blobId}` | `Authorization: Bearer <uploadToken>`   | Removes bytes and record on this node only. Returns `204`.                                                                                                                    |
 
+- `POST /private-blobs` returns `201` with `Location: /private-blobs/{blobId}`; the reservation body still carries `blobId`.
 - Capabilities are 256-bit random values sent only in the `Authorization` header (never the URL); the node keeps their SHA-256 and compares in constant time.
 - A wrong, swapped, missing or expired capability, an unknown id and a not-yet-uploaded blob all return the same `404`.
 - Quotas: `PRIVATE_BLOB_MAX_BYTES`, `PRIVATE_BLOB_QUOTA_BYTES_PER_OWNER`, `PRIVATE_BLOB_QUOTA_BYTES_TOTAL` (exceeded: `413`). Quota owners are an HMAC of the identity id with a per-node secret salt.

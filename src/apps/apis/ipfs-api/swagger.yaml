@@ -74,7 +74,12 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
-          description: Public content stored in IPFS.
+          description: Public content stored in IPFS. `Location` names the content.
+          headers:
+            Location:
+              description: Relative URL of the stored content.
+              schema:
+                type: string
           content:
             application/json:
               schema:

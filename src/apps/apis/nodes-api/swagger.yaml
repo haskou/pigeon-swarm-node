@@ -801,7 +801,12 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
-          description: 'Registration code issued. Sent with `Cache-Control: no-store`.'
+          description: 'Registration code issued. Sent with `Cache-Control: no-store`. `Location` names the code by its id.'
+          headers:
+            Location:
+              description: Relative URL of the issued code by id. The secret code is never included.
+              schema:
+                type: string
           content:
             application/json:
               schema:

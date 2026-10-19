@@ -39,6 +39,9 @@ export class PostPublicIPFSContentRoute extends IPFSContentUploadRouteSupport {
       }),
     );
 
-    return response.status(HttpRouteStatusEnum.CREATED).json(published);
+    return response
+      .status(HttpRouteStatusEnum.CREATED)
+      .location(`/ipfs/contents/${encodeURIComponent(published.cid)}`)
+      .json(published);
   }
 }

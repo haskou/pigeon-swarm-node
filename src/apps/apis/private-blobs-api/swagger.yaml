@@ -37,7 +37,12 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
-          description: Reservation created.
+          description: Reservation created. `Location` names the reserved blob.
+          headers:
+            Location:
+              description: Relative URL of the reserved blob.
+              schema:
+                type: string
           content:
             application/json:
               schema:

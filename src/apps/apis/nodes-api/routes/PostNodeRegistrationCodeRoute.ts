@@ -33,9 +33,14 @@ export class PostNodeRegistrationCodeRoute extends NodeOwnerRouteSupport {
 
       response.setHeader('Cache-Control', 'no-store');
 
+      const resource = new IssuedNodeRegistrationCodeViewModel(
+        issued,
+      ).toResource();
+
       return response
         .status(HttpRouteStatusEnum.CREATED)
-        .send(new IssuedNodeRegistrationCodeViewModel(issued).toResource());
+        .location(`/node/registration-codes/${encodeURIComponent(resource.id)}`)
+        .send(resource);
     } catch (error: unknown) {
       if (
         error instanceof NodeRegistrationCodeMaxUsesIsOutOfRangeError ||
