@@ -1,3 +1,4 @@
+import { KeychainOwnershipUnverifiedError } from '@app/contexts/keychains/domain/errors/KeychainOwnershipUnverifiedError';
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import IpfsKeychainRepository from '@app/contexts/keychains/infrastructure/ipfs/IpfsKeychainRepository';
 import IpfsKeychainMapper from '@app/contexts/keychains/infrastructure/ipfs/mappers/IpfsKeychainMapper';
@@ -23,8 +24,8 @@ describe('IpfsKeychainRepository', () => {
       metadataIndex,
     );
     ipfs.getRecordCandidates.mockResolvedValue([]);
-    ipfs.findConnectedNetworkIds.mockImplementation(
-      async (networkIds) => networkIds,
+    ipfs.findConnectedNetworkIds.mockImplementation((networkIds) =>
+      Promise.resolve(networkIds),
     );
   });
 
@@ -179,6 +180,27 @@ describe('IpfsKeychainRepository', () => {
     expect(ipfs.getJSON).not.toHaveBeenCalled();
   });
 
+  it('should not report an owner-indexed metadata row whose keychain belongs to another owner', async () => {
+    const owner = await KeychainMother.create();
+    const other = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([
+      {
+        cid: 'bafy-other-keychain-v1',
+        keychain: other.withVersion(1).build(),
+        ownerIdentityId: owner.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 100,
+        version: 1,
+      },
+    ]);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+    expect(ipfs.getRecordCandidates).toHaveBeenCalledTimes(1);
+  });
+
   it('should report an owner keychain discovered remotely', async () => {
     const mother = await KeychainMother.create();
     const remote = mother.withVersion(2).build();
@@ -229,33 +251,41 @@ describe('IpfsKeychainRepository', () => {
     ).resolves.toBe(false);
   });
 
-  it('should fail the head-less check when a routed keychain document is missing', async () => {
+  it('should fail closed without the routed reason when a keychain document cannot be read', async () => {
     const owner = await KeychainMother.create();
+    const missing = new Error('document not found');
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
     ipfs.getRecordCandidates.mockResolvedValue(['bafy-missing-keychain']);
     ipfs.getJSON.mockRejectedValue(new Error('document not found'));
-    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+    ipfs.getBytes.mockRejectedValue(missing);
 
-    await expect(
-      repository.hasKeychainForOwner(owner.ownerIdentityId),
-    ).rejects.toThrow('document not found');
+    const error = await repository
+      .hasKeychainForOwner(owner.ownerIdentityId)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(KeychainOwnershipUnverifiedError);
+    expect((error as Error).message).not.toContain('document not found');
+    expect((error as KeychainOwnershipUnverifiedError).cause).toBe(missing);
   });
 
-  it('should propagate a routing lookup error from the head-less check', async () => {
+  it('should fail closed without the routing reason when the routing lookup fails', async () => {
     const owner = await KeychainMother.create();
+    const routing = new Error('routing unavailable');
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
-    ipfs.getRecordCandidates.mockRejectedValue(
-      new Error('routing unavailable'),
-    );
+    ipfs.getRecordCandidates.mockRejectedValue(routing);
 
-    await expect(
-      repository.hasKeychainForOwner(owner.ownerIdentityId),
-    ).rejects.toThrow('routing unavailable');
+    const error = await repository
+      .hasKeychainForOwner(owner.ownerIdentityId)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(KeychainOwnershipUnverifiedError);
+    expect((error as Error).message).not.toContain('routing unavailable');
+    expect((error as KeychainOwnershipUnverifiedError).cause).toBe(routing);
   });
 
-  it('should report an owner keychain held in local metadata when its document is missing', async () => {
+  it('should not report an owner keychain from a keychain-less metadata row', async () => {
     const owner = await KeychainMother.create();
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([
@@ -267,14 +297,11 @@ describe('IpfsKeychainRepository', () => {
         version: 1,
       },
     ]);
-    ipfs.getJSON.mockRejectedValue(new Error('document not found'));
-    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
 
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
-    ).resolves.toBe(true);
-    expect(ipfs.getJSON).not.toHaveBeenCalled();
-    expect(ipfs.getBytes).not.toHaveBeenCalled();
+    ).resolves.toBe(false);
+    expect(ipfs.getRecordCandidates).toHaveBeenCalledTimes(1);
   });
 
   it('should ignore a remote document that fails verification on write', async () => {
@@ -300,6 +327,23 @@ describe('IpfsKeychainRepository', () => {
     ipfs.getRecordCandidates.mockResolvedValue(['bafy-garbage-document']);
     ipfs.getJSON.mockRejectedValue(new Error('not json'));
     ipfs.getBytes.mockResolvedValue(Buffer.from('not a keychain'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
+  it('should ignore routed documents with malformed fields when checking for an owner keychain', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue([
+      'bafy-null-document',
+      'bafy-partial-document',
+    ]);
+    ipfs.getJSON
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ _id: 42 } as never);
 
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),

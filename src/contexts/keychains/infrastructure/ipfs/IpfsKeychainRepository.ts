@@ -1,4 +1,5 @@
 import { KeychainExternalIdentifierNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainExternalIdentifierNotFoundError';
+import { KeychainOwnershipUnverifiedError } from '@app/contexts/keychains/domain/errors/KeychainOwnershipUnverifiedError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
@@ -10,6 +11,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import { DomainError } from '@haskou/value-objects';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
@@ -196,17 +198,22 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       return false;
     }
 
-    return record.keychain?.belongsTo(ownerIdentityId) ?? true;
+    return (
+      record.keychain !== undefined &&
+      record.keychain.belongsTo(ownerIdentityId)
+    );
   }
 
-  // Fails closed, unlike listing: a routed keychain that cannot be fetched
-  // leaves the owner's keychain unproven, so its read error propagates.
+  // Fails closed, unlike listing: a routed keychain that cannot be read leaves
+  // the owner's keychain unproven, so the check throws without the read reason.
   private async hasRemoteKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
-    const cidStrings = await this.ipfsManager.getRecordCandidates(
-      this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
-    );
+    const cidStrings = await this.ipfsManager
+      .getRecordCandidates(this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf())
+      .catch((error: unknown) => {
+        throw new KeychainOwnershipUnverifiedError(error);
+      });
     const results = await Promise.allSettled(
       cidStrings.map((cidString) =>
         this.isRemoteKeychainOf(new IPFSId(cidString), ownerIdentityId),
@@ -224,7 +231,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
 
     if (failure) {
-      throw failure.reason;
+      throw new KeychainOwnershipUnverifiedError(failure.reason);
     }
 
     return false;
@@ -257,11 +264,33 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
-  // Fetch failures propagate. Bytes that are not JSON or do not map to a
-  // keychain cannot be the owner's, so they are ignored: failing on them would
-  // let any routed garbage block the owner's first publish.
+  private isKeychainDocument(value: unknown): value is IpfsKeychainDocument {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+
+    const document = value as Record<string, unknown>;
+
+    return (
+      typeof document._id === 'string' &&
+      typeof document.encryptedPayload === 'string' &&
+      typeof document.signature === 'string' &&
+      typeof document.timestamp === 'number' &&
+      typeof document.version === 'number' &&
+      this.isOptionalCid(document.previousCid)
+    );
+  }
+
+  private isOptionalCid(value: unknown): boolean {
+    return value === undefined || value === null || typeof value === 'string';
+  }
+
+  // Fetch failures propagate. Bytes that are not a keychain document, or that
+  // do not map to a keychain, cannot be the owner's, so they are ignored:
+  // failing on them would let any routed garbage block the owner's first
+  // publish.
   private async readRoutedKeychain(cid: IPFSId): Promise<Keychain | undefined> {
-    let document: IpfsKeychainDocument;
+    let document: unknown;
 
     try {
       document = await this.getDocumentFromCid(cid);
@@ -273,10 +302,18 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       throw error;
     }
 
+    if (!this.isKeychainDocument(document)) {
+      return undefined;
+    }
+
     try {
       return this.mapper.toDomain(document);
-    } catch {
-      return undefined;
+    } catch (error) {
+      if (error instanceof DomainError) {
+        return undefined;
+      }
+
+      throw error;
     }
   }
 
