@@ -40,10 +40,7 @@ export default class KeychainPublisher {
   private async ownerHasKeychain(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
-    const candidates =
-      await this.repository.findCandidateReferencesByOwnerId(ownerIdentityId);
-
-    return candidates.length > 0;
+    return this.repository.hasKeychainForOwner(ownerIdentityId);
   }
 
   public async publish(

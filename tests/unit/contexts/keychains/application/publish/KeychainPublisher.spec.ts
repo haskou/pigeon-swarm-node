@@ -6,7 +6,6 @@ import { KeychainPublishMessage } from '@app/contexts/keychains/application/publ
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
 import { KeychainOwnerAlreadyHasKeychainError } from '@app/contexts/keychains/domain/errors/KeychainOwnerAlreadyHasKeychainError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
-import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
 import KeychainSaverService from '@app/contexts/keychains/domain/services/KeychainSaverService';
@@ -81,7 +80,7 @@ describe('KeychainPublisher', () => {
     identityRepository.findById.mockResolvedValue(
       mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
     );
-    repository.findCandidateReferencesByOwnerId.mockResolvedValue([]);
+    repository.hasKeychainForOwner.mockResolvedValue(false);
     saver.save.mockResolvedValue(externalIdentifier);
     eventPublisher.publish.mockResolvedValue(undefined);
 
@@ -141,9 +140,7 @@ describe('KeychainPublisher', () => {
     identityRepository.findById.mockResolvedValue(
       mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
     );
-    repository.findCandidateReferencesByOwnerId.mockResolvedValue([
-      mock<KeychainCandidate>(),
-    ]);
+    repository.hasKeychainForOwner.mockResolvedValue(true);
     saver.save.mockResolvedValue(
       new KeychainExternalIdentifier('bafy-keychain'),
     );
@@ -154,36 +151,6 @@ describe('KeychainPublisher', () => {
     );
     expect(saver.save).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
-  });
-
-  it('should publish a head-less first keychain version when the only candidate belongs to another owner', async () => {
-    const primitives = (await KeychainMother.create()).primitives();
-    const message = new KeychainPublishMessage(
-      primitives.ownerIdentityId,
-      primitives.encryptedPayload,
-      primitives.timestamp,
-      primitives.signature,
-      primitives.version,
-      primitives.previousKeychainExternalIdentifier,
-    );
-    const otherOwnersCandidate = mock<KeychainCandidate>();
-    otherOwnersCandidate.belongsTo.mockReturnValue(false);
-
-    validator.isValidChainFor.mockResolvedValue(true);
-    identityRepository.findById.mockResolvedValue(
-      mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
-    );
-    repository.findCandidateReferencesByOwnerId.mockResolvedValue([
-      otherOwnersCandidate,
-    ]);
-    saver.save.mockResolvedValue(
-      new KeychainExternalIdentifier('bafy-keychain'),
-    );
-    eventPublisher.publish.mockResolvedValue(undefined);
-
-    await publisher.publish(message);
-
-    expect(saver.save).toHaveBeenCalledTimes(1);
   });
 
   it('should publish a next keychain version when the owner already has a keychain', async () => {
@@ -207,9 +174,7 @@ describe('KeychainPublisher', () => {
     identityRepository.findById.mockResolvedValue(
       mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
     );
-    repository.findCandidateReferencesByOwnerId.mockResolvedValue([
-      mock<KeychainCandidate>(),
-    ]);
+    repository.hasKeychainForOwner.mockResolvedValue(true);
     saver.save.mockResolvedValue(externalIdentifier);
     eventPublisher.publish.mockResolvedValue(undefined);
 

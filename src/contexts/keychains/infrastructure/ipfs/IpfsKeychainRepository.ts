@@ -236,6 +236,25 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     return this.sortCandidateReferencesByFreshness(remoteCandidates);
   }
 
+  public async hasKeychainForOwner(
+    ownerIdentityId: IdentityId,
+  ): Promise<boolean> {
+    const metadata =
+      await this.metadataIndex.findByOwnerIdentityId(ownerIdentityId);
+
+    if (metadata.length > 0) {
+      return true;
+    }
+
+    // Remote candidates can belong to other owners; only the owner's count.
+    const candidates = await this.findRemoteCandidateReferences(
+      ownerIdentityId,
+      new Set(),
+    );
+
+    return candidates.some((candidate) => candidate.belongsTo(ownerIdentityId));
+  }
+
   public async save(
     keychain: Keychain,
     networkIds: NetworkId[],

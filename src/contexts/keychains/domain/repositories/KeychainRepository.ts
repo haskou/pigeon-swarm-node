@@ -19,6 +19,11 @@ export default abstract class KeychainRepository {
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]>;
 
+  /** True when the owner's own keychain is stored locally or discoverable. */
+  public abstract hasKeychainForOwner(
+    ownerIdentityId: IdentityId,
+  ): Promise<boolean>;
+
   public abstract findCandidatesByOwnerId(
     ownerIdentityId: IdentityId,
   ): Promise<Keychain[]>;

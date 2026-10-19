@@ -156,6 +156,58 @@ describe('IpfsKeychainRepository', () => {
     expect(ipfs.getJSON).toHaveBeenCalledTimes(1);
   });
 
+  it('should report an owner keychain held in local metadata without reading IPFS', async () => {
+    const mother = await KeychainMother.create();
+    const keychain = mother.withVersion(1).build();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([
+      {
+        cid: 'bafy-keychain-v1',
+        keychain,
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 100,
+        version: 1,
+      },
+    ]);
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).resolves.toBe(true);
+    expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
+    expect(ipfs.getJSON).not.toHaveBeenCalled();
+  });
+
+  it('should report an owner keychain discovered remotely', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-keychain-v2']);
+    ipfs.getJSON.mockResolvedValue(mapper.toDocument(remote));
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should ignore remote keychains that belong to another owner', async () => {
+    const owner = await KeychainMother.create();
+    const other = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-other-keychain']);
+    ipfs.getJSON.mockResolvedValue(
+      mapper.toDocument(other.withVersion(1).build()),
+    );
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
   it('should find previous keychains by replicated external identifier without IPFS', async () => {
     const mother = await KeychainMother.create();
     const keychain = mother.withVersion(3).build();
