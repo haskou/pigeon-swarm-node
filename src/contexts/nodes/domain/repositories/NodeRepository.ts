@@ -15,8 +15,8 @@ export default abstract class NodeRepository {
   /**
    * Whether the local node has no networks as it is stored, read without
    * generating a node or syncing the runtime networks, so it is cheap enough
-   * to ask on every readiness check. A node whose stored configuration could
-   * not be read, or was regenerated over an unreadable one, is not empty.
+   * to ask on every readiness check. A node whose stored configuration cannot
+   * be read is not empty.
    */
   public abstract isLocalNodeConfigurationEmpty(): Promise<boolean>;
   /**

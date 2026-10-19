@@ -1,4 +1,5 @@
 import { LocalNodeNotFoundError } from '@app/contexts/nodes/domain/errors/LocalNodeNotFoundError';
+import { NodeMetadataIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeMetadataIsUnreadableError';
 import { NodeOwnerResetFlagIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeOwnerResetFlagIsUnreadableError';
 import { Node } from '@app/contexts/nodes/domain/Node';
 import { NodeRelayConfiguration } from '@app/contexts/nodes/domain/NodeRelayConfiguration';
@@ -21,8 +22,6 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   private static readonly LOCAL_NODE_ID = 'local';
 
   private latestSavedMetadata?: LocalNodeMetadataDocument;
-  // Set when this boot regenerated the metadata over an unreadable document.
-  private regeneratedOverUnreadableDocument = false;
 
   constructor(
     private readonly database: EmbeddedLocalDatabase,
@@ -94,8 +93,12 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
       LocalNodeMetadataRepository.LOCAL_NODE_ID,
     );
 
-    if (!document || !this.isDocument(document)) {
+    if (!document) {
       return undefined;
+    }
+
+    if (!this.isDocument(document)) {
+      throw new NodeMetadataIsUnreadableError();
     }
 
     return {
@@ -125,20 +128,13 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
     );
   }
 
-  /** Generates and saves the metadata of a new node; run inside `exclusively`. */
+  /**
+   * Generates and saves the metadata of a new node. Runs inside `exclusively`
+   * after `findMetadata` found no stored document, so a stored document, whether
+   * readable or not, is never replaced.
+   */
   private async createMetadata(): Promise<LocalNodeMetadataDocument> {
     const generatedMetadata = this.metadataMapper.generate();
-
-    // Only reached when no readable metadata exists, so a stored document here
-    // is an unreadable one.
-    if (
-      await this.database.findOne(
-        LocalNodeMetadataRepository.NAMESPACE,
-        LocalNodeMetadataRepository.LOCAL_NODE_ID,
-      )
-    ) {
-      this.regeneratedOverUnreadableDocument = true;
-    }
 
     await this.persistMetadata(generatedMetadata);
 
@@ -310,10 +306,6 @@ export default class LocalNodeMetadataRepository extends NodeRepository {
   }
 
   public async isLocalNodeConfigurationEmpty(): Promise<boolean> {
-    if (this.regeneratedOverUnreadableDocument) {
-      return false;
-    }
-
     const document = await this.database.findOne(
       LocalNodeMetadataRepository.NAMESPACE,
       LocalNodeMetadataRepository.LOCAL_NODE_ID,

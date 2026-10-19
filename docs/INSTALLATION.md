@@ -54,6 +54,10 @@ It keeps the node id, networks, relay configuration, identities, content and key
 
 To start over instead, stop the node and delete the `PIGEON_LOCAL_DB_PATH` folder. The node then starts with a new node id and no owner, networks, relay configuration or other local data, while the IPFS peer key under `IPFS_STORAGE_PATH` survives. Such a node is unclaimed, like a new installation: claim it with `PUT /node/owner` before anyone else can reach the API.
 
+## Unreadable Node Configuration
+
+If the stored node configuration cannot be read, the node refuses to start with the error `The stored node configuration cannot be read, so the node cannot start.` The configuration is left as stored and is never regenerated, because a new one would drop the stored networks and give the node a new node id. Restore the `PIGEON_LOCAL_DB_PATH` folder from a copy, or delete it to start over as described under Resetting the Node Owner, then start the node.
+
 ## Upgrading from Alias Identity Ids
 
 Nodes that ran before identity ids had to be canonical may hold alias ids (a DER prefix with a different first byte, or base64 with non-zero padding bits). Such an id is refused on every signed route and in block lists, and it cannot be stored again. On each start, before the API listens, the node purges alias ids from its local exceptions and from adopted block sources, and it logs only counts: `Purged non-canonical identity ids: ownerCleared=<bool> removedEntries=<n>`.
