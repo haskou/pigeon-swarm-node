@@ -49,7 +49,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return this.versions.newestFirst(
         await this.metadataIndex.findByIdentityId(id),
       );
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       return [];
     }
   }
@@ -254,7 +258,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       return candidate;
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       this.identityByCid.delete(metadata.cid);
 
       return undefined;
