@@ -106,35 +106,40 @@ export default class IpfsIdentityRepository extends IdentityRepository {
             IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
           );
     } catch (jsonError: unknown) {
-      let bytes: Buffer;
-
-      try {
-        bytes =
-          networkIds && networkIds.length > 0
-            ? await this.ipfsManager.getBytesFromNetworks(
-                cid,
-                networkIds,
-                IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
-              )
-            : await this.ipfsManager.getBytes(
-                cid,
-                IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
-              );
-      } catch (bytesError: unknown) {
-        // A NotFound verdict counts only when the JSON read also verified absence.
-        if (
-          bytesError instanceof IPFSContentNotFoundError &&
-          !(jsonError instanceof IPFSContentNotFoundError)
-        ) {
-          throw new ReplicatedStateNotReadyError();
-        }
-
-        throw bytesError;
-      }
+      const bytes = await this.readDocumentBytes(cid, networkIds, jsonError);
 
       const document: unknown = JSON.parse(Buffer.from(bytes).toString('utf8'));
 
       return document;
+    }
+  }
+
+  private async readDocumentBytes(
+    cid: IPFSId,
+    networkIds: string[] | undefined,
+    jsonError: unknown,
+  ): Promise<Buffer> {
+    try {
+      return networkIds && networkIds.length > 0
+        ? await this.ipfsManager.getBytesFromNetworks(
+            cid,
+            networkIds,
+            IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+          )
+        : await this.ipfsManager.getBytes(
+            cid,
+            IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+          );
+    } catch (bytesError: unknown) {
+      // A NotFound verdict counts only when the JSON read also verified absence.
+      if (
+        bytesError instanceof IPFSContentNotFoundError &&
+        !(jsonError instanceof IPFSContentNotFoundError)
+      ) {
+        throw new ReplicatedStateNotReadyError();
+      }
+
+      throw bytesError;
     }
   }
 
@@ -173,6 +178,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return undefined;
     }
   }
+
   // Local candidates keep their metadata answer when a previous version is unreachable.
   private async findLocalPreviousIdentity(
     externalIdentifier: IdentityExternalIdentifier,
