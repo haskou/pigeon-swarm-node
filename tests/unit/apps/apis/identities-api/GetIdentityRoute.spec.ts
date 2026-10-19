@@ -2,6 +2,7 @@ import { GetIdentityRoute } from '@app/apps/apis/identities-api/routes/GetIdenti
 import NodeReadiness from '@app/apps/NodeReadiness';
 import IdentityFinder from '@app/contexts/identities/application/find/IdentityFinder';
 import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
+import { NodeMetadataIsUnreadableError } from '@app/contexts/nodes/domain/errors/NodeMetadataIsUnreadableError';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import {
@@ -21,6 +22,7 @@ describe('Get identity route readiness gate', () => {
   let replicatedStateOpen: boolean;
   let networksRegistered: boolean;
   let configEmpty: boolean;
+  let configUnreadable: boolean;
   let readiness: NodeReadiness;
   let findCandidate: jest.Mock;
 
@@ -28,9 +30,15 @@ describe('Get identity route readiness gate', () => {
     replicatedStateOpen = false;
     networksRegistered = false;
     configEmpty = true;
+    configUnreadable = false;
     const nodeRepository = mock<NodeRepository>();
     nodeRepository.isLocalNodeConfigurationEmpty.mockImplementation(
-      async () => configEmpty,
+      async () => {
+        if (configUnreadable) {
+          throw new NodeMetadataIsUnreadableError();
+        }
+        return configEmpty;
+      },
     );
     readiness = new NodeReadiness(
       {
@@ -114,5 +122,22 @@ describe('Get identity route readiness gate', () => {
     expect(restarting.status).toBe(503);
     await expect(restarting.json()).resolves.toMatchObject({ code: 503020 });
     expect(findCandidate).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers 503020 when the stored node configuration cannot be read', async () => {
+    const getIdentity = () =>
+      fetch(`${baseUrl}/api/identities/identity-under-test`);
+    readiness.markStarted();
+    replicatedStateOpen = false;
+    networksRegistered = false;
+    configEmpty = true;
+    configUnreadable = true;
+    findCandidate.mockClear();
+
+    // Unreadable configuration is not a fresh node; a miss is not genuine.
+    const unreadable = await getIdentity();
+    expect(unreadable.status).toBe(503);
+    await expect(unreadable.json()).resolves.toMatchObject({ code: 503020 });
+    expect(findCandidate).not.toHaveBeenCalled();
   });
 });

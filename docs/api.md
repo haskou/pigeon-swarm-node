@@ -2931,11 +2931,11 @@ Use `identityExternalIdentifier` as the next update's
 `previousIdentityExternalIdentifier`.
 
 While the node is still starting, or a network it has configured has not
-finished opening its replicated state, the lookup answers HTTP 503 with code
-`503020` (`ReplicatedStateNotReadyError`) instead of 409
-`IdentityNotFoundError`. The identity is not reported missing, so retry. A 409
-means the node is ready, because every network it has configured is open or it
-holds none, and does not know the identity.
+finished opening its replicated state, or its stored configuration cannot be
+read, the lookup answers HTTP 503 with code `503020`
+(`ReplicatedStateNotReadyError`) instead of 409 `IdentityNotFoundError`. The
+identity is not reported missing, so retry. A 409 means the node is ready (see
+Node readiness) and does not know the identity.
 
 ### Publish identity
 
