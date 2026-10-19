@@ -1749,9 +1749,15 @@ Response:
 {
   "networks": [
     {
-      "id": "<networkId>",
+      "id": "<publicNetworkId>",
       "name": "public",
-      "key": "<optionalPrivateNetworkKey>"
+      "privateNetwork": false
+    },
+    {
+      "id": "<privateNetworkId>",
+      "name": "private",
+      "key": "<privateNetworkKey>",
+      "privateNetwork": true
     }
   ]
 }
@@ -1760,10 +1766,14 @@ Response:
 Implemented:
 
 - return the networks configured for the local node
+- include `privateNetwork` for each network when the request is signed by a
+  valid identity: `true` when the network has a private key, `false` when it
+  is public; the flag reveals no key material
 - include private network `key` values only when the request is signed by the
   current node owner
-- omit private network `key` values for anonymous callers, spoofed owner
-  headers, non-owner identities or malformed signatures
+- omit `privateNetwork` and private network `key` values for anonymous callers,
+  spoofed owner headers, or malformed signatures
+- omit private network `key` values for non-owner identities
 
 ### Add local node network
 

@@ -5,7 +5,10 @@ import { NetworksResource } from '../resources/NetworksResource';
 export class NetworksViewModel {
   constructor(
     private readonly node: Node,
-    private readonly exposeKeys: boolean = true,
+    private readonly disclosure: {
+      exposeKeys: boolean;
+      exposePrivacy: boolean;
+    } = { exposeKeys: true, exposePrivacy: true },
   ) {}
 
   public toResource(): NetworksResource {
@@ -14,8 +17,11 @@ export class NetworksViewModel {
     return {
       networks: Object.values(primitives.networks).map((network) => ({
         id: network.id,
-        ...(this.exposeKeys ? { key: network.key } : {}),
+        ...(this.disclosure.exposeKeys ? { key: network.key } : {}),
         name: network.name,
+        ...(this.disclosure.exposePrivacy
+          ? { privateNetwork: network.key !== undefined }
+          : {}),
       })),
     };
   }
