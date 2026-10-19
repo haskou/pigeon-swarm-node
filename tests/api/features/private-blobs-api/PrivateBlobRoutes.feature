@@ -9,6 +9,7 @@ Feature: Private blob store routes
   Scenario: Reserve, upload, download and range-read an opaque blob
     When I reserve a private blob of 10 bytes
     Then response code is equal to 201
+    And response header "location" should contain "/private-blobs/"
     And response body should contain "uploadToken"
     And response body should contain "downloadToken"
     When I upload "0123456789" to the private blob with the upload capability

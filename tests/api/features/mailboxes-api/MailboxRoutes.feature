@@ -9,6 +9,7 @@ Feature: Opaque mailbox routes
   Scenario: Create, append, page, acknowledge and delete
     When I create a mailbox
     Then response code is equal to 201
+    And response header "location" should contain "/mailboxes/"
     When I create the same mailbox again
     Then response code is equal to 200
     When I create the mailbox again with other capabilities
@@ -100,6 +101,7 @@ Feature: Opaque mailbox routes
     And I append an envelope "a" of 1024 bytes to the mailbox with the post capability
     When I add a second reader to the mailbox with the read capability
     Then response code is equal to 201
+    And response header "location" should contain "/readers/"
     When I add a second reader to the mailbox with the read capability
     Then response code is equal to 200
     When I acknowledge the mailbox up to 1 with the read capability
