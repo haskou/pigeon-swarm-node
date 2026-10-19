@@ -207,12 +207,13 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  // Routing records are writable under the owner's key, so a candidate that
-  // cannot be read, mapped, or proven to be the owner's is skipped: it must
-  // not block the owner's publish. Only a failed routing lookup or a failed
-  // local write fails the check closed. Candidates past the cap are not read;
-  // when any exist and no checked candidate proves the owner's keychain, the
-  // check fails closed rather than report that the owner has no keychain.
+  // Routing records are writable under the owner's key. A candidate whose
+  // bytes are not a keychain document, or belong to another owner, is skipped:
+  // it cannot be the owner's keychain. A candidate that cannot be fetched
+  // proves nothing either way, so it fails the check closed, as do a failed
+  // routing lookup, a failed local write, and an overflow past the cap when no
+  // checked candidate proves the owner's keychain. One proven owner keychain
+  // settles the check, whatever the other candidates are.
   private async hasRemoteKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
@@ -227,7 +228,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       this.logRoutedOverflow(cidStrings.length);
     }
 
-    const owned = await Promise.all(
+    const checks = await Promise.allSettled(
       cidStrings
         .slice(0, this.MAX_ROUTED_CANDIDATES)
         .map((cidString) =>
@@ -235,8 +236,20 @@ export default class IpfsKeychainRepository extends KeychainRepository {
         ),
     );
 
-    if (owned.includes(true)) {
+    if (checks.some((check) => check.status === 'fulfilled' && check.value)) {
       return true;
+    }
+
+    const unverified = checks.find(
+      (check): check is PromiseRejectedResult => check.status === 'rejected',
+    );
+
+    if (unverified) {
+      const reason: unknown = unverified.reason;
+
+      throw reason instanceof KeychainOwnershipUnverifiedError
+        ? reason
+        : new KeychainOwnershipUnverifiedError(reason);
     }
 
     if (overflowed) {
@@ -279,10 +292,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
       return true;
     } catch (error) {
-      // The replicated gate refuses a forged document with
-      // InvalidPublicMutationError whatever its internal failure, so the
-      // document proves no owner keychain. Any other failure is local
-      // (replicated state, storage) and fails the check closed.
+      // The replicated gate decides every document from its content alone, so
+      // its InvalidPublicMutationError proves the document is not the owner's
+      // keychain. Any other failure of the write is local (replicated state,
+      // storage) and fails the check closed.
       if (error instanceof InvalidPublicMutationError) {
         return false;
       }
@@ -312,19 +325,38 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     return value === undefined || value === null || typeof value === 'string';
   }
 
-  // Routed bytes that cannot be fetched, parsed, or mapped are not a keychain.
-  // They cannot be the owner's, so they are skipped rather than failing the
-  // check.
-  private async readRoutedKeychain(
-    cidString: string,
-  ): Promise<Keychain | undefined> {
-    let document: unknown;
+  // Fetching a routed document is not definitive: a timeout, an unreachable
+  // provider, or a record that does not resolve says nothing about the owner,
+  // so it fails closed. Bytes that arrive but are not JSON are definitive.
+  private async readRoutedDocument(cidString: string): Promise<unknown> {
+    const cid = new IPFSId(cidString);
 
     try {
-      document = await this.getDocumentFromCid(new IPFSId(cidString));
+      return await this.ipfsManager.getJSON<unknown>(cid);
+    } catch {
+      // Not a JSON block: the raw bytes may still be a keychain document.
+    }
+
+    const bytes = await this.ipfsManager
+      .getBytes(cid)
+      .catch((error: unknown) => {
+        throw new KeychainOwnershipUnverifiedError(error);
+      });
+
+    try {
+      return JSON.parse(Buffer.from(bytes).toString('utf8')) as unknown;
     } catch {
       return undefined;
     }
+  }
+
+  // Routed bytes that are not a keychain document, or do not map to one, are
+  // not the owner's keychain and are skipped. A document that cannot be
+  // fetched is not definitive: readRoutedDocument throws for it.
+  private async readRoutedKeychain(
+    cidString: string,
+  ): Promise<Keychain | undefined> {
+    const document = await this.readRoutedDocument(cidString);
 
     if (!this.isKeychainDocument(document)) {
       return undefined;

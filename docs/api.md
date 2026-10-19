@@ -3128,10 +3128,18 @@ Implemented:
 - publish keychain announcement through the domain event publisher
 
 An owner keychain check that cannot prove the owner's keychain fails closed with
-`KeychainOwnershipUnverifiedError` (409, retry later). The check examines at most
-20 routing record candidates per owner. When more exist and none of the examined
-candidates proves the owner's keychain, the publish fails the same way, and a
-count-only warning is logged at most once per minute.
+`KeychainOwnershipUnverifiedError`, which the route answers as `503` with code
+`503020` (retry later). The check fails closed when a routing record cannot be
+fetched, when the routing lookup or a local keychain index read fails, or when
+more than 20 routing record candidates exist per owner and none of the first 20
+proves the owner's keychain. A routing record whose bytes are readable but are not
+a keychain of this owner does not block the publish. A count-only warning is logged
+at most once per minute when candidates overflow the cap.
+
+This is a liveness trade-off. While an unreadable or unresolvable routing record
+sits under the owner's key, a first-version publish waits with `503` until the
+record becomes readable or is removed. Publishing the next version from the current
+head is not affected by this check.
 
 `signature` is the owner identity key's base64 Ed25519 signature, built by
 `KeychainSignature` from `@haskou/pigeon-swarm-crypto`, over

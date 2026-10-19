@@ -6,6 +6,7 @@ import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metada
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -252,7 +253,7 @@ describe('IpfsKeychainRepository', () => {
     ).resolves.toBe(false);
   });
 
-  it('should skip a routed keychain document that cannot be read', async () => {
+  it('should fail closed when a routed keychain document cannot be fetched', async () => {
     const owner = await KeychainMother.create();
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
@@ -262,7 +263,61 @@ describe('IpfsKeychainRepository', () => {
 
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
-    ).resolves.toBe(false);
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should fail closed when an unreadable routed candidate sits beside another owner keychain', async () => {
+    const owner = await KeychainMother.create();
+    const other = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue([
+      'bafy-unreadable-candidate',
+      'bafy-other-keychain',
+    ]);
+    ipfs.getJSON.mockImplementation((cid) =>
+      cid.valueOf() === 'bafy-other-keychain'
+        ? Promise.resolve(mapper.toDocument(other.withVersion(1).build()))
+        : Promise.reject(new Error('document not found')),
+    );
+    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should report the owner keychain when a failed JSON fetch falls back to readable bytes', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-keychain-v2']);
+    ipfs.getJSON.mockRejectedValue(new Error('timed out'));
+    ipfs.getBytes.mockResolvedValue(
+      Buffer.from(JSON.stringify(mapper.toDocument(remote))),
+    );
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should fail closed when the replicated index is not ready for a verified remote keychain', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-keychain-v2']);
+    ipfs.getJSON.mockResolvedValue(mapper.toDocument(remote));
+    metadataIndex.save.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
   });
 
   it('should still report the owner keychain when another routed candidate cannot be read', async () => {
@@ -356,13 +411,12 @@ describe('IpfsKeychainRepository', () => {
     const owner = await KeychainMother.create();
     const candidates = Array.from(
       { length: 20 },
-      (_, index) => `bafy-unreadable-${index}`,
+      (_, index) => `bafy-not-a-keychain-${index}`,
     );
 
     metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
     ipfs.getRecordCandidates.mockResolvedValue(candidates);
-    ipfs.getJSON.mockRejectedValue(new Error('document not found'));
-    ipfs.getBytes.mockRejectedValue(new Error('document not found'));
+    ipfs.getJSON.mockResolvedValue({ unrelated: true });
 
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
