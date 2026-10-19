@@ -3224,7 +3224,7 @@ Response:
 Implemented:
 
 - only return the authenticated identity keychain
-- resolve the latest valid candidate from OrbitDB metadata
+- resolve the latest valid candidate from OrbitDB metadata: the highest version wins; when valid candidates share it, the smaller external identifier wins, so the result does not depend on index order
 - return encrypted payload as-is for client-side unlock/decryption
 
 Errors:

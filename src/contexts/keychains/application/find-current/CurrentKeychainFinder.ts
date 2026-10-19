@@ -53,11 +53,11 @@ export default class CurrentKeychainFinder {
     }
 
     return validCandidates.sort((left, right) => {
-      if (left.isNewerThan(right)) {
+      if (left.takesPrecedenceOver(right)) {
         return -1;
       }
 
-      if (right.isNewerThan(left)) {
+      if (right.takesPrecedenceOver(left)) {
         return 1;
       }
 
