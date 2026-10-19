@@ -140,4 +140,27 @@ describe('Get identity route readiness gate', () => {
     await expect(unreadable.json()).resolves.toMatchObject({ code: 503020 });
     expect(findCandidate).not.toHaveBeenCalled();
   });
+
+  it('answers 503020 when replicated state closes while a miss is being looked up', async () => {
+    const getIdentity = () =>
+      fetch(`${baseUrl}/api/identities/identity-under-test`);
+    readiness.markStarted();
+    configUnreadable = false;
+    configEmpty = false;
+    networksRegistered = true;
+    replicatedStateOpen = true;
+    findCandidate.mockClear();
+    // The state closes while the lookup runs, so the miss may be a replay gap.
+    findCandidate.mockImplementationOnce(async () => {
+      replicatedStateOpen = false;
+      throw new IdentityNotFoundError('identity-under-test');
+    });
+
+    const closedDuringLookup = await getIdentity();
+    expect(closedDuringLookup.status).toBe(503);
+    await expect(closedDuringLookup.json()).resolves.toMatchObject({
+      code: 503020,
+    });
+    expect(findCandidate).toHaveBeenCalledTimes(1);
+  });
 });
