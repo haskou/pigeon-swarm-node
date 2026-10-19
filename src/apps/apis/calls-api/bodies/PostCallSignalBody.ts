@@ -8,18 +8,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 
+import { PostCallSealedEntryBody } from './PostCallSealedEntryBody';
+
 enum PostCallSignalType {
   ANSWER = 'answer',
   ICE_CANDIDATE = 'ice_candidate',
   OFFER = 'offer',
-}
-
-export class PostCallSealedEntryBody {
-  @IsString()
-  public readonly envelope: string;
-
-  @IsString()
-  public readonly recipientDeviceCredential: string;
 }
 
 export class PostCallSignalBody {

@@ -44,7 +44,10 @@ export default class RegisterCallSignalWhenSent extends Consumer {
       );
     } catch (error) {
       if (error instanceof InvalidCallSignalError) {
-        Kernel.logger.warn?.('Refused a received call signal that is not valid.');
+        Kernel.logger.warn?.(
+          'Refused a received call signal that is not valid.',
+        );
+
         return;
       }
 
