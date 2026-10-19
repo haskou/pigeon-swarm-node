@@ -38,6 +38,8 @@ paths:
           description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getNotifications
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -64,6 +66,10 @@ paths:
               $ref: '#/components/schemas/PostNotificationBody'
       operationId: postNotifications
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -100,6 +106,10 @@ paths:
               $ref: '#/components/schemas/PatchNotificationBody'
       operationId: patchNotificationsByNotificationId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

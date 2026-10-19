@@ -38,6 +38,8 @@ paths:
                   description: Canonical decimal proof-of-work nonce of 1 to 16 digits, without leading zeros. The crypto library's v2 mailbox-creation proof (`ProofOfWork.mailboxCreation`) bound to the mailbox id and both token hashes must have the required leading zero bits.
       operationId: putMailboxesByMailboxId
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -95,6 +97,8 @@ paths:
                   description: Base64url ciphertext.
       operationId: postMailboxesByMailboxIdEnvelopes
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -239,6 +243,8 @@ paths:
                   pattern: '^[0-9a-f]{64}$'
       operationId: postMailboxesByMailboxIdReaders
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -299,6 +305,8 @@ paths:
                   minimum: 0
       operationId: postMailboxesByMailboxIdAck
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '204':

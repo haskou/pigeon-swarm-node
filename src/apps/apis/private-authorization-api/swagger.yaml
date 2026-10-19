@@ -20,6 +20,8 @@ paths:
               $ref: '#/components/schemas/PostPrivateAuthorizationScopeBody'
       operationId: postPrivateAuthorizationScopes
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
@@ -65,6 +67,8 @@ paths:
               $ref: '#/components/schemas/PostPrivateAuthorizationChallengeBody'
       operationId: postPrivateAuthorizationChallenges
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -98,6 +102,8 @@ paths:
               $ref: '#/components/schemas/PostPrivateAuthorizationOperationBody'
       operationId: postPrivateAuthorizationOperations
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

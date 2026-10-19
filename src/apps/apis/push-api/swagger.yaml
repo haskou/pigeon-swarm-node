@@ -38,6 +38,10 @@ paths:
               $ref: '#/components/schemas/PushSubscriptionBody'
       operationId: putPushSubscriptions
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -62,6 +66,10 @@ paths:
               $ref: '#/components/schemas/PushSubscriptionBody'
       operationId: deletePushSubscriptions
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -97,6 +105,10 @@ paths:
               $ref: '#/components/schemas/PushTestBody'
       operationId: postPushTest
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

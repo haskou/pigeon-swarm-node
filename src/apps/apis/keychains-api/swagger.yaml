@@ -35,6 +35,8 @@ paths:
               $ref: '#/components/schemas/PostKeychainBody'
       operationId: postKeychains
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

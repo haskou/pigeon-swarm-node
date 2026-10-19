@@ -37,6 +37,8 @@ paths:
           description: Comma-separated identity ids or repeated identityIds query params. Absent lists no ids and returns an empty list. Identity ids are public keys without PEM wrapping. Bounded input of 1 to 100 distinct canonical ids; duplicates count once. A non-string value (an object-form identityIds[x] param), a blank item or a non-canonical id is refused, not dropped.
       operationId: getPresence
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '400':
@@ -72,6 +74,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getPresenceByIdentityId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -103,6 +107,10 @@ paths:
               $ref: '#/components/schemas/PutPresenceBody'
       operationId: putPresenceMe
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

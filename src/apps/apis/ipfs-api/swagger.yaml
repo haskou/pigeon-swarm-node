@@ -118,6 +118,8 @@ paths:
                   type: object
       operationId: putIpfsReplicationsByCid
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '204':
@@ -154,6 +156,8 @@ paths:
                   type: object
       operationId: deleteIpfsReplicationsByCid
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '204':

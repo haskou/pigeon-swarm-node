@@ -26,6 +26,8 @@ paths:
               $ref: '#/components/schemas/PostIdentityBody'
       operationId: postIdentities
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -109,6 +111,10 @@ paths:
               $ref: '#/components/schemas/SignedIdentityBody'
       operationId: putIdentitiesByIdentityId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
