@@ -21,6 +21,15 @@ export default class NodeReadiness {
     this.started = true;
   }
 
+  /**
+   * Whether replicated state can be read now. Keychain reads use this check,
+   * not `isReady`: a node with no registered network is ready for probes
+   * without its replicated state ever being open.
+   */
+  public isServingReplicatedState(): boolean {
+    return this.started && this.replicatedState.isOpen();
+  }
+
   public async isReady(): Promise<boolean> {
     if (!this.started) {
       return false;

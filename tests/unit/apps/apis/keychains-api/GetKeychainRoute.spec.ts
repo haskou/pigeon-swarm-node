@@ -2,11 +2,13 @@ import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequ
 import { GetKeychainRoute } from '@app/apps/apis/keychains-api/routes/GetKeychainRoute';
 import NodeReadiness from '@app/apps/NodeReadiness';
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { generateKeyPairSync } from 'crypto';
 import { Server } from 'http';
+import { mock } from 'jest-mock-extended';
 import { AddressInfo } from 'net';
 import { createExpressServer } from 'routing-controllers';
 
@@ -26,9 +28,12 @@ describe('Get keychain route readiness gate', () => {
       .replace(/-----[^-]+-----|\s/g, '');
 
     replicatedStateOpen = false;
-    readiness = new NodeReadiness({
-      isOpen: () => replicatedStateOpen,
-    } as unknown as OrbitDBReplicatedStateRegistry);
+    readiness = new NodeReadiness(
+      {
+        isOpen: () => replicatedStateOpen,
+      } as unknown as OrbitDBReplicatedStateRegistry,
+      mock<NodeRepository>(),
+    );
     find = jest.fn().mockRejectedValue(new Error('finder reached'));
 
     const services = new Map<unknown, unknown>([
