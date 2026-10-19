@@ -3241,6 +3241,11 @@ Errors:
 
 - `409` code `KeychainNotFoundError`: the node holds no valid keychain candidate for the identity
 - `503` code `503020` (`ReplicatedStateNotReadyError`): the node is not ready: it has not finished startup or has not opened its replicated state yet, for example right after a restart while it replays. The keychain is not reported missing, so retry. A client must not publish a keychain version, or a first version, on this response.
+- `503` code `503020` also covers a lookup that cannot verify a candidate right now:
+  its routing record, replicated keychain document or local index entry cannot be
+  read or mapped. The keychain is not reported missing, so retry. A record or
+  document that stays unreadable keeps this answer at 503 rather than 409 until it
+  is repaired or removed.
 
 ## Conversation HTTP API
 
@@ -3296,6 +3301,11 @@ A direct conversation is private by nature, so the node refuses one on a public
 network with `409` `PrivateNetworkRequiredError`, before it stores anything. This
 holds for an existing 1:1 too: the refusal comes before the lookup, so a public
 1:1 is never returned. Only a private network carries a direct conversation.
+
+A keychain check that cannot verify the candidate keychain (its routing record, its
+replicated keychain document or its local index entry cannot be read or mapped right
+now) answers `503` with code `503020` (`ReplicatedStateNotReadyError`) and stores
+nothing. Retry: the conversation is neither created nor refused.
 
 Response:
 

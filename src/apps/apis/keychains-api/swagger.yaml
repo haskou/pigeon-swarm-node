@@ -92,7 +92,7 @@ paths:
         '409':
           description: No valid keychain candidate for this identity (code KeychainNotFoundError).
         '503':
-          description: Node not ready (code 503020). The node has not finished startup or has not opened its replicated state yet, for example right after it restarted while it replays. The keychain is not reported missing. Retry.
+          description: Node not ready (code 503020). The node has not finished startup or has not opened its replicated state yet, for example right after it restarted while it replays. The keychain is not reported missing. A candidate whose routing record, keychain document or local index entry cannot be read or mapped right now answers the same way. Retry.
 components:
   schemas:
     PostKeychainBody:

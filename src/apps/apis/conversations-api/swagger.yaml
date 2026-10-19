@@ -33,6 +33,8 @@ paths:
                 $ref: '#/components/schemas/ConversationResource'
         '409':
           description: PrivateNetworkRequiredError. Direct conversations are refused on a public network; only a private network can carry them.
+        '503':
+          description: Node not ready (code 503020). The keychain of the conversation could not be verified right now (its routing record, keychain document or local index entry cannot be read or mapped), so the conversation is neither created nor refused. Retry.
     get:
       tags:
         - conversations

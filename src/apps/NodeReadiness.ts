@@ -22,12 +22,11 @@ export default class NodeReadiness {
   }
 
   /**
-   * Whether replicated state can be read now. Keychain reads use this check,
-   * not `isReady`: a node with no registered network is ready for probes
-   * without its replicated state ever being open.
+   * Whether a network is registered. A node with none has nothing to replay,
+   * so a missing keychain on it is genuine.
    */
-  public isServingReplicatedState(): boolean {
-    return this.started && this.replicatedState.isOpen();
+  public hasNetworks(): boolean {
+    return this.replicatedState.hasNetworks();
   }
 
   public async isReady(): Promise<boolean> {

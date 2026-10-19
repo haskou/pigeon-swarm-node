@@ -1,6 +1,8 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import ConversationCreator from '@app/contexts/conversations/application/create-conversation/ConversationCreator';
+import { KeychainOwnershipUnverifiedError } from '@app/contexts/keychains/domain/errors/KeychainOwnershipUnverifiedError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -49,9 +51,19 @@ export class PostConversationRoute extends Route {
     if (!body.participantIds.every(PostConversationRoute.isParticipantId)) {
       throw new BadRequestError('Invalid participant id.');
     }
-    const conversation = await this.creator.create(
-      new PostConversationRequest(body, ownerIdentityId).getMessage(),
-    );
+    const conversation = await this.creator
+      .create(new PostConversationRequest(body, ownerIdentityId).getMessage())
+      .catch((error: unknown) => {
+        // The keychain of the conversation could not be verified, so the
+        // conversation is neither created nor refused. Answer the retryable
+        // replicated-state code rather than a conflict. Every other failure is
+        // unchanged.
+        if (error instanceof KeychainOwnershipUnverifiedError) {
+          throw new ReplicatedStateNotReadyError();
+        }
+
+        throw error;
+      });
 
     return response
       .status(HttpRouteStatusEnum.OK)

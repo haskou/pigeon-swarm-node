@@ -1,6 +1,7 @@
 import { findPublishedKeychain } from '@app/apps/consumers/pubsub/keychains/FindPublishedKeychain';
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { KeychainNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainNotFoundError';
+import { KeychainOwnershipUnverifiedError } from '@app/contexts/keychains/domain/errors/KeychainOwnershipUnverifiedError';
 import { KeychainWasPublishedEvent } from '@app/contexts/keychains/domain/events/KeychainWasPublishedEvent';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -26,6 +27,15 @@ describe('findPublishedKeychain', () => {
 
   it('should complete without retrying while the replicated state is not open', async () => {
     finder.find.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+    await expect(findPublishedKeychain(finder, event)).resolves.toBeUndefined();
+    expect(finder.find).toHaveBeenCalledTimes(1);
+  });
+
+  it('should complete without retrying when the keychain cannot be verified yet', async () => {
+    finder.find.mockRejectedValue(
+      new KeychainOwnershipUnverifiedError(new Error('document not found')),
+    );
 
     await expect(findPublishedKeychain(finder, event)).resolves.toBeUndefined();
     expect(finder.find).toHaveBeenCalledTimes(1);

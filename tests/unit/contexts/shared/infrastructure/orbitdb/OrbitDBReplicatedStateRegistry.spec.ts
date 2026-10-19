@@ -596,6 +596,26 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     registry.clear();
   });
 
+  it('stays not open after a restart whose head cache rebuild fails, with no listeners', async () => {
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const { heads, stores } = createStores();
+    const missingBlock = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+
+    heads.all.mockRejectedValueOnce(missingBlock);
+
+    await expect(registry.register('network-1', stores)).rejects.toThrow();
+    expect(registry.hasNetworks()).toBe(true);
+    expect(registry.isOpen()).toBe(false);
+
+    heads.emitJoin('peer-1', []);
+    await flushPromises();
+    expect(registry.isOpen()).toBe(true);
+    registry.clear();
+  });
+
   it('stops waiting on a degraded network once it is unregistered', async () => {
     const registry = new OrbitDBReplicatedStateRegistry();
     const degraded = createStores();
