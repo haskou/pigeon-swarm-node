@@ -5,12 +5,19 @@ import IpfsKeychainMapper from '@app/contexts/keychains/infrastructure/ipfs/mapp
 import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataIndex';
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSContentTooLargeError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentTooLargeError';
+import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Kernel from '@haskou/ddd-kernel';
+import { DomainError } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
+
+const ROUTED_DOCUMENT_BYTES = 256 * 1024;
+const PUBLISH_BODY_BYTES = 100 * 1024;
 
 describe('IpfsKeychainRepository', () => {
   let ipfs: MockProxy<IPFS>;
@@ -30,6 +37,38 @@ describe('IpfsKeychainRepository', () => {
       Promise.resolve(networkIds),
     );
   });
+
+  // Mirrors the IPFS fetch caps: content larger than the cap is refused.
+  const serveRoutedDocument = (document: unknown): void => {
+    const bytes = Buffer.from(JSON.stringify(document));
+    const fits = (maxBytes?: number): boolean =>
+      maxBytes === undefined || bytes.length <= maxBytes;
+
+    ipfs.getJSON.mockImplementation((cid, maxBytes) =>
+      fits(maxBytes)
+        ? Promise.resolve(document)
+        : Promise.reject(
+            new IPFSContentTooLargeError(cid.valueOf(), maxBytes ?? 0),
+          ),
+    );
+    ipfs.getBytes.mockImplementation((cid, maxBytes) =>
+      fits(maxBytes)
+        ? Promise.resolve(bytes)
+        : Promise.reject(
+            new IPFSContentTooLargeError(cid.valueOf(), maxBytes ?? 0),
+          ),
+    );
+  };
+
+  // Pads the payload so the serialized document is exactly `bytes` long.
+  const documentOfByteLength = (document: object, bytes: number): object => {
+    const unpadded = JSON.stringify({ ...document, encryptedPayload: '' });
+
+    return {
+      ...document,
+      encryptedPayload: 'A'.repeat(bytes - Buffer.byteLength(unpadded)),
+    };
+  };
 
   it('should use complete replicated keychain metadata without reading IPFS', async () => {
     const mother = await KeychainMother.create();
@@ -342,7 +381,7 @@ describe('IpfsKeychainRepository', () => {
     ).resolves.toBe(true);
   });
 
-  it('should skip a routed document whose mapping fails with a non-domain error', async () => {
+  it('should fail closed when mapping a routed document throws a non-domain error', async () => {
     const owner = await KeychainMother.create();
     const mapper = new IpfsKeychainMapper();
     const repositoryWithFailingMapper = new IpfsKeychainRepository(
@@ -362,7 +401,121 @@ describe('IpfsKeychainRepository', () => {
 
     await expect(
       repositoryWithFailingMapper.hasKeychainForOwner(owner.ownerIdentityId),
-    ).resolves.toBe(false);
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should fail closed when a routed document fails to map with a domain error', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const repositoryWithFailingMapper = new IpfsKeychainRepository(
+      ipfs,
+      mapper,
+      metadataIndex,
+    );
+
+    jest.spyOn(mapper, 'toDomain').mockImplementation(() => {
+      throw new DomainError('keychain rejected');
+    });
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-mapping-fails']);
+    ipfs.getJSON.mockResolvedValue(
+      mapper.toDocument(owner.withVersion(1).build()),
+    );
+
+    await expect(
+      repositoryWithFailingMapper.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should fail closed when a routed document exceeds the fetch size cap', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const oversized = {
+      ...mapper.toDocument(owner.withVersion(1).build()),
+      encryptedPayload: 'A'.repeat(ROUTED_DOCUMENT_BYTES),
+    };
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-oversized-keychain']);
+    serveRoutedDocument(oversized);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should verify a routed keychain whose document is exactly at the fetch size cap', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const atCap = documentOfByteLength(
+      mapper.toDocument(owner.withVersion(1).build()),
+      ROUTED_DOCUMENT_BYTES,
+    );
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-cap-sized-keychain']);
+    serveRoutedDocument(atCap);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should fail closed when a routed document is one byte over the fetch size cap', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const overCap = documentOfByteLength(
+      mapper.toDocument(owner.withVersion(1).build()),
+      ROUTED_DOCUMENT_BYTES + 1,
+    );
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-over-cap-keychain']);
+    serveRoutedDocument(overCap);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should request routed documents with the fetch size cap on both paths', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const document = mapper.toDocument(owner.withVersion(1).build());
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-capped-keychain']);
+    ipfs.getJSON.mockRejectedValue(new Error('not json'));
+    ipfs.getBytes.mockResolvedValue(Buffer.from(JSON.stringify(document)));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
+    expect(ipfs.getJSON).toHaveBeenCalledWith(
+      expect.anything(),
+      ROUTED_DOCUMENT_BYTES,
+    );
+    expect(ipfs.getBytes).toHaveBeenCalledWith(
+      expect.anything(),
+      ROUTED_DOCUMENT_BYTES,
+    );
+  });
+
+  it('should verify a routed keychain as large as a publish body', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const publishSized = {
+      ...mapper.toDocument(owner.withVersion(1).build()),
+      encryptedPayload: 'A'.repeat(PUBLISH_BODY_BYTES),
+    };
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-publish-sized-keychain']);
+    serveRoutedDocument(publishSized);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
   });
 
   it('should fail closed when routed candidates overflow the check cap without identifying the owner', async () => {
@@ -594,6 +747,84 @@ describe('IpfsKeychainRepository', () => {
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
     ).resolves.toBe(false);
+  });
+
+  it('should recognise an owner keychain written by the real writer as a keychain document', async () => {
+    const owner = await KeychainMother.create();
+    const keychain = owner.withVersion(1).build();
+    let written: unknown;
+
+    ipfs.addJSONToNetworks.mockImplementation((document) => {
+      written = JSON.parse(JSON.stringify(document));
+
+      return Promise.resolve(new IPFSId('bafy-owner-keychain'));
+    });
+    await repository.save(keychain, [NetworkId.generate()]);
+
+    expect(Object.keys(written as object).sort()).toEqual([
+      '_id',
+      'encryptedPayload',
+      'signature',
+      'timestamp',
+      'version',
+    ]);
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-owner-keychain']);
+    ipfs.getJSON.mockResolvedValue(written as never);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should skip non-JSON and shape-failing routed documents without hiding a reachable owner keychain', async () => {
+    const mother = await KeychainMother.create();
+    const remote = mother.withVersion(2).build();
+    const mapper = new IpfsKeychainMapper();
+    const documents: Record<string, unknown> = {
+      'bafy-keychain-v2': mapper.toDocument(remote),
+      'bafy-partial-document': { _id: 42 },
+    };
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue([
+      'bafy-garbage-document',
+      'bafy-partial-document',
+      'bafy-keychain-v2',
+    ]);
+    ipfs.getJSON.mockImplementation((cid) => {
+      const document = documents[cid.valueOf()];
+
+      return document === undefined
+        ? Promise.reject(new Error('not json'))
+        : Promise.resolve(document as never);
+    });
+    ipfs.getBytes.mockResolvedValue(Buffer.from('not a keychain'));
+
+    await expect(
+      repository.hasKeychainForOwner(mother.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should fail closed on an unreachable owner candidate beside non-keychain routed documents', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue([
+      'bafy-garbage-document',
+      'bafy-unreachable-keychain',
+    ]);
+    ipfs.getJSON.mockRejectedValue(new Error('not json'));
+    ipfs.getBytes.mockImplementation((cid) =>
+      cid.valueOf() === 'bafy-garbage-document'
+        ? Promise.resolve(Buffer.from('not a keychain'))
+        : Promise.reject(new Error('document not found')),
+    );
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
   });
 
   it('should find previous keychains by replicated external identifier without IPFS', async () => {

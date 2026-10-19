@@ -19,6 +19,9 @@ import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
 export default class IpfsKeychainRepository extends KeychainRepository {
   private readonly ROUTING_KEY_PREFIX = 'pigeon-swarm_keychain-';
   private readonly MAX_ROUTED_CANDIDATES = 20;
+  // Above the 100 kB publish body limit (body-parser default), so every
+  // keychain a publish can store is readable. Larger records fail closed.
+  private readonly MAX_ROUTED_DOCUMENT_BYTES = 256 * 1024;
   private readonly OVERFLOW_LOG_INTERVAL_MS = 60_000;
   private lastOverflowLogAt = 0;
   private readonly keychainByCid = new Map<string, Keychain>();
@@ -209,11 +212,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
   // Routing records are writable under the owner's key. A candidate whose
   // bytes are not a keychain document, or belong to another owner, is skipped:
-  // it cannot be the owner's keychain. A candidate that cannot be fetched
-  // proves nothing either way, so it fails the check closed, as do a failed
-  // routing lookup, a failed local write, and an overflow past the cap when no
-  // checked candidate proves the owner's keychain. One proven owner keychain
-  // settles the check, whatever the other candidates are.
+  // it cannot be the owner's keychain. A candidate that cannot be fetched or
+  // mapped proves nothing either way, so it fails the check closed, as do a
+  // failed routing lookup, a failed local write, and an overflow past the cap
+  // when no checked candidate proves the owner's keychain. One proven owner
+  // keychain settles the check, whatever the other candidates are.
   private async hasRemoteKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
@@ -304,6 +307,12 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
+  // The writer (save, through IpfsKeychainMapper.toDocument) emits exactly
+  // these fields, and that format has held since the keychain format was
+  // introduced. A routed CID is content-addressed, so the bytes behind the
+  // owner's keychain CID are that output and always pass this check. A
+  // document that fails it cannot be the owner's keychain. If the writer's
+  // format changes, this check must change with it.
   private isKeychainDocument(value: unknown): value is IpfsKeychainDocument {
     if (typeof value !== 'object' || value === null) {
       return false;
@@ -328,17 +337,21 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   // Fetching a routed document is not definitive: a timeout, an unreachable
   // provider, or a record that does not resolve says nothing about the owner,
   // so it fails closed. Bytes that arrive but are not JSON are definitive.
+  // The fetch cap refuses an oversized record, which fails closed the same way.
   private async readRoutedDocument(cidString: string): Promise<unknown> {
     const cid = new IPFSId(cidString);
 
     try {
-      return await this.ipfsManager.getJSON<unknown>(cid);
+      return await this.ipfsManager.getJSON<unknown>(
+        cid,
+        this.MAX_ROUTED_DOCUMENT_BYTES,
+      );
     } catch {
       // Not a JSON block: the raw bytes may still be a keychain document.
     }
 
     const bytes = await this.ipfsManager
-      .getBytes(cid)
+      .getBytes(cid, this.MAX_ROUTED_DOCUMENT_BYTES)
       .catch((error: unknown) => {
         throw new KeychainOwnershipUnverifiedError(error);
       });
@@ -350,9 +363,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
-  // Routed bytes that are not a keychain document, or do not map to one, are
-  // not the owner's keychain and are skipped. A document that cannot be
-  // fetched is not definitive: readRoutedDocument throws for it.
+  // Routed bytes that fail the keychain shape check are not the owner's
+  // keychain and are skipped (see isKeychainDocument). A keychain document
+  // that fails to map is not definitive, because the owner's keychain may
+  // carry content the domain rejects, so it throws. A document that cannot be
+  // fetched throws in readRoutedDocument.
   private async readRoutedKeychain(
     cidString: string,
   ): Promise<Keychain | undefined> {
@@ -364,8 +379,8 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
     try {
       return this.mapper.toDomain(document);
-    } catch {
-      return undefined;
+    } catch (error: unknown) {
+      throw new KeychainOwnershipUnverifiedError(error);
     }
   }
 

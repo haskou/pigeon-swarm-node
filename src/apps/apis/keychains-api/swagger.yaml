@@ -48,7 +48,7 @@ paths:
         '409':
           description: Invalid keychain candidate (code InvalidKeychainCandidateError), the owner identity has no networks (code KeychainOwnerNetworksNotFoundError), or the owner already has a keychain and the candidate is a first version without a previous link (code KeychainOwnerAlreadyHasKeychainError). Publish the next version from the current head instead.
         '503':
-          description: Node not ready (code 503020). The node has not finished opening its replicated state yet. Retry. For a first-version publish, the same code means the owner's keychain could not be verified, because a routing record could not be fetched, the routing lookup or a local keychain index read failed, or more routing records exist than the owner check examines and none of the examined ones proves the owner's keychain. Retry later; the publish is safe to repeat.
+          description: Node not ready (code 503020). The node has not finished opening its replicated state yet. Retry. For a first-version publish, the same code means the owner's keychain could not be verified, because a routing record could not be fetched or exceeds the routed-document size limit, the routing lookup or a local keychain index read or write failed, a keychain document failed to map (including a domain rejection), or more routing records exist than the owner check examines and none of the examined ones proves the owner's keychain. Retry later; the publish is safe to repeat.
   /keychains/{identityId}:
     get:
       tags:
