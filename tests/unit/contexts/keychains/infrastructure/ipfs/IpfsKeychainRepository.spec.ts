@@ -58,6 +58,16 @@ describe('IpfsKeychainRepository', () => {
     );
   };
 
+  // Pads the payload so the serialized document is exactly `bytes` long.
+  const documentOfByteLength = (document: object, bytes: number): object => {
+    const unpadded = JSON.stringify({ ...document, encryptedPayload: '' });
+
+    return {
+      ...document,
+      encryptedPayload: 'A'.repeat(bytes - Buffer.byteLength(unpadded)),
+    };
+  };
+
   it('should use complete replicated keychain metadata without reading IPFS', async () => {
     const mother = await KeychainMother.create();
     const keychain = mother.withVersion(4).build();
@@ -392,7 +402,7 @@ describe('IpfsKeychainRepository', () => {
     ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
   });
 
-  it('should skip a routed document whose mapping fails with a domain error', async () => {
+  it('should fail closed when a routed document fails to map with a domain error', async () => {
     const owner = await KeychainMother.create();
     const mapper = new IpfsKeychainMapper();
     const repositoryWithFailingMapper = new IpfsKeychainRepository(
@@ -412,7 +422,7 @@ describe('IpfsKeychainRepository', () => {
 
     await expect(
       repositoryWithFailingMapper.hasKeychainForOwner(owner.ownerIdentityId),
-    ).resolves.toBe(false);
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
   });
 
   it('should fail closed when a routed document exceeds the fetch size cap', async () => {
@@ -430,6 +440,63 @@ describe('IpfsKeychainRepository', () => {
     await expect(
       repository.hasKeychainForOwner(owner.ownerIdentityId),
     ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should verify a routed keychain whose document is exactly at the fetch size cap', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const atCap = documentOfByteLength(
+      mapper.toDocument(owner.withVersion(1).build()),
+      ROUTED_DOCUMENT_BYTES,
+    );
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-cap-sized-keychain']);
+    serveRoutedDocument(atCap);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
+  });
+
+  it('should fail closed when a routed document is one byte over the fetch size cap', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const overCap = documentOfByteLength(
+      mapper.toDocument(owner.withVersion(1).build()),
+      ROUTED_DOCUMENT_BYTES + 1,
+    );
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-over-cap-keychain']);
+    serveRoutedDocument(overCap);
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
+  });
+
+  it('should request routed documents with the fetch size cap on both paths', async () => {
+    const owner = await KeychainMother.create();
+    const mapper = new IpfsKeychainMapper();
+    const document = mapper.toDocument(owner.withVersion(1).build());
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-capped-keychain']);
+    ipfs.getJSON.mockRejectedValue(new Error('not json'));
+    ipfs.getBytes.mockResolvedValue(Buffer.from(JSON.stringify(document)));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(true);
+    expect(ipfs.getJSON).toHaveBeenCalledWith(
+      expect.anything(),
+      ROUTED_DOCUMENT_BYTES,
+    );
+    expect(ipfs.getBytes).toHaveBeenCalledWith(
+      expect.anything(),
+      ROUTED_DOCUMENT_BYTES,
+    );
   });
 
   it('should verify a routed keychain as large as a publish body', async () => {

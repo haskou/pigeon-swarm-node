@@ -12,7 +12,6 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
 import Kernel from '@haskou/ddd-kernel';
-import { DomainError } from '@haskou/value-objects';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
 import IpfsKeychainMapper from './mappers/IpfsKeychainMapper';
@@ -213,11 +212,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
 
   // Routing records are writable under the owner's key. A candidate whose
   // bytes are not a keychain document, or belong to another owner, is skipped:
-  // it cannot be the owner's keychain. A candidate that cannot be fetched
-  // proves nothing either way, so it fails the check closed, as do a failed
-  // routing lookup, a failed local write, and an overflow past the cap when no
-  // checked candidate proves the owner's keychain. One proven owner keychain
-  // settles the check, whatever the other candidates are.
+  // it cannot be the owner's keychain. A candidate that cannot be fetched or
+  // mapped proves nothing either way, so it fails the check closed, as do a
+  // failed routing lookup, a failed local write, and an overflow past the cap
+  // when no checked candidate proves the owner's keychain. One proven owner
+  // keychain settles the check, whatever the other candidates are.
   private async hasRemoteKeychainForOwner(
     ownerIdentityId: IdentityId,
   ): Promise<boolean> {
@@ -358,10 +357,10 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
-  // Routed bytes that are not a keychain document, or that the domain rejects,
-  // are not the owner's keychain and are skipped. Any other mapping failure is
-  // not definitive and throws. A document that cannot be fetched is not
-  // definitive either: readRoutedDocument throws for it.
+  // Routed bytes that are not a keychain document are not the owner's keychain
+  // and are skipped. A keychain document that fails to map is not definitive,
+  // so it throws. A document that cannot be fetched throws in
+  // readRoutedDocument.
   private async readRoutedKeychain(
     cidString: string,
   ): Promise<Keychain | undefined> {
@@ -374,10 +373,6 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     try {
       return this.mapper.toDomain(document);
     } catch (error: unknown) {
-      if (error instanceof DomainError) {
-        return undefined;
-      }
-
       throw new KeychainOwnershipUnverifiedError(error);
     }
   }
