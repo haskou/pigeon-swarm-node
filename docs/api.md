@@ -67,6 +67,11 @@ block that is missing locally. Neither lifts with time: readiness stays
 `not_ready` until the replay succeeds. A replay that failed at registration is
 retried on the next peer head exchange.
 
+While a peer join rebuilds a network's head cache, the node is not open. A
+rebuild that fails keeps it not open until a later join rebuilds the cache. A
+warm head cache that cannot be compared with the stored heads is rebuilt before
+the node opens.
+
 A node that stores no network has nothing to replay, so it is ready from its
 stored configuration alone. That configuration is read without starting any
 network, so a readiness poll does not change the node.
