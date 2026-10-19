@@ -756,8 +756,9 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   `CallParticipantNotFoundError`. The cause is local block availability, and the
   bound keeps a block no peer serves from holding reads off.
 - Keychain lookups (`GET /keychains/{identityId}` and the keychain publication
-  consumers) answer `503020` while the replicated state is not open: no network
-  is registered yet, a store still awaits replay, or a subscriber bootstrap is
+  consumers) answer `503020` while the node is not ready: startup has not
+  finished, or the replicated state is not open, for example no network is
+  registered yet, a store still awaits replay, or a subscriber bootstrap is
   deferred (as above). A keychain is not reported missing in that state. The
   consumers complete as for a miss, as described below.
 
