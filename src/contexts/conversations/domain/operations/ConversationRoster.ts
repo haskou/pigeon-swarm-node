@@ -4,12 +4,16 @@
  * never changes once created. Group rosters live in MLS.
  */
 export class ConversationRoster {
+  private readonly members: readonly string[];
+
   constructor(
     private readonly id: string,
     private readonly networkId: string,
     private readonly creator: string,
-    private readonly members: string[],
-  ) {}
+    members: readonly string[],
+  ) {
+    this.members = [...members];
+  }
 
   public getCreator(): string {
     return this.creator;
