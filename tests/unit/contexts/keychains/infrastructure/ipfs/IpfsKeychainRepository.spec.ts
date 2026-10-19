@@ -293,6 +293,31 @@ describe('IpfsKeychainRepository', () => {
     ).resolves.toBe(false);
   });
 
+  it('should ignore routed bytes that are not JSON when checking for an owner keychain', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-garbage-document']);
+    ipfs.getJSON.mockRejectedValue(new Error('not json'));
+    ipfs.getBytes.mockResolvedValue(Buffer.from('not a keychain'));
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
+  it('should ignore routed JSON that is not a keychain when checking for an owner keychain', async () => {
+    const owner = await KeychainMother.create();
+
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([]);
+    ipfs.getRecordCandidates.mockResolvedValue(['bafy-non-keychain-json']);
+    ipfs.getJSON.mockResolvedValue({ unrelated: true });
+
+    await expect(
+      repository.hasKeychainForOwner(owner.ownerIdentityId),
+    ).resolves.toBe(false);
+  });
+
   it('should find previous keychains by replicated external identifier without IPFS', async () => {
     const mother = await KeychainMother.create();
     const keychain = mother.withVersion(3).build();
