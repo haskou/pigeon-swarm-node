@@ -1,5 +1,6 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 
+import ReplicatedStateNotReadyError from '../../orbitdb/ReplicatedStateNotReadyError';
 import { IPFSContentNotFoundError } from '../errors/IPFSContentNotFoundError';
 import { IPFSNetwork } from '../networks/IPFSNetwork';
 import { IPFSId } from './IPFSId';
@@ -7,6 +8,11 @@ import { IPFSId } from './IPFSId';
 export default class IPFSContentRacer {
   private static readonly DEFAULT_TIMEOUT_MS = 2500;
   private static readonly MAX_TIMEOUT_MS = 5000;
+  private static readonly RECORD_UNAVAILABLE_MESSAGE =
+    'IPFS records are not reachable on every network yet. Retry shortly.';
+
+  public static readonly CONTENT_UNAVAILABLE_MESSAGE =
+    'IPFS content is not reachable on every network yet. Retry shortly.';
 
   private readonly timeoutMs: number;
 
@@ -43,31 +49,50 @@ export default class IPFSContentRacer {
     }
   }
 
+  private async raceFirst<T>(
+    cid: IPFSId,
+    networks: IPFSNetwork[],
+    attempt: (network: IPFSNetwork, signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const controller = new AbortController();
+    const probe = { notFound: false };
+
+    try {
+      return await this.withTimeout(
+        controller,
+        Promise.any(
+          networks.map((network) =>
+            attempt(network, controller.signal).catch((error: unknown) => {
+              if (error instanceof IPFSContentNotFoundError) {
+                probe.notFound = true;
+              }
+
+              throw error;
+            }),
+          ),
+        ),
+      );
+    } catch {
+      if (probe.notFound) {
+        throw new IPFSContentNotFoundError(cid.valueOf());
+      }
+
+      throw new ReplicatedStateNotReadyError(
+        IPFSContentRacer.CONTENT_UNAVAILABLE_MESSAGE,
+      );
+    } finally {
+      controller.abort();
+    }
+  }
+
   public async raceGetJSON<T>(
     networks: IPFSNetwork[],
     cid: IPFSId,
     maxBytes?: number,
   ): Promise<T> {
-    const controller = new AbortController();
-
-    try {
-      const result = await this.withTimeout(
-        controller,
-        Promise.any(
-          networks.map((network) =>
-            network.getJSON<T>(cid, controller.signal, maxBytes),
-          ),
-        ),
-      );
-
-      controller.abort();
-
-      return result;
-    } catch {
-      throw new IPFSContentNotFoundError(cid.valueOf());
-    } finally {
-      controller.abort();
-    }
+    return this.raceFirst(cid, networks, (network, signal) =>
+      network.getJSON<T>(cid, signal, maxBytes),
+    );
   }
 
   public async raceGetBytes(
@@ -75,47 +100,15 @@ export default class IPFSContentRacer {
     cid: IPFSId,
     maxBytes?: number,
   ): Promise<Buffer> {
-    const controller = new AbortController();
-
-    try {
-      const result = await this.withTimeout(
-        controller,
-        Promise.any(
-          networks.map((network) =>
-            network.getBytes(cid, controller.signal, maxBytes),
-          ),
-        ),
-      );
-
-      controller.abort();
-
-      return result;
-    } catch {
-      throw new IPFSContentNotFoundError(cid.valueOf());
-    } finally {
-      controller.abort();
-    }
+    return this.raceFirst(cid, networks, (network, signal) =>
+      network.getBytes(cid, signal, maxBytes),
+    );
   }
 
   public async raceStat(networks: IPFSNetwork[], cid: IPFSId): Promise<void> {
-    const controller = new AbortController();
-
-    try {
-      await this.withTimeout(
-        controller,
-        Promise.any(
-          networks.map((network) =>
-            network.stat(cid, false, controller.signal),
-          ),
-        ),
-      );
-
-      controller.abort();
-    } catch {
-      throw new IPFSContentNotFoundError(cid.valueOf());
-    } finally {
-      controller.abort();
-    }
+    return this.raceFirst(cid, networks, (network, signal) =>
+      network.stat(cid, false, signal),
+    );
   }
 
   public async raceGetRecord(
@@ -123,14 +116,16 @@ export default class IPFSContentRacer {
     key: string,
   ): Promise<string | undefined> {
     const controller = new AbortController();
+    const probe = { absent: 0 };
 
     try {
-      const result = await this.withTimeout(
+      return await this.withTimeout(
         controller,
         Promise.any(
           networks.map((network) =>
             network.getRecord(key, controller.signal).then((value) => {
               if (value === undefined) {
+                probe.absent += 1;
                 throw new Error('Record not found in this network');
               }
 
@@ -139,12 +134,14 @@ export default class IPFSContentRacer {
           ),
         ),
       );
-
-      controller.abort();
-
-      return result;
     } catch {
-      return undefined;
+      if (networks.length > 0 && probe.absent === networks.length) {
+        return undefined;
+      }
+
+      throw new ReplicatedStateNotReadyError(
+        IPFSContentRacer.RECORD_UNAVAILABLE_MESSAGE,
+      );
     } finally {
       controller.abort();
     }
@@ -155,27 +152,46 @@ export default class IPFSContentRacer {
     key: string,
   ): Promise<string[]> {
     const controller = new AbortController();
+    const records: (string | undefined)[] = [];
+    const answered: boolean[] = [];
+
+    const lookups = networks.map((network, index) =>
+      network
+        .getRecord(key, controller.signal)
+        .then((value) => {
+          records[index] = value;
+          answered[index] = true;
+        })
+        .catch((): undefined => undefined),
+    );
 
     try {
-      const results = await this.withTimeout(
-        controller,
-        Promise.allSettled(
-          networks.map((network) => network.getRecord(key, controller.signal)),
-        ),
-      );
-
-      return [
-        ...new Set(
-          results
-            .filter((result) => result.status === 'fulfilled')
-            .map((result) => result.value)
-            .filter((value) => value !== undefined),
-        ),
-      ];
+      await this.withTimeout(controller, Promise.all(lookups));
     } catch {
-      return [];
+      // The deadline passed: keep only the answers received so far.
     } finally {
       controller.abort();
     }
+
+    const candidates = [
+      ...new Set(
+        records.filter((value): value is string => value !== undefined),
+      ),
+    ];
+
+    if (candidates.length > 0) {
+      return candidates;
+    }
+
+    if (
+      networks.length > 0 &&
+      answered.filter((done) => done).length === networks.length
+    ) {
+      return [];
+    }
+
+    throw new ReplicatedStateNotReadyError(
+      IPFSContentRacer.RECORD_UNAVAILABLE_MESSAGE,
+    );
   }
 }

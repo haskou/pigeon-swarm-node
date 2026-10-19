@@ -1,3 +1,4 @@
+import ReplicatedStateNotReadyError from '../orbitdb/ReplicatedStateNotReadyError';
 import { IPFSContentNotFoundError } from './errors/IPFSContentNotFoundError';
 import { IPFSNetworksNotFoundByIdsError } from './errors/IPFSNetworksNotFoundByIdsError';
 import { heliaRuntimeAdapter } from './helia/adapters/HeliaRuntimeAdapter';
@@ -36,6 +37,8 @@ export default class IPFS {
     cid: IPFSId,
     networks: IPFSNetwork[],
   ): Promise<void> {
+    let notFound = false;
+
     for (const network of networks) {
       try {
         await network.stat(cid, true);
@@ -43,14 +46,18 @@ export default class IPFS {
         return;
       } catch (error: unknown) {
         if (error instanceof IPFSContentNotFoundError) {
-          continue;
+          notFound = true;
         }
-
-        throw error;
       }
     }
 
-    throw new IPFSContentNotFoundError(cid.valueOf());
+    if (notFound) {
+      throw new IPFSContentNotFoundError(cid.valueOf());
+    }
+
+    throw new ReplicatedStateNotReadyError(
+      IPFSContentRacer.CONTENT_UNAVAILABLE_MESSAGE,
+    );
   }
 
   public async initialize(): Promise<void> {
