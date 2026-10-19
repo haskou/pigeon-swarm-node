@@ -1,6 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
@@ -103,18 +105,32 @@ export default class IpfsIdentityRepository extends IdentityRepository {
             cid,
             IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
           );
-    } catch {
-      const bytes =
-        networkIds && networkIds.length > 0
-          ? await this.ipfsManager.getBytesFromNetworks(
-              cid,
-              networkIds,
-              IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
-            )
-          : await this.ipfsManager.getBytes(
-              cid,
-              IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
-            );
+    } catch (jsonError: unknown) {
+      let bytes: Buffer;
+
+      try {
+        bytes =
+          networkIds && networkIds.length > 0
+            ? await this.ipfsManager.getBytesFromNetworks(
+                cid,
+                networkIds,
+                IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+              )
+            : await this.ipfsManager.getBytes(
+                cid,
+                IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+              );
+      } catch (bytesError: unknown) {
+        // A NotFound verdict counts only when the JSON read also verified absence.
+        if (
+          bytesError instanceof IPFSContentNotFoundError &&
+          !(jsonError instanceof IPFSContentNotFoundError)
+        ) {
+          throw new ReplicatedStateNotReadyError();
+        }
+
+        throw bytesError;
+      }
 
       const document: unknown = JSON.parse(Buffer.from(bytes).toString('utf8'));
 
@@ -149,6 +165,21 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         new IPFSId(externalIdentifier.valueOf()),
         networkIds,
       );
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
+      return undefined;
+    }
+  }
+  // Local candidates keep their metadata answer when a previous version is unreachable.
+  private async findLocalPreviousIdentity(
+    externalIdentifier: IdentityExternalIdentifier,
+    networkIds?: string[],
+  ): Promise<Identity | undefined> {
+    try {
+      return await this.findPreviousIdentity(externalIdentifier, networkIds);
     } catch {
       return undefined;
     }
@@ -179,7 +210,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       return identity;
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       return undefined;
     }
   }
@@ -245,7 +280,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const externalIdentifier = new IdentityExternalIdentifier(
       metadata.previousCid,
     );
-    const identity = await this.findPreviousIdentity(
+    const identity = await this.findLocalPreviousIdentity(
       externalIdentifier,
       metadata.networkIds,
     );
@@ -258,7 +293,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       new IdentityId(metadata.identityId),
       identity,
       (previousExternalIdentifier) =>
-        this.findPreviousIdentity(
+        this.findLocalPreviousIdentity(
           previousExternalIdentifier,
           metadata.networkIds,
         ),
@@ -451,7 +486,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       await this.saveMetadata(identity, cid);
 
       return identity;
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       this.identityByCid.delete(cid.valueOf());
 
       return undefined;

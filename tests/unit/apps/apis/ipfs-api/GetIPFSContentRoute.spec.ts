@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
 import { ContentGetResult } from '@app/contexts/content-replication/application/get-content/ContentGetResult';
+import { ReplicatedContentNotFoundError } from '@app/contexts/content-replication/domain/errors/ReplicatedContentNotFoundError';
+import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Response } from 'express';
 
 function responseDouble(): {
@@ -89,5 +92,26 @@ describe('GetIPFSContentRoute errors', () => {
       (route as unknown as GetIPFSContentRoute).request('cid', response),
     ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
     expect(response.status).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 only when the getter reports content absent on every network', async () => {
+    // Characterization: the racer's all-network NotFound is the only path to 404.
+    const { response } = responseDouble();
+    const route = Object.create(GetIPFSContentRoute.prototype) as {
+      getter: unknown;
+    };
+
+    route.getter = {
+      get: jest
+        .fn()
+        .mockRejectedValue(new ReplicatedContentNotFoundError(new ContentId('cid'))),
+    };
+
+    await (route as unknown as GetIPFSContentRoute).request('cid', response);
+
+    expect(response.status).toHaveBeenCalledWith(HttpRouteStatusEnum.NOT_FOUND);
+    expect(response.json).toHaveBeenCalledWith({
+      error: 'CID not found in any network',
+    });
   });
 });

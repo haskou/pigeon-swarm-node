@@ -169,6 +169,22 @@ describe('IPFS', () => {
       await expect(ipfs.stat(cid, true)).resolves.toBe(false);
     });
 
+    it('should throw ReplicatedStateNotReadyError when offline checks answer not found on one network and fail on another', async () => {
+      const cid = new IPFSId('bafy-offline-mixed');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-offline-mixed'),
+      );
+      secondNetwork.stat.mockRejectedValue(new Error('transport failed'));
+
+      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
     it('should throw ReplicatedStateNotReadyError when offline checks have no networks to ask', async () => {
       const cid = new IPFSId('bafy-offline-empty');
 

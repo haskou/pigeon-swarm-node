@@ -37,7 +37,7 @@ export default class IPFS {
     cid: IPFSId,
     networks: IPFSNetwork[],
   ): Promise<void> {
-    let notFound = false;
+    let notFoundCount = 0;
 
     for (const network of networks) {
       try {
@@ -46,12 +46,12 @@ export default class IPFS {
         return;
       } catch (error: unknown) {
         if (error instanceof IPFSContentNotFoundError) {
-          notFound = true;
+          notFoundCount += 1;
         }
       }
     }
 
-    if (notFound) {
+    if (networks.length > 0 && notFoundCount === networks.length) {
       throw new IPFSContentNotFoundError(cid.valueOf());
     }
 

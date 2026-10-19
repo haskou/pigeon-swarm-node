@@ -1,4 +1,5 @@
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IdentitySignature, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -441,6 +442,67 @@ describe('IpfsIdentityRepository', () => {
           externalIdentifier,
         ),
       ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when the announced document is unavailable', async () => {
+      const externalIdentifier = new IdentityExternalIdentifier(
+        'bafy-unavailable-announced-identity',
+      );
+
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findCandidateByExternalIdentifier(
+          mother.id,
+          externalIdentifier,
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requireByExternalIdentifier', () => {
+    it('should throw ReplicatedStateNotReadyError when the identity document is unavailable', async () => {
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.requireByExternalIdentifier(
+          new IdentityExternalIdentifier('bafy-required-unavailable'),
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw IdentityNotFoundError when the identity document is absent on every network', async () => {
+      ipfsManager.getJSON.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-required-absent'),
+      );
+      ipfsManager.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-required-absent'),
+      );
+
+      await expect(
+        repository.requireByExternalIdentifier(
+          new IdentityExternalIdentifier('bafy-required-absent'),
+        ),
+      ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when the JSON read is unavailable and the bytes read answers not found', async () => {
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-required-mixed'),
+      );
+
+      await expect(
+        repository.requireByExternalIdentifier(
+          new IdentityExternalIdentifier('bafy-required-mixed'),
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
   });
@@ -1107,6 +1169,29 @@ describe('IpfsIdentityRepository', () => {
       await expect(
         repository.findById(new IdentityId(previousPrimitives.id)),
       ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should answer ReplicatedStateNotReadyError when a previous identity cannot be reached', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafyunreachablepreviousidentity';
+      const candidateCidString = 'bafyupdatedidentity';
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
+      ipfsManager.getJSON
+        .mockResolvedValueOnce(mapper.toDocument(candidate))
+        .mockRejectedValueOnce(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findById(new IdentityId(previousPrimitives.id)),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
   });

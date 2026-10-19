@@ -37,7 +37,10 @@ export default abstract class IdentityRepository {
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<boolean>;
 
-  /** Rejects with IdentityNotFoundError when the document cannot be read. */
+  /**
+   * Rejects with IdentityNotFoundError only when every network verifiably lacks the document.
+   * Rejects with ReplicatedStateNotReadyError when any read could not complete.
+   */
   public abstract requireByExternalIdentifier(
     externalIdentifier: IdentityExternalIdentifier,
   ): Promise<Identity>;

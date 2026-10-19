@@ -6,6 +6,7 @@ import KeychainMetadataIndex from '@app/contexts/keychains/infrastructure/metada
 import { KeychainMetadataRecord } from '@app/contexts/keychains/infrastructure/metadata/KeychainMetadataRecord';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSContentTooLargeError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentTooLargeError';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
@@ -132,6 +133,28 @@ describe('IpfsKeychainRepository', () => {
     ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
     expect(ipfs.getJSON).toHaveBeenCalledTimes(1);
     expect(ipfs.getBytes).toHaveBeenCalledTimes(1);
+  });
+
+  it('should fail closed when the JSON read is unavailable and the bytes read answers not found', async () => {
+    // Characterization: keychain reads already fail closed on mixed answers; this pins that.
+    const mother = await KeychainMother.create();
+    metadataIndex.findByOwnerIdentityId.mockResolvedValue([
+      {
+        cid: 'bafy-mixed-keychain',
+        ownerIdentityId: mother.ownerIdentityId.valueOf(),
+        previousCid: undefined,
+        receivedAt: 100,
+        version: 1,
+      },
+    ]);
+    ipfs.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+    ipfs.getBytes.mockRejectedValue(
+      new IPFSContentNotFoundError('bafy-mixed-keychain'),
+    );
+
+    await expect(
+      repository.findCandidateReferencesByOwnerId(mother.ownerIdentityId),
+    ).rejects.toBeInstanceOf(KeychainOwnershipUnverifiedError);
   });
 
   it('should fail closed when the metadata index cannot be read for the owner', async () => {

@@ -55,7 +55,7 @@ export default class IPFSContentRacer {
     attempt: (network: IPFSNetwork, signal: AbortSignal) => Promise<T>,
   ): Promise<T> {
     const controller = new AbortController();
-    const probe = { notFound: false };
+    let notFoundCount = 0;
 
     try {
       return await this.withTimeout(
@@ -64,7 +64,7 @@ export default class IPFSContentRacer {
           networks.map((network) =>
             attempt(network, controller.signal).catch((error: unknown) => {
               if (error instanceof IPFSContentNotFoundError) {
-                probe.notFound = true;
+                notFoundCount += 1;
               }
 
               throw error;
@@ -73,7 +73,8 @@ export default class IPFSContentRacer {
         ),
       );
     } catch {
-      if (probe.notFound) {
+      // Absence needs every attempted network to answer NotFound; one failure keeps it unknown.
+      if (networks.length > 0 && notFoundCount === networks.length) {
         throw new IPFSContentNotFoundError(cid.valueOf());
       }
 

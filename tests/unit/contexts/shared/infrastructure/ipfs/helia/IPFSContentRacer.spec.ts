@@ -70,7 +70,7 @@ describe('IPFSContentRacer', () => {
       );
     });
 
-    it('should throw IPFSContentNotFoundError when one network answers not found and the rest fail', async () => {
+    it('should throw ReplicatedStateNotReadyError when one network answers not found and the rest fail', async () => {
       const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
       const network1 = mock<IPFSNetwork>();
       const network2 = mock<IPFSNetwork>();
@@ -81,7 +81,7 @@ describe('IPFSContentRacer', () => {
       network2.getJSON.mockRejectedValue(new Error('transport failed'));
 
       await expect(racer.raceGetJSON([network1, network2], cid)).rejects.toThrow(
-        IPFSContentNotFoundError,
+        ReplicatedStateNotReadyError,
       );
     });
 
@@ -136,6 +136,20 @@ describe('IPFSContentRacer', () => {
       await expect(racer.raceGetBytes([network], cid)).rejects.toThrow(
         IPFSContentNotFoundError,
       );
+    });
+    it('should throw ReplicatedStateNotReadyError when one network answers not found and the rest fail', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network1 = mock<IPFSNetwork>();
+      const network2 = mock<IPFSNetwork>();
+
+      network1.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError(cid.valueOf()),
+      );
+      network2.getBytes.mockRejectedValue(new Error('transport failed'));
+
+      await expect(
+        racer.raceGetBytes([network1, network2], cid),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
     });
   });
 
@@ -330,6 +344,20 @@ describe('IPFSContentRacer', () => {
 
       await expect(racer.raceStat([network1, network2], cid)).rejects.toThrow(
         IPFSContentNotFoundError,
+      );
+    });
+    it('should throw ReplicatedStateNotReadyError when one stat call answers not found and the rest fail', async () => {
+      const cid = new IPFSId('bafybeigdyrzt5sfp7udm7hu76uh7y26nf3');
+      const network1 = mock<IPFSNetwork>();
+      const network2 = mock<IPFSNetwork>();
+
+      network1.stat.mockRejectedValue(
+        new IPFSContentNotFoundError(cid.valueOf()),
+      );
+      network2.stat.mockRejectedValue(new Error('transport failed'));
+
+      await expect(racer.raceStat([network1, network2], cid)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
       );
     });
 

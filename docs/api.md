@@ -2528,9 +2528,11 @@ may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
 A read that no reachable network can serve answers `503` with code `503020`
-(`ReplicatedStateNotReadyError`) once the lookup times out. A CID that no
-network holds gets the same answer: a block read cannot prove that content is
-absent, so this endpoint never answers `404` for an unknown CID. Retry.
+(`ReplicatedStateNotReadyError`) once the lookup times out. A CID answers `404`
+only when every network the node attempted answered that it does not hold the
+content. If any attempted network fails or times out, the answer is `503` with
+code `503020`, even when another network reported the CID absent: one network's
+absence does not prove the content is absent everywhere. Retry.
 
 ### Register content replication
 
@@ -2938,7 +2940,9 @@ finished opening its replicated state, or its stored configuration cannot be
 read, the lookup answers HTTP 503 with code `503020`
 (`ReplicatedStateNotReadyError`) instead of 409 `IdentityNotFoundError`. The
 identity is not reported missing, so retry. A 409 means the node is ready (see
-Node readiness) and does not know the identity.
+Node readiness) and every network it asked answered that it does not know the
+identity. If any network fails to answer, the lookup answers 503 with code
+`503020` instead, even when another network reported the identity absent.
 
 ### Publish identity
 
