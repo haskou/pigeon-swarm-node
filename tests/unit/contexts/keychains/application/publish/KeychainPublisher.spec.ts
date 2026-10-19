@@ -4,6 +4,7 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import KeychainPublisher from '@app/contexts/keychains/application/publish/KeychainPublisher';
 import { KeychainPublishMessage } from '@app/contexts/keychains/application/publish/messages/KeychainPublishMessage';
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
+import { KeychainOwnerAlreadyHasKeychainError } from '@app/contexts/keychains/domain/errors/KeychainOwnerAlreadyHasKeychainError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
 import KeychainCandidateValidationDomainService from '@app/contexts/keychains/domain/services/KeychainCandidateValidationDomainService';
@@ -79,6 +80,7 @@ describe('KeychainPublisher', () => {
     identityRepository.findById.mockResolvedValue(
       mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
     );
+    repository.hasKeychainForOwner.mockResolvedValue(false);
     saver.save.mockResolvedValue(externalIdentifier);
     eventPublisher.publish.mockResolvedValue(undefined);
 
@@ -121,5 +123,62 @@ describe('KeychainPublisher', () => {
     );
     expect(saver.save).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('should refuse a head-less first keychain version when the owner already has a keychain', async () => {
+    const primitives = (await KeychainMother.create()).primitives();
+    const message = new KeychainPublishMessage(
+      primitives.ownerIdentityId,
+      primitives.encryptedPayload,
+      primitives.timestamp,
+      primitives.signature,
+      primitives.version,
+      primitives.previousKeychainExternalIdentifier,
+    );
+
+    validator.isValidChainFor.mockResolvedValue(true);
+    identityRepository.findById.mockResolvedValue(
+      mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
+    );
+    repository.hasKeychainForOwner.mockResolvedValue(true);
+    saver.save.mockResolvedValue(
+      new KeychainExternalIdentifier('bafy-keychain'),
+    );
+    eventPublisher.publish.mockResolvedValue(undefined);
+
+    await expect(publisher.publish(message)).rejects.toThrow(
+      KeychainOwnerAlreadyHasKeychainError,
+    );
+    expect(saver.save).not.toHaveBeenCalled();
+    expect(eventPublisher.publish).not.toHaveBeenCalled();
+  });
+
+  it('should publish a next keychain version when the owner already has a keychain', async () => {
+    const primitives = (await KeychainMother.create())
+      .withVersion(2)
+      .withPreviousKeychainExternalIdentifier('bafy-previous-keychain')
+      .primitives();
+    const message = new KeychainPublishMessage(
+      primitives.ownerIdentityId,
+      primitives.encryptedPayload,
+      primitives.timestamp,
+      primitives.signature,
+      primitives.version,
+      primitives.previousKeychainExternalIdentifier,
+    );
+    const externalIdentifier = new KeychainExternalIdentifier(
+      'bafy-keychain-v2',
+    );
+
+    validator.isValidChainFor.mockResolvedValue(true);
+    identityRepository.findById.mockResolvedValue(
+      mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
+    );
+    repository.hasKeychainForOwner.mockResolvedValue(true);
+    saver.save.mockResolvedValue(externalIdentifier);
+    eventPublisher.publish.mockResolvedValue(undefined);
+
+    await expect(publisher.publish(message)).resolves.toBe(externalIdentifier);
+    expect(saver.save).toHaveBeenCalledTimes(1);
   });
 });

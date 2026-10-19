@@ -36,6 +36,7 @@ package "keychains.domain" {
   interface KeychainRepository {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidateReferencesByOwnerId(ownerIdentityId: IdentityId): Promise<KeychainCandidate[]>
+    +hasKeychainForOwner(ownerIdentityId: IdentityId): Promise<boolean>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
   }
 
@@ -117,6 +118,7 @@ package "keychains.infrastructure" {
   class IpfsKeychainRepository {
     +save(keychain: Keychain, networkIds: NetworkId[]): Promise<KeychainExternalIdentifier>
     +findCandidatesByOwnerId(ownerIdentityId: IdentityId): Promise<Keychain[]>
+    +hasKeychainForOwner(ownerIdentityId: IdentityId): Promise<boolean>
   }
 
   class IpfsKeychainMapper {
