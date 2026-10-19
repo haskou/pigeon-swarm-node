@@ -1176,6 +1176,37 @@ describe('IpfsIdentityRepository', () => {
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
 
+    it('should throw ReplicatedStateNotReadyError when the local previous identity of metadata is unreachable', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafy-unreachable-local-previous';
+      const currentCidString = 'bafy-unreachable-local-current';
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: currentCidString,
+          identity: candidate,
+          identityId: previousPrimitives.id,
+          previousCid: previousCidString,
+          version: candidate.toPrimitives().version,
+        },
+      ]);
+      ipfsManager.calculateJSONId.mockResolvedValue(
+        new IPFSId('bafy-unreachable-local-other'),
+      );
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findById(new IdentityId(previousPrimitives.id)),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
     it('should throw ReplicatedStateNotReadyError when the identity metadata index is unavailable', async () => {
       const primitives = (await mother.build()).toPrimitives();
 
