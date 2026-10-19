@@ -4,6 +4,7 @@ import IdentityRepository from '@app/contexts/identities/domain/repositories/Ide
 import KeychainPublisher from '@app/contexts/keychains/application/publish/KeychainPublisher';
 import { KeychainPublishMessage } from '@app/contexts/keychains/application/publish/messages/KeychainPublishMessage';
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
+import { KeychainOwnerAlreadyHasKeychainError } from '@app/contexts/keychains/domain/errors/KeychainOwnerAlreadyHasKeychainError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import { KeychainCandidate } from '@app/contexts/keychains/domain/KeychainCandidate';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
@@ -12,7 +13,7 @@ import KeychainSaverService from '@app/contexts/keychains/domain/services/Keycha
 import { KeychainExternalIdentifier } from '@app/contexts/keychains/domain/value-objects/KeychainExternalIdentifier';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { DomainEventPublisher } from '@haskou/ddd-kernel/domain';
-import { DomainError, UUID } from '@haskou/value-objects';
+import { UUID } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { KeychainMother } from '../../../../mothers/KeychainMother';
@@ -80,6 +81,7 @@ describe('KeychainPublisher', () => {
     identityRepository.findById.mockResolvedValue(
       mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
     );
+    repository.findCandidateReferencesByOwnerId.mockResolvedValue([]);
     saver.save.mockResolvedValue(externalIdentifier);
     eventPublisher.publish.mockResolvedValue(undefined);
 
@@ -147,8 +149,8 @@ describe('KeychainPublisher', () => {
     );
     eventPublisher.publish.mockResolvedValue(undefined);
 
-    await expect(publisher.publish(message)).rejects.toBeInstanceOf(
-      DomainError,
+    await expect(publisher.publish(message)).rejects.toThrow(
+      KeychainOwnerAlreadyHasKeychainError,
     );
     expect(saver.save).not.toHaveBeenCalled();
     expect(eventPublisher.publish).not.toHaveBeenCalled();

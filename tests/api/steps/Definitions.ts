@@ -238,6 +238,10 @@ export default class Definitions {
   private createdIdentityId: string | undefined;
   private registrationCode: { code: string; id: string } | undefined;
   private keychainExternalIdentifier: string | undefined;
+  private readonly keychainExternalIdentifiersByKeyPair = new WeakMap<
+    KeyPair,
+    string
+  >();
   private messageId: string | undefined;
   private notificationId: string | undefined;
   private createdNotificationIds: string[] = [];
@@ -3047,6 +3051,17 @@ export default class Definitions {
 
   @given('I have published a keychain for the authenticated identity')
   public async iHavePublishedAKeychainForTheAuthenticatedIdentity(): Promise<void> {
+    // A head-less v1 is refused once the identity has a keychain. Publish once
+    // per identity key pair; a restored identity reuses its pointer.
+    const keyPair = this.identityKeyPair;
+    const publishedKeychainExternalIdentifier = keyPair
+      ? this.keychainExternalIdentifiersByKeyPair.get(keyPair)
+      : undefined;
+    if (publishedKeychainExternalIdentifier) {
+      this.keychainExternalIdentifier = publishedKeychainExternalIdentifier;
+      return;
+    }
+
     this.body = JSON.stringify({
       encryptedPayload: 'encrypted-keychain-payload',
       previousKeychainExternalIdentifier: null,
@@ -3067,8 +3082,13 @@ export default class Definitions {
       );
     }
 
-    this.keychainExternalIdentifier =
+    const keychainExternalIdentifier: string =
       this.response.data.keychainExternalIdentifier;
+    this.keychainExternalIdentifier = keychainExternalIdentifier;
+    this.keychainExternalIdentifiersByKeyPair.set(
+      await this.ensureIdentityKeyPair(),
+      keychainExternalIdentifier,
+    );
   }
 
   @given('I set a non-JSON body with content type {string}')

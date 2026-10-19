@@ -1,5 +1,6 @@
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { InvalidKeychainCandidateError } from '@app/contexts/keychains/domain/errors/InvalidKeychainCandidateError';
+import { KeychainOwnerAlreadyHasKeychainError } from '@app/contexts/keychains/domain/errors/KeychainOwnerAlreadyHasKeychainError';
 import { KeychainOwnerNetworksNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainOwnerNetworksNotFoundError';
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import KeychainRepository from '@app/contexts/keychains/domain/repositories/KeychainRepository';
@@ -36,6 +37,15 @@ export default class KeychainPublisher {
     return networkIds;
   }
 
+  private async ownerHasKeychain(
+    ownerIdentityId: IdentityId,
+  ): Promise<boolean> {
+    const candidates =
+      await this.repository.findCandidateReferencesByOwnerId(ownerIdentityId);
+
+    return candidates.length > 0;
+  }
+
   public async publish(
     message: KeychainPublishMessage,
   ): Promise<KeychainExternalIdentifier> {
@@ -51,6 +61,13 @@ export default class KeychainPublisher {
 
     if (!isValid) {
       throw new InvalidKeychainCandidateError();
+    }
+
+    if (
+      keychain.isFirstVersion() &&
+      (await this.ownerHasKeychain(message.ownerIdentityId))
+    ) {
+      throw new KeychainOwnerAlreadyHasKeychainError();
     }
 
     const networkIds = await this.findOwnerNetworkIds(message.ownerIdentityId);
