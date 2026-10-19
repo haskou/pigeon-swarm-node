@@ -6680,6 +6680,14 @@ export default class Definitions {
     });
   }
 
+  @given('I set a public node network body with id {string} and name {string}')
+  public iSetAPublicNodeNetworkBodyWithIdAndName(
+    id: string,
+    name: string,
+  ): void {
+    this.body = JSON.stringify({ id, name });
+  }
+
   @given('I have created a private community text channel')
   public async iHaveCreatedAPrivateCommunityTextChannel(): Promise<void> {
     this.iSetAPrivateCommunityBody();

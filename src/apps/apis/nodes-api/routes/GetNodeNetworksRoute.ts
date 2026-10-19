@@ -1,6 +1,6 @@
 import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
-import { Node } from '@app/contexts/nodes/domain/Node';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { Request, Response } from 'express';
@@ -15,17 +15,13 @@ export class GetNodeNetworksRoute extends Route {
   private readonly signedRequestAuthenticator =
     this.get<SignedHttpRequestAuthenticator>(SignedHttpRequestAuthenticator);
 
-  private async canExposeNetworkKeys(
-    node: Node,
+  private async authenticatedIdentityId(
     request: Request,
-  ): Promise<boolean> {
+  ): Promise<IdentityId | undefined> {
     try {
-      const authenticatedIdentityId =
-        await this.signedRequestAuthenticator.authenticate(request);
-
-      return node.isOwnedBy(authenticatedIdentityId);
+      return await this.signedRequestAuthenticator.authenticate(request);
     } catch {
-      return false;
+      return undefined;
     }
   }
 
@@ -35,10 +31,13 @@ export class GetNodeNetworksRoute extends Route {
     @Res() response: Response,
   ): Promise<Response> {
     const node = await this.loader.loadNode();
-    const canExposeNetworkKeys = await this.canExposeNetworkKeys(node, request);
+    const identityId = await this.authenticatedIdentityId(request);
 
-    return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new NetworksViewModel(node, canExposeNetworkKeys).toResource());
+    return response.status(HttpRouteStatusEnum.OK).send(
+      new NetworksViewModel(node, {
+        exposeKeys: identityId !== undefined && node.isOwnedBy(identityId),
+        exposePrivacy: identityId !== undefined,
+      }).toResource(),
+    );
   }
 }

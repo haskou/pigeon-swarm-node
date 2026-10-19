@@ -585,7 +585,7 @@ paths:
       tags:
         - nodes
       summary: Get local node networks
-      description: Private network keys are returned only when the request is signed by the current node owner. Unsigned, malformed, or non-owner requests still receive networks without private keys.
+      description: Networks are returned to every caller. Requests signed by a valid identity also get privateNetwork for each network, true when the network has a private key and false when it is public. The private key itself is returned only when the request is signed by the current node owner. Unsigned or malformed requests get neither privateNetwork nor keys.
       parameters:
         - $ref: '#/components/parameters/XOptionalIdentityId'
         - $ref: '#/components/parameters/XOptionalTimestamp'
@@ -1243,6 +1243,9 @@ components:
         key:
           type: string
           description: Present only when the caller identity in X-Identity-Id is the node owner, or when returned by owner-only write operations.
+        privateNetwork:
+          type: boolean
+          description: Present only when the request is signed by a valid identity. True when the network has a private key, false when it is public. Carries no key material.
     NetworksResource:
       type: object
       required:
