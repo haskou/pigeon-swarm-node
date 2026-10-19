@@ -152,47 +152,35 @@ export default class IPFSContentRacer {
     networks: IPFSNetwork[],
     key: string,
   ): Promise<string[]> {
-    const controller = new AbortController();
-    const records: (string | undefined)[] = [];
-    const answered: boolean[] = [];
+    if (networks.length === 0) {
+      throw new ReplicatedStateNotReadyError(
+        IPFSContentRacer.RECORD_UNAVAILABLE_MESSAGE,
+      );
+    }
 
-    const lookups = networks.map((network, index) =>
-      network
-        .getRecord(key, controller.signal)
-        .then((value) => {
-          records[index] = value;
-          answered[index] = true;
-        })
-        .catch((): undefined => undefined),
-    );
+    const controller = new AbortController();
 
     try {
-      await this.withTimeout(controller, Promise.all(lookups));
+      const records = await this.withTimeout(
+        controller,
+        Promise.all(
+          networks.map((network) => network.getRecord(key, controller.signal)),
+        ),
+      );
+
+      return [
+        ...new Set(
+          records.filter((value): value is string => value !== undefined),
+        ),
+      ];
     } catch {
-      // The deadline passed: keep only the answers received so far.
+      // A candidate list is complete only when every network answered: a
+      // failed or timed-out network may hold the record, so fail closed.
+      throw new ReplicatedStateNotReadyError(
+        IPFSContentRacer.RECORD_UNAVAILABLE_MESSAGE,
+      );
     } finally {
       controller.abort();
     }
-
-    const candidates = [
-      ...new Set(
-        records.filter((value): value is string => value !== undefined),
-      ),
-    ];
-
-    if (candidates.length > 0) {
-      return candidates;
-    }
-
-    if (
-      networks.length > 0 &&
-      answered.filter((done) => done).length === networks.length
-    ) {
-      return [];
-    }
-
-    throw new ReplicatedStateNotReadyError(
-      IPFSContentRacer.RECORD_UNAVAILABLE_MESSAGE,
-    );
   }
 }

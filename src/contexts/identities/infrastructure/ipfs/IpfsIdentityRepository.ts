@@ -407,6 +407,12 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     try {
       return await this.findRemoteCandidateReferences(id, knownCids);
     } catch (error) {
+      // A not-ready race is not an answer: local metadata may be older than
+      // the record the open network would return, so it must not stand in.
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       if (localCandidates.length > 0) {
         return [];
       }
