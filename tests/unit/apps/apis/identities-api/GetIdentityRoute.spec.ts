@@ -19,17 +19,23 @@ describe('Get identity route readiness gate', () => {
   let server: Server;
   let baseUrl: string;
   let replicatedStateOpen: boolean;
+  let networksRegistered: boolean;
+  let configEmpty: boolean;
   let readiness: NodeReadiness;
   let findCandidate: jest.Mock;
 
   beforeAll(async () => {
     replicatedStateOpen = false;
+    networksRegistered = false;
+    configEmpty = true;
     const nodeRepository = mock<NodeRepository>();
-    nodeRepository.isLocalNodeConfigurationEmpty.mockResolvedValue(true);
+    nodeRepository.isLocalNodeConfigurationEmpty.mockImplementation(
+      async () => configEmpty,
+    );
     readiness = new NodeReadiness(
       {
         isOpen: () => replicatedStateOpen,
-        hasNetworks: () => false,
+        hasNetworks: () => networksRegistered,
       } as unknown as OrbitDBReplicatedStateRegistry,
       nodeRepository,
     );
@@ -71,26 +77,42 @@ describe('Get identity route readiness gate', () => {
     });
   });
 
-  it('answers 503020 until startup has finished and the replicated state is open, and keeps a genuine miss at 409', async () => {
+  it('answers 503020 while not ready and keeps a genuine miss at 409 once ready', async () => {
     const getIdentity = () =>
       fetch(`${baseUrl}/api/identities/identity-under-test`);
 
-    replicatedStateOpen = false;
+    // Not started yet.
     const beforeStart = await getIdentity();
     expect(beforeStart.status).toBe(503);
     await expect(beforeStart.json()).resolves.toMatchObject({ code: 503020 });
     expect(findCandidate).not.toHaveBeenCalled();
 
-    // Started, but still replaying: a miss here is not a genuine miss.
+    // Started, but networks are registered and still replaying.
     readiness.markStarted();
+    networksRegistered = true;
     const replaying = await getIdentity();
     expect(replaying.status).toBe(503);
     await expect(replaying.json()).resolves.toMatchObject({ code: 503020 });
     expect(findCandidate).not.toHaveBeenCalled();
 
+    // Replicated state open: a miss is genuine.
     replicatedStateOpen = true;
     const genuineMiss = await getIdentity();
     expect(genuineMiss.status).toBe(409);
     expect(findCandidate).toHaveBeenCalledTimes(1);
+
+    // Fresh node: no networks and an empty configuration, so nothing to replay.
+    replicatedStateOpen = false;
+    networksRegistered = false;
+    const freshMiss = await getIdentity();
+    expect(freshMiss.status).toBe(409);
+    expect(findCandidate).toHaveBeenCalledTimes(2);
+
+    // Configured networks not registered yet (restart before registration).
+    configEmpty = false;
+    const restarting = await getIdentity();
+    expect(restarting.status).toBe(503);
+    await expect(restarting.json()).resolves.toMatchObject({ code: 503020 });
+    expect(findCandidate).toHaveBeenCalledTimes(2);
   });
 });

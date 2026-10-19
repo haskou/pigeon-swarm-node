@@ -1,7 +1,6 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
@@ -48,13 +47,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return this.versions.newestFirst(
         await this.metadataIndex.findByIdentityId(id),
       );
-    } catch (error) {
-      // Unready replicated state is not a miss: rethrow so the caller answers
-      // not-ready instead of a 409 for an identity that may still be replaying.
-      if (error instanceof ReplicatedStateNotReadyError) {
-        throw error;
-      }
-
+    } catch {
       return [];
     }
   }

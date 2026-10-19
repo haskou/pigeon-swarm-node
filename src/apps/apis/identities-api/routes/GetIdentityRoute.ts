@@ -22,9 +22,10 @@ export class GetIdentityRoute extends Route {
     @Param('identityId') identityId: string,
     @Res() response: Response,
   ): Promise<Response> {
-    // Not ready means the node is still starting or has not opened its replicated
-    // state, so a missing identity cannot be told apart from one still replaying.
-    if (!this.readiness.isServingReplicatedState()) {
+    // Not ready: the node is still starting, or a configured network has not
+    // finished opening its replicated state, so a miss cannot be told apart
+    // from one still replaying. A fresh node holds no network to replay.
+    if (!(await this.readiness.isReady())) {
       throw new ReplicatedStateNotReadyError();
     }
 

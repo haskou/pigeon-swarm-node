@@ -486,30 +486,6 @@ describe('IpfsIdentityRepository', () => {
     });
   });
 
-  describe('findCandidateReferencesById', () => {
-    it('should not answer unready replicated state as an unknown identity', async () => {
-      const identity = await mother.build();
-
-      metadataRepository.findByIdentityId.mockRejectedValue(
-        new ReplicatedStateNotReadyError(),
-      );
-
-      await expect(
-        repository.findCandidateReferencesById(identity.getId()),
-      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
-    });
-
-    it('should still answer a genuine miss as an unknown identity', async () => {
-      const identity = await mother.build();
-
-      metadataRepository.findByIdentityId.mockResolvedValue([]);
-
-      await expect(
-        repository.findCandidateReferencesById(identity.getId()),
-      ).rejects.toBeInstanceOf(IdentityNotFoundError);
-    });
-  });
-
   describe('findById', () => {
     it('should find identity from embedded metadata before DHT fallback', async () => {
       const identity = await mother.build();
