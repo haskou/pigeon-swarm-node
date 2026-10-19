@@ -156,6 +156,36 @@ describe('KeychainPublisher', () => {
     expect(eventPublisher.publish).not.toHaveBeenCalled();
   });
 
+  it('should publish a head-less first keychain version when the only candidate belongs to another owner', async () => {
+    const primitives = (await KeychainMother.create()).primitives();
+    const message = new KeychainPublishMessage(
+      primitives.ownerIdentityId,
+      primitives.encryptedPayload,
+      primitives.timestamp,
+      primitives.signature,
+      primitives.version,
+      primitives.previousKeychainExternalIdentifier,
+    );
+    const otherOwnersCandidate = mock<KeychainCandidate>();
+    otherOwnersCandidate.belongsTo.mockReturnValue(false);
+
+    validator.isValidChainFor.mockResolvedValue(true);
+    identityRepository.findById.mockResolvedValue(
+      mockOwnerIdentity([new NetworkId(UUID.generate().toString())]),
+    );
+    repository.findCandidateReferencesByOwnerId.mockResolvedValue([
+      otherOwnersCandidate,
+    ]);
+    saver.save.mockResolvedValue(
+      new KeychainExternalIdentifier('bafy-keychain'),
+    );
+    eventPublisher.publish.mockResolvedValue(undefined);
+
+    await publisher.publish(message);
+
+    expect(saver.save).toHaveBeenCalledTimes(1);
+  });
+
   it('should publish a next keychain version when the owner already has a keychain', async () => {
     const primitives = (await KeychainMother.create())
       .withVersion(2)
