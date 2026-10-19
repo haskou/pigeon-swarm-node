@@ -307,6 +307,12 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
+  // The writer (save, through IpfsKeychainMapper.toDocument) emits exactly
+  // these fields, and that format has held since the keychain format was
+  // introduced. A routed CID is content-addressed, so the bytes behind the
+  // owner's keychain CID are that output and always pass this check. A
+  // document that fails it cannot be the owner's keychain. If the writer's
+  // format changes, this check must change with it.
   private isKeychainDocument(value: unknown): value is IpfsKeychainDocument {
     if (typeof value !== 'object' || value === null) {
       return false;
@@ -357,10 +363,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
-  // Routed bytes that are not a keychain document are not the owner's keychain
-  // and are skipped. A keychain document that fails to map is not definitive,
-  // so it throws. A document that cannot be fetched throws in
-  // readRoutedDocument.
+  // Routed bytes that fail the keychain shape check are not the owner's
+  // keychain and are skipped (see isKeychainDocument). A keychain document
+  // that fails to map is not definitive, because the owner's keychain may
+  // carry content the domain rejects, so it throws. A document that cannot be
+  // fetched throws in readRoutedDocument.
   private async readRoutedKeychain(
     cidString: string,
   ): Promise<Keychain | undefined> {
