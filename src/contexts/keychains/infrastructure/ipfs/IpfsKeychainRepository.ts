@@ -136,15 +136,15 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     );
   }
 
-  private sortCandidateReferencesByFreshness(
+  private sortCandidateReferencesByPrecedence(
     candidates: KeychainCandidate[],
   ): KeychainCandidate[] {
     return [...candidates].sort((left, right) => {
-      if (left.isNewerThan(right)) {
+      if (left.takesPrecedenceOver(right)) {
         return -1;
       }
 
-      if (right.isNewerThan(left)) {
+      if (right.takesPrecedenceOver(left)) {
         return 1;
       }
 
@@ -422,7 +422,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 
     if (localCandidates.length > 0) {
-      return this.sortCandidateReferencesByFreshness(localCandidates);
+      return this.sortCandidateReferencesByPrecedence(localCandidates);
     }
 
     const remoteCandidates = await this.findRemoteCandidateReferences(
@@ -430,7 +430,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
       new Set(metadata.map((document) => document.cid)),
     );
 
-    return this.sortCandidateReferencesByFreshness(remoteCandidates);
+    return this.sortCandidateReferencesByPrecedence(remoteCandidates);
   }
 
   public async hasKeychainForOwner(

@@ -3224,7 +3224,10 @@ Response:
 Implemented:
 
 - only return the authenticated identity keychain
-- resolve the latest valid candidate from OrbitDB metadata
+- resolve the latest valid candidate from OrbitDB metadata: the highest version wins; when valid candidates share it, the smaller external identifier wins, so the result does not depend on index order
+- the rule is a pure function of the valid candidate set: every node that holds the same set returns the same keychain. A node that has not yet replicated every candidate may return a different one until it does
+- a same-version tie is logged as a warning at most once a minute, `Resolved same-version keychain tie: candidates=<n> suppressedSinceLastLog=<m>`: counts only, no identifiers or owner ids, where `m` counts the ties resolved silently since the previous line
+- residual: two owner-signed keychains of the same version (for example, two devices publishing at once) resolve silently to the smaller external identifier on every node. Only the owner can sign either one, so no outsider picks the winner, but neither the owner nor a client is told that the other version lost
 - return encrypted payload as-is for client-side unlock/decryption
 
 Errors:

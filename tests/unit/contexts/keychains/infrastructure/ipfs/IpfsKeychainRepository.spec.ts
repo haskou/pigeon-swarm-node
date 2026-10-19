@@ -141,6 +141,38 @@ describe('IpfsKeychainRepository', () => {
     expect(ipfs.getRecordCandidates).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['larger identifier indexed first', ['bafy-z-current', 'bafy-a-current']],
+    ['smaller identifier indexed first', ['bafy-a-current', 'bafy-z-current']],
+  ])(
+    'should order candidates at one version by external identifier when the %s',
+    async (_order, cids) => {
+      const mother = await KeychainMother.create();
+      const keychain = mother.withVersion(2).build();
+
+      metadataIndex.findByOwnerIdentityId.mockResolvedValue(
+        cids.map((cid): KeychainMetadataRecord => ({
+          cid,
+          keychain,
+          ownerIdentityId: mother.ownerIdentityId.valueOf(),
+          previousCid: undefined,
+          receivedAt: 100,
+          version: 2,
+        })),
+      );
+
+      const candidates = await repository.findCandidateReferencesByOwnerId(
+        mother.ownerIdentityId,
+      );
+
+      expect(
+        candidates.map((candidate) =>
+          candidate.getExternalIdentifier().valueOf(),
+        ),
+      ).toEqual(['bafy-a-current', 'bafy-z-current']);
+    },
+  );
+
   it('should not refresh routing records when local metadata is available', async () => {
     const mother = await KeychainMother.create();
     const local = mother.withVersion(1).build();
