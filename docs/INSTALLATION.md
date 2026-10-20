@@ -130,6 +130,12 @@ reverse proxy in front of the node should keep them.
 | `LOG_URL` | `logs` | No | Log folder under the project root; file is `<SERVICE_NAME or service>.log`. |
 | `SERVICE_NAME` | unset | Recommended | Service name used in logs and message bus metadata. |
 
+An HTTP request that fails with an unhandled error is answered with HTTP 500 and
+logged at error level in every environment, including `NODE_ENV=production`, as
+`Unhandled error: name=<ErrorName> errno=<n>`. The `errno` part appears only when
+the error has a numeric one, for example `-13` for a refused file write. The
+message, stack, paths and identifiers are never logged.
+
 Content-retrieval diagnostics are not configured through the environment. The
 node owner opens a diagnostics session with explicit consent through
 `PUT /node/diagnostics` (see [API](api.md)). The session records for 1 to 60

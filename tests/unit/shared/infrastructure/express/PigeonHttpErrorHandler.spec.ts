@@ -85,7 +85,9 @@ describe('createPigeonHttpErrorHandler', () => {
 
     respondTo(error, logger);
 
-    expect(logger.error).toHaveBeenCalledWith('Unhandled error: name=BrokenThing');
+    expect(logger.error).toHaveBeenCalledWith(
+      'Unhandled error: name=BrokenThing',
+    );
   });
 
   it('never logs a name that is not a plain identifier', () => {
