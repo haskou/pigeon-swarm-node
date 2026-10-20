@@ -2675,6 +2675,107 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         jest.useRealTimers();
       }
     });
+
+    it('reads a key by the key alone: a copy held under it in any network makes the read wait until a head of that key is settled, in any network', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const { network, registry } = await setup((record) =>
+          String(record.id).startsWith('honest'),
+        );
+        const other = createStores();
+
+        await registry.register('network-2', other.stores);
+        emit(other, 'community:same', 'junk-b', 10);
+        await jest.advanceTimersByTimeAsync(0);
+
+        // Held in network 2 only: a read of the key waits, whichever
+        // network the caller means. Reads take no network.
+        await expect(registry.findHead('community:same')).rejects.toThrow(
+          ReplicatedStateNotReadyError,
+        );
+
+        // A head of the key settled in network 1 ends the wait for the
+        // copy network 2 holds: verified keys are global by key.
+        emit(network, 'community:same', 'honest-a', 10);
+        await jest.advanceTimersByTimeAsync(0);
+        await expect(registry.findHead('community:same')).resolves.toEqual(
+          expect.objectContaining({
+            communityOperations: [{ id: 'honest-a' }],
+          }),
+        );
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('never makes a key with a verified head wait for a copy another network holds under the same key', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const { network, registry } = await setup((record) =>
+          String(record.id).startsWith('honest'),
+        );
+        const other = createStores();
+
+        await registry.register('network-2', other.stores);
+        emit(network, 'community:same', 'honest-a', 10);
+        await jest.advanceTimersByTimeAsync(0);
+        emit(other, 'community:same', 'junk-b', 20);
+        await jest.advanceTimersByTimeAsync(0);
+
+        await expect(registry.findHead('community:same')).resolves.toEqual(
+          expect.objectContaining({
+            communityOperations: [{ id: 'honest-a' }],
+          }),
+        );
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('answers 503020 on a read of a restored head the network dropped for lack of room, and on the list', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+        const registry =
+          OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+        const { heads, stores } = createStores();
+        const gate = mock<OrbitDBMutationGate>();
+
+        gate.governs.mockImplementation(
+          (collection) => collection === 'communityOperations',
+        );
+        gate.governsHead.mockReturnValue(false);
+        gate.verdictOf.mockResolvedValue('pending');
+        // More restored heads than the network holds (256 active + 256 queued).
+        for (let index = 1; index <= 600; index += 1) {
+          await headCache.save('network-1', `community:own-${index}`, {
+            communityOperations: [{ id: `own-${index}` }],
+            id: `own-${index}`,
+            updatedAt: 10,
+          });
+        }
+        await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+        heads.log = { heads: jest.fn(async () => [{ hash: 'head-1' }]) };
+        registry.addMutationGate(gate);
+        await registry.register('network-1', stores);
+        await jest.advanceTimersByTimeAsync(0);
+
+        await expect(registry.findHead('community:own-600')).rejects.toThrow(
+          ReplicatedStateNotReadyError,
+        );
+        expect(registry.hasPendingRestoredHeadAdmissions('community:')).toBe(
+          true,
+        );
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   it('keeps one timer per held head however long it stays held or often it is received', async () => {

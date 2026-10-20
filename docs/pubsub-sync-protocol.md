@@ -751,9 +751,15 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   head. A key this node restored from its own head cache is always remembered (it is
   bounded by the persisted heads); any other key up to 1024 per network, and past
   that it is not remembered, so a peer that plants more keys than that delays no
-  read of any other key, in this network or another. A key nobody dropped or holds,
-  every key of another network (the same key too) and a subject with a verified head
-  are read as usual. Only the count of dropped heads is logged. A held head is
+  read of any other key. A key nobody dropped or holds, and a key with a verified
+  head, are read as usual. Holds, drops and cool-downs are kept per network and
+  key, but a read takes the key alone, because the head cache and the verified keys
+  are global by key: a copy held or dropped under a key in any network makes a
+  read of that key wait while no network has settled a head under it, and a head
+  settled under the key in any network ends that wait for every network. So a peer
+  in network B that offers a head under a key this node holds unverified in
+  network A, and that settles it, ungates A's read of that key (it never gates a
+  key that has a verified head). Only the count of dropped heads is logged. A held head is
   offered again on every 60 s retry, with one retry timer for the node, so offers
   never stack. A flood in one store never takes the place of another store's
   records, and one network's held heads never take another's places.
@@ -781,7 +787,11 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   key is not held again in that network for 15 minutes whatever digests arrive, and
   after 3 expiries it is never held again while remembered, so a peer cannot keep a
   subject waiting by renewing the hold with fresh copies; the same key in another
-  network has its own record. Until then a held copy makes only a subject with no
+  network has its own record. Consequence: after the third expiry a genuine head
+  offered later under that key in that network is not held either, so a read of it
+  no longer answers `503020` while it proves out: it reads as missing until it is
+  admitted, or until the key is forgotten (LRU of 1024) or the node restarts.
+  Until then a held copy makes only a subject with no
   verified head answer `503020` on a read of that subject. It never delays the
   community list: the list (`GET /communities`, and the discoverable list) waits only
   for a head this node restored from its own persisted head cache at start and has not
