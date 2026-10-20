@@ -10,6 +10,7 @@ Feature: Node registration codes
     And I sign a POST request to "/node/registration-codes"
     When I POST to "/node/registration-codes"
     Then response code is equal to 201
+    And response header "location" should contain "/node/registration-codes/"
     And response body should contain "code"
     And response data should match partially
       """

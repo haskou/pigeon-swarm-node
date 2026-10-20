@@ -46,8 +46,13 @@ export class PutMailboxRoute extends MailboxRouteSupport {
         ),
       );
 
+      if (!created) {
+        return response.status(HttpRouteStatusEnum.OK).send();
+      }
+
       return response
-        .status(created ? HttpRouteStatusEnum.CREATED : HttpRouteStatusEnum.OK)
+        .status(HttpRouteStatusEnum.CREATED)
+        .location(`/mailboxes/${encodeURIComponent(id)}`)
         .send();
     } catch (error: unknown) {
       if (error instanceof MailboxCreationProofInvalidError) {

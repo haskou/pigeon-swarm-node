@@ -45,7 +45,12 @@ paths:
         '200':
           description: Already exists with the same hashes.
         '201':
-          description: Created.
+          description: Created. `Location` names the mailbox.
+          headers:
+            Location:
+              description: Relative URL of the mailbox. Relative to the API base path (`ROUTE_PREFIX`).
+              schema:
+                type: string
         '400':
           description: Invalid hashes, or a creationNonce that fails the proof of work. A short proof includes `requiredDifficultyBits` with the bits it needs.
         '409':
@@ -250,7 +255,12 @@ paths:
         '200':
           description: The hash is already a reader.
         '201':
-          description: Reader added.
+          description: Reader added. `Location` names the reader by its read token hash.
+          headers:
+            Location:
+              description: Relative URL of the added reader. Relative to the API base path (`ROUTE_PREFIX`).
+              schema:
+                type: string
         '404':
           description: Unknown mailbox, wrong capability, or a post token.
         '409':

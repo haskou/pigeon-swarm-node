@@ -10,6 +10,7 @@ Feature: Post public IPFS content route
     And I sign the current public IPFS content request
     When I POST to "/ipfs/contents"
     Then response code is equal to 201
+    And response header "location" should contain "/ipfs/contents/"
     And response body should contain "cid"
     And response contains a valid resource with the following fields
       | contentType | image/png   |

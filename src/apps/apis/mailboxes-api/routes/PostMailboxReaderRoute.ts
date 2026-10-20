@@ -34,8 +34,15 @@ export class PostMailboxReaderRoute extends MailboxRouteSupport {
         new MailboxReaderAddMessage(id, token, body.readTokenHash),
       );
 
+      if (!added) {
+        return response.status(HttpRouteStatusEnum.OK).send();
+      }
+
+      const readerPath = `/mailboxes/${encodeURIComponent(id)}/readers`;
+
       return response
-        .status(added ? HttpRouteStatusEnum.CREATED : HttpRouteStatusEnum.OK)
+        .status(HttpRouteStatusEnum.CREATED)
+        .location(`${readerPath}/${encodeURIComponent(body.readTokenHash)}`)
         .send();
     } catch (error: unknown) {
       return this.translate(error);

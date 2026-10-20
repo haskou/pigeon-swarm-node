@@ -31,7 +31,10 @@ export class PostPrivateBlobRoute extends PrivateBlobRouteSupport {
         new PrivateBlobReserveMessage(identityId, body.size),
       );
 
-      return response.status(HttpRouteStatusEnum.CREATED).json(reservation);
+      return response
+        .status(HttpRouteStatusEnum.CREATED)
+        .location(`/private-blobs/${encodeURIComponent(reservation.blobId)}`)
+        .json(reservation);
     } catch (error: unknown) {
       return this.translate(error);
     }
