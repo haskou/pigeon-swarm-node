@@ -706,6 +706,15 @@ trigger matters because the record usually rests on exactly that state: on a slo
 a joiner's identity can replicate after the community head that lists its join, and
 the head would otherwise wait for the next retry.
 
+A refusal is intrinsic: the record can never be valid whatever this node learns later.
+A failure that depends on state the node does not hold yet is pending, never refused.
+That covers a community or conversation that is not local yet, a frontier whose
+operations have not arrived, an identity or device revision that has not replicated,
+and a node that is not ready. It applies to community operations, pins, reactions,
+channel messages, membership requests, invitation claims, moderation log records, MLS
+records, poll scopes and call records (start and participant) alike. A pending record
+of a subject that never arrives is dropped with its held copy after 15 minutes.
+
 A head with a pending record is held, not cached. It is offered again the same way.
 A held copy is a candidate a peer offered; it never makes a subject unavailable while
 a verified head exists for it. A head is verified once one copy of it was admitted in

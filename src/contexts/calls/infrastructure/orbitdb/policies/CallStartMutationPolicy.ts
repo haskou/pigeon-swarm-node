@@ -196,7 +196,9 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       },
     );
 
-    if (!community || community.getNetworkId().valueOf() !== record.networkId) {
+    if (!community) throw new PublicMutationPendingError();
+
+    if (community.getNetworkId().valueOf() !== record.networkId) {
       throw new InvalidPublicMutationError();
     }
 

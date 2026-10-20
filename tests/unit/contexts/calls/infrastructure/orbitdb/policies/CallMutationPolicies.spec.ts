@@ -27,6 +27,7 @@ describe('call mutation policies', () => {
   let registry: OrbitDBReplicatedStateRegistry;
   let conversation: Record<string, unknown>;
   let voiceAllowed: boolean;
+  let communityPresent: boolean;
   let identityNetworks: Record<string, string[]>;
   let startPolicy: CallStartMutationPolicy;
   let participantPolicy: CallParticipantMutationPolicy;
@@ -47,6 +48,7 @@ describe('call mutation policies', () => {
   beforeEach(() => {
     docs = [];
     voiceAllowed = true;
+    communityPresent = true;
     identityNetworks = { [alice]: [NETWORK], [bob]: [NETWORK] };
     conversation = {
       getNetworkId: () => ({ valueOf: () => NETWORK }),
@@ -81,7 +83,7 @@ describe('call mutation policies', () => {
       }),
     } as never;
     const communities = {
-      hasById: jest.fn(async () => true),
+      hasById: jest.fn(async () => communityPresent),
       requireById: jest.fn(async () => community),
     } as never;
 
@@ -359,6 +361,14 @@ describe('call mutation policies', () => {
       ).resolves.toBeUndefined();
     });
 
+    it('holds a community start while the community is not local yet', async () => {
+      communityPresent = false;
+
+      await expect(
+        startPolicy.assertPermitted(communityStart(1), alice, false),
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
+    });
+
     it('rejects a community start the creator may not connect to', async () => {
       voiceAllowed = false;
 
@@ -465,6 +475,24 @@ describe('call mutation policies', () => {
       await expect(
         participantPolicy.assertPermitted(joined(carol), carol, false),
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
+    it('holds a community join while the community is not local yet', async () => {
+      const community = communityStart(1);
+      docs.push(community);
+      const record = clone(
+        participantPayload({
+          at: now(),
+          callId: community.callId as string,
+          identityId: carol,
+          state: 'joined',
+        }),
+      );
+
+      communityPresent = false;
+      await expect(
+        participantPolicy.assertPermitted(record, carol, false),
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
     });
 
     it('applies the community voice rule to community calls', async () => {

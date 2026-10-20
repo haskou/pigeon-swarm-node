@@ -64,7 +64,7 @@ export default class CallParticipantMutationPolicy extends PublicMutationPolicy 
       },
     );
 
-    if (!community) throw new InvalidPublicMutationError();
+    if (!community) throw new PublicMutationPendingError();
 
     try {
       community.authorizeVoiceChannelCall(
