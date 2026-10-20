@@ -143,10 +143,11 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
   public async findByIdentity(
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]> {
-    // A held request head of this identity is not in the cache yet, so the
-    // list would leave it out: it waits until the head is admitted.
+    // A request head of this identity that this node restored is not admitted
+    // yet, so the list would leave it out: it waits until the head is
+    // admitted. A head a peer plants under the identity's key never waits it.
     if (
-      this.registry.hasPendingHeadAdmissions(
+      this.registry.hasPendingRestoredHeadAdmissions(
         this.identityIndexHeadKey(identityId),
       )
     ) {

@@ -735,24 +735,28 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
 - At most 256 pending documents per store wait in its readmission at once, and 256
   more queue behind them in arrival order. A pending document past both bounds is
   dropped and the store is overflowed: until its queue drains and its documents are
-  projected again in full, `isDocumentPendingAdmission` answers every document of that
-  store as waiting, so a call endpoint answers `503020` for a call it does not hold. A
-  failed rescan is retried every 60 s. A head with a pending record is held under its
-  network's bounds: at most 256 held head keys per network are offered at once, and 256
-  more queue behind them in arrival order. A head past both bounds, or a copy past the
-  8 a key holds, is dropped and the network is overflowed. The flag is per network and
-  clears as soon as the network's held heads fit again (fewer than 256 keys, no key at
-  its 8 copies) and its heads were rescanned without dropping again; it does not wait
-  for the network to drain. The overflow is scoped: a read of a head key or a
-  document that the overflowed network or store dropped (up to 1024 are remembered;
-  past that the whole network or store waits) answers `503020` (never missing, never
-  partial) while it has no verified head, and `hasPendingHeadAdmissions` answers
-  true for it; every key of another network, a key nobody dropped or holds, and a
-  subject with a verified head are read as usual. Only the count of dropped heads is
-  logged. A held head is offered again on
-  every 60 s retry, with one retry timer for the node, so offers never stack. A flood
-  in one store never takes the place of another store's records, and one network's held
-  heads never take another's places.
+  projected again in full, `isDocumentPendingAdmission` answers `503020` for the
+  documents the store dropped and remembers (up to 1024 subjects per store). A
+  document dropped past that bound is not remembered: it waits for nothing and is
+  offered again by the rescan, so a flood never makes a document it did not drop
+  wait. A failed rescan is retried every 60 s. A head with a pending record is held
+  under its network's bounds: at most 256 held head keys per network are offered at
+  once, and 256 more queue behind them in arrival order. A head past both bounds, or
+  a copy past the 8 a key holds, is dropped and the network is overflowed. The flag
+  is per network, gates no read by itself, and clears as soon as the network's held
+  heads fit again (fewer than 256 keys, no key at its 8 copies) and its heads were
+  rescanned without dropping again; it does not wait for the network to drain. What
+  a read waits on is the key: a read of a head key that the overflowed network
+  dropped answers `503020` (never missing, never partial) while it has no verified
+  head. A key this node restored from its own head cache is always remembered (it is
+  bounded by the persisted heads); any other key up to 1024 per network, and past
+  that it is not remembered, so a peer that plants more keys than that delays no
+  read of any other key, in this network or another. A key nobody dropped or holds,
+  every key of another network (the same key too) and a subject with a verified head
+  are read as usual. Only the count of dropped heads is logged. A held head is
+  offered again on every 60 s retry, with one retry timer for the node, so offers
+  never stack. A flood in one store never takes the place of another store's
+  records, and one network's held heads never take another's places.
 - A held head waits under its key and its value. A copy received again is not held
   twice; a different value under the same key waits beside it, and at most 8 copies
   per key wait. A key that is full keeps the copies it holds, so junk copies cannot
@@ -773,24 +777,27 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   held twice when its value has a digest; a value without one is held as a new copy on
   each receipt, at most 8 per key, each with its own chain.
 - A held copy that never proves out is held for 15 minutes and then dropped. The
-  expiry is remembered per head key (up to 1024 keys), not per copy: the key is not
-  held again for 15 minutes whatever digests arrive, and after 3 expiries it is never
-  held again while remembered, so a peer cannot keep a subject waiting by renewing
-  the hold with fresh copies. Until then a held copy makes only a subject with no
+  expiry is remembered per network and head key (up to 1024 pairs), not per copy: the
+  key is not held again in that network for 15 minutes whatever digests arrive, and
+  after 3 expiries it is never held again while remembered, so a peer cannot keep a
+  subject waiting by renewing the hold with fresh copies; the same key in another
+  network has its own record. Until then a held copy makes only a subject with no
   verified head answer `503020` on a read of that subject. It never delays the
   community list: the list (`GET /communities`, and the discoverable list) waits only
   for a head this node restored from its own persisted head cache at start and has not
-  verified yet, or one it dropped; a key a peer planted that this node never stored
-  is no reason to fail a list read. A community the node learns from a peer while
-  running is listed once its head is admitted. Residual: a planted key that was also
-  persisted gates the list for at most 15 minutes after a restart; a genuine head that
-  needs more than 15 minutes of replication reads as missing until a peer offers it
-  again after the cool-down. Held and dropped copies are logged as counts with the
-  prefix `Peer-induced hold`; a pending record is logged as a count, at most once a
-  minute, and a node that is still opening answers `503020` and logs `node starting`
-  instead. A head whose evidence check fails on an IPFS error is not cached, held or
-  retried: the key is dropped with a warning until a peer offers it again. A key is
-  marked verified also for a head the gate refused or that carried nothing to check.
+  verified yet, whether it is held or was dropped for want of room; no state a peer
+  can drive (planted keys, held copies, the overflow of a network) gates a list, so a
+  flood of planted keys leaves it served. A community the node learns from a peer
+  while running is listed once its head is admitted. Residual: a planted key that was
+  also persisted (it needed a head the gate admitted) gates the list for at most 15
+  minutes after a restart; a genuine head that needs more than 15 minutes of
+  replication reads as missing until a peer offers it again after the cool-down. Held
+  and dropped copies are logged as counts with the prefix `Peer-induced hold`; a
+  pending record is logged as a count, at most once a minute, and a node that is still
+  opening answers `503020` and logs `node starting` instead. A head whose evidence
+  check fails on an IPFS error is not cached, held or retried: the key is dropped with
+  a warning until a peer offers it again. A key is marked verified also for a head the
+  gate refused or that carried nothing to check.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).
@@ -799,8 +806,9 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   times each (3 retries and a wake every 2 s for 72 s); a head offer runs the
   gate once per gated record it carries.
 - A membership-request lookup by identity answers `503020` while a request head under
-  that identity's index is held, as the community list does, so a request is not
-  reported missing while it waits.
+  that identity's index that this node restored from its own head cache is held, as
+  the community list does, so a request is not reported missing while it waits. A
+  head a peer plants under the identity's key never makes it wait.
 - A read can ask whether a document waits for readmission, by store and id
   (`isDocumentPendingAdmission`), to tell "not admitted yet" from "missing". A
   call endpoint answers a call whose start waits as `503020` not ready instead

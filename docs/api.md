@@ -811,9 +811,10 @@ node cannot find answers `503020` instead of `CallNotFoundError` or
 `CallParticipantNotFoundError`. The list keeps answering 200.
 
 A store whose pending records overflow its readmission (more than 512 waiting at once)
-keeps every call it does not hold answering `503020` until the store is readmitted in
-full: its queue drains and its records are projected again. A failed rescan is retried
-every 60 seconds, so the answer lasts as long as the rescan fails.
+keeps every call it dropped and remembers answering `503020` until the store is
+readmitted in full: its queue drains and its records are projected again. A call it did
+not drop is read as usual, however many records a peer floods. A failed rescan is
+retried every 60 seconds, so the answer lasts as long as the rescan fails.
 
 ### List active calls
 

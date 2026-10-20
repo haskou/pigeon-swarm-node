@@ -195,7 +195,7 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
 
   it('rejects a partial list while an identity request head is held', async () => {
     const hasPending = jest
-      .spyOn(registry, 'hasPendingHeadAdmissions')
+      .spyOn(registry, 'hasPendingRestoredHeadAdmissions')
       .mockReturnValue(true);
 
     await expect(store.findByIdentity(requesterIdentityId)).rejects.toThrow(

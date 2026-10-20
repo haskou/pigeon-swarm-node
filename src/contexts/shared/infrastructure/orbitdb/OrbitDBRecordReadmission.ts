@@ -13,8 +13,9 @@ import { OrbitDBPendingRecordReadmission } from './OrbitDBPendingRecordReadmissi
  * arrived. Past the last backoff delay the rejection is final.
  *
  * A scope that outgrows both its active bound and its queue drops the record
- * and is marked overflowed: reads of it wait (see `isOverflowed`) until its
- * offers have drained and its rescan has completed without dropping anything.
+ * and is marked overflowed. Only a read about a subject it dropped waits (see
+ * `isOverflowedFor`), until its offers have drained and its rescan has
+ * completed without dropping anything; the rescan offers the drops again.
  */
 type QueuedRecord = {
   isCurrent: () => boolean;
@@ -30,12 +31,12 @@ type ScopeReadmissions = {
   /** Records dropped since the scope was last readmitted in full. */
   dropped: number;
   /**
-   * The subjects of the dropped records, up to a bound; `unscoped` once a
-   * dropped record has no subject or the bound is passed.
+   * The subjects of the dropped records, up to a bound. A record dropped past
+   * the bound, or without a subject, is not remembered: it gates no read, and
+   * the rescan offers it again.
    */
   droppedSubjects: Set<string>;
   overflowed: boolean;
-  unscoped: boolean;
   reconciling: boolean;
   retry?: NodeJS.Timeout;
 };
@@ -43,7 +44,7 @@ type ScopeReadmissions = {
 export class OrbitDBRecordReadmission {
   private static readonly MAX_PENDING_PER_SCOPE = 256;
 
-  /** Dropped subjects remembered per scope; past it the whole scope waits. */
+  /** Dropped subjects remembered per scope; past it a drop is not remembered. */
   private static readonly MAX_DROPPED_SUBJECTS = 1024;
 
   /** Records past the active bound wait here, in arrival order, for a slot. */
@@ -210,23 +211,18 @@ export class OrbitDBRecordReadmission {
   private overflow(state: ScopeReadmissions, subject?: string): void {
     if (!state.overflowed)
       Kernel.logger.warn?.(
-        'OrbitDB record re-admission overflowed: reads wait until the scope is readmitted',
+        'OrbitDB record re-admission overflowed: dropped records are offered again once the scope is readmitted',
       );
 
     state.overflowed = true;
     state.dropped += 1;
 
     if (
-      subject === undefined ||
-      state.droppedSubjects.size >=
-        OrbitDBRecordReadmission.MAX_DROPPED_SUBJECTS
+      subject !== undefined &&
+      state.droppedSubjects.size < OrbitDBRecordReadmission.MAX_DROPPED_SUBJECTS
     ) {
-      state.unscoped = true;
-
-      return;
+      state.droppedSubjects.add(subject);
     }
-
-    state.droppedSubjects.add(subject);
   }
 
   private clearOverflow(state: ScopeReadmissions): void {
@@ -236,7 +232,6 @@ export class OrbitDBRecordReadmission {
     state.overflowed = false;
     state.dropped = 0;
     state.droppedSubjects.clear();
-    state.unscoped = false;
   }
 
   /**
@@ -249,9 +244,8 @@ export class OrbitDBRecordReadmission {
 
   /**
    * Whether the scope dropped records it had no room for and has not
-   * readmitted them since. A read of the scope then waits: it must not
-   * answer "missing" or a partial list. The flag clears once the scope's
-   * offers have drained and its rescan completed without dropping anything.
+   * readmitted them since. The flag clears once the scope's offers have
+   * drained and its rescan completed without dropping anything.
    */
   public isOverflowed(scope: string | object): boolean {
     return this.scopes.get(scope)?.overflowed === true;
@@ -259,15 +253,12 @@ export class OrbitDBRecordReadmission {
 
   /**
    * Whether a read about `subject` must wait on the overflow of the scope:
-   * the subject is among the dropped records, or too many were dropped to
-   * tell. A subject the scope did not drop is not affected by it.
+   * the subject is among the records it dropped. Nothing else waits, however
+   * many records a peer makes the scope drop: past the bound a drop is simply
+   * not remembered.
    */
   public isOverflowedFor(scope: string | object, subject: string): boolean {
-    const state = this.scopes.get(scope);
-
-    if (!state?.overflowed) return false;
-
-    return state.unscoped || state.droppedSubjects.has(subject);
+    return this.scopes.get(scope)?.droppedSubjects.has(subject) === true;
   }
 
   /**
@@ -307,7 +298,6 @@ export class OrbitDBRecordReadmission {
       queued: new Map<unknown, QueuedRecord>(),
       reconcile,
       reconciling: false,
-      unscoped: false,
     };
     const entryKey = key ?? Symbol('record');
 

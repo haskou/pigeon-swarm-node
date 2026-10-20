@@ -298,28 +298,38 @@ export default class OrbitDBReplicatedStateRegistry {
 
   /**
    * Networks whose held heads overflowed, with the count of heads dropped.
-   * A read waits only on a key the network dropped (see `droppedHeadKeys`),
-   * never on another network's overflow. It clears once the held heads
-   * drained and the network was rescanned in full without dropping again.
+   * It gates no read by itself: a read waits only on a key the network
+   * dropped (see `droppedHeadKeys`). It clears once the held heads drained and
+   * the network was rescanned in full without dropping again; the rescan
+   * offers the dropped heads again.
    */
   private readonly overflowedHeadNetworks = new Map<string, number>();
 
   /**
    * Head keys whose last offer was settled: fully admitted, but also refused
    * or trivially empty (a head with nothing gated has nothing left to prove).
-   * Their reads never wait on a held copy.
+   * Their reads never wait on a held copy. A peer can add keys only by
+   * offering a head the gate settles, and the entry only ever ungates a read:
+   * it never makes one wait. It is as large as the heads cache.
    */
   private readonly verifiedHeadKeys = new Set<string>();
 
+  /** Expiries of held head keys, per network and key (see `expiryKey`). */
   private readonly expiredHeadKeys = new Map<string, ExpiredHeadKey>();
 
   /**
-   * The head keys each overflowed network dropped, up to a bound; a network
-   * past it is in `unscopedHeadNetworks` and every read waits on it.
+   * The head keys each overflowed network dropped that are not ours, bounded
+   * per network. A peer can drive it, so a key past the bound is not
+   * remembered: it waits for nothing and is offered again by the rescan.
    */
   private readonly droppedHeadKeys = new Map<string, Set<string>>();
 
-  private readonly unscopedHeadNetworks = new Set<string>();
+  /**
+   * The head keys each overflowed network dropped that this node restored
+   * from its own persisted head cache. Bounded by those persisted heads, so a
+   * peer cannot crowd it, and the only dropped keys a list read waits on.
+   */
+  private readonly droppedRestoredHeadKeys = new Map<string, Set<string>>();
 
   /** Head keys restored from this node's own persisted head cache at start. */
   private readonly restoredHeadKeys = new Set<string>();
@@ -729,7 +739,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (copies.has(copyKey)) return true;
 
-    if (this.isCoolingDown(headKey)) return false;
+    if (this.isCoolingDown(networkId, headKey)) return false;
 
     if (!this.canHoldHead(networkId, heads, headKey)) return false;
 
@@ -783,37 +793,52 @@ export default class OrbitDBReplicatedStateRegistry {
     return false;
   }
 
-  /** Counts a head that could not be held; the count is the only thing logged. */
+  /**
+   * Counts a head that could not be held and remembers its key where a read
+   * about it waits: a key this node restored always (bounded by its persisted
+   * heads), any other up to a bound per network. Past the bound the key is
+   * not remembered, so a flood of planted keys gates nothing; the rescan
+   * offers the dropped heads again.
+   */
   private recordHeadDrop(networkId: string, headKey: string): void {
     const dropped = (this.overflowedHeadNetworks.get(networkId) ?? 0) + 1;
 
     if (dropped === 1) {
       Kernel.logger.warn?.(
-        'Peer-induced hold: held head bound reached, unverified head reads answer not ready until it has room',
+        'Peer-induced hold: held head bound reached, dropped heads are offered again once there is room',
       );
     }
     this.overflowedHeadNetworks.set(networkId, dropped);
 
-    const keys = this.droppedHeadKeys.get(networkId) ?? new Set<string>();
+    const own = this.restoredHeadKeys.has(headKey);
+    const droppedByNetwork = own
+      ? this.droppedRestoredHeadKeys
+      : this.droppedHeadKeys;
+    const keys = droppedByNetwork.get(networkId) ?? new Set<string>();
 
-    if (keys.size >= MAX_DROPPED_HEAD_KEYS_PER_NETWORK) {
-      this.unscopedHeadNetworks.add(networkId);
-    } else {
+    if (own || keys.size < MAX_DROPPED_HEAD_KEYS_PER_NETWORK) {
       keys.add(headKey);
+      droppedByNetwork.set(networkId, keys);
     }
-    this.droppedHeadKeys.set(networkId, keys);
     this.startHeadRetries();
   }
 
   private clearHeadOverflow(networkId: string): void {
     this.overflowedHeadNetworks.delete(networkId);
     this.droppedHeadKeys.delete(networkId);
-    this.unscopedHeadNetworks.delete(networkId);
+    this.droppedRestoredHeadKeys.delete(networkId);
+  }
+
+  /** Key of a head key's expiry record: the same key in two networks differs. */
+  private expiryKey(networkId: string, headKey: string): string {
+    return `${networkId}\n${headKey}`;
   }
 
   /** Whether the head key expired unverified lately, or too often. */
-  private isCoolingDown(headKey: string): boolean {
-    const expired = this.expiredHeadKeys.get(headKey);
+  private isCoolingDown(networkId: string, headKey: string): boolean {
+    const expired = this.expiredHeadKeys.get(
+      this.expiryKey(networkId, headKey),
+    );
 
     if (!expired) return false;
 
@@ -848,7 +873,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
     for (const [networkId, heads] of this.unverifiedHeads) {
       for (const [headKey, copies] of heads) {
-        expired += this.expireCopiesOf(headKey, copies, oldest);
+        expired += this.expireCopiesOf(networkId, headKey, copies, oldest);
         this.pruneUnverifiedHead(networkId, headKey);
       }
     }
@@ -861,6 +886,7 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private expireCopiesOf(
+    networkId: string,
     headKey: string,
     copies: UnverifiedHeadCopies,
     oldest: number,
@@ -874,24 +900,25 @@ export default class OrbitDBReplicatedStateRegistry {
       expired += 1;
     }
 
-    if (expired > 0) this.rememberExpiredKey(headKey);
+    if (expired > 0) this.rememberExpiredKey(networkId, headKey);
 
     return expired;
   }
 
-  private rememberExpiredKey(headKey: string): void {
-    const previous = this.expiredHeadKeys.get(headKey);
+  private rememberExpiredKey(networkId: string, headKey: string): void {
+    const key = this.expiryKey(networkId, headKey);
+    const previous = this.expiredHeadKeys.get(key);
 
-    this.expiredHeadKeys.delete(headKey);
-    this.expiredHeadKeys.set(headKey, {
+    this.expiredHeadKeys.delete(key);
+    this.expiredHeadKeys.set(key, {
       at: Date.now(),
       expiries: (previous?.expiries ?? 0) + 1,
     });
 
-    for (const key of this.expiredHeadKeys.keys()) {
+    for (const oldest of this.expiredHeadKeys.keys()) {
       if (this.expiredHeadKeys.size <= MAX_EXPIRED_KEYS_REMEMBERED) break;
 
-      this.expiredHeadKeys.delete(key);
+      this.expiredHeadKeys.delete(oldest);
     }
   }
 
@@ -1050,7 +1077,8 @@ export default class OrbitDBReplicatedStateRegistry {
    * waits: a copy a peer offers, held or not, cannot make it unavailable. Only
    * a key with nothing verified waits, on its own held copy or on a head of
    * its own that a network dropped. A network that overflowed delays only the
-   * keys it dropped (every key once it dropped more than it can name).
+   * keys it dropped and remembers: a peer that makes it drop more keys than
+   * it can remember delays nothing else.
    */
   private awaitsVerifiedHead(headKey: string): boolean {
     if (this.verifiedHeadKeys.has(headKey)) return false;
@@ -1059,13 +1087,12 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private isHeadDropped(headKey: string): boolean {
-    for (const networkId of this.overflowedHeadNetworks.keys()) {
-      if (
-        this.unscopedHeadNetworks.has(networkId) ||
-        this.droppedHeadKeys.get(networkId)?.has(headKey)
-      ) {
-        return true;
-      }
+    for (const keys of this.droppedHeadKeys.values()) {
+      if (keys.has(headKey)) return true;
+    }
+
+    for (const keys of this.droppedRestoredHeadKeys.values()) {
+      if (keys.has(headKey)) return true;
     }
 
     return false;
@@ -2900,15 +2927,7 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private hasPendingHeadUnder(prefix: string, onlyRestored: boolean): boolean {
-    if (
-      [...this.overflowedHeadNetworks.keys()].some((networkId) =>
-        this.unscopedHeadNetworks.has(networkId),
-      )
-    ) {
-      return true;
-    }
-
-    for (const key of this.pendingHeadKeys()) {
+    for (const key of this.pendingHeadKeys(onlyRestored)) {
       if (
         key.startsWith(prefix) &&
         !this.verifiedHeadKeys.has(key) &&
@@ -2921,15 +2940,19 @@ export default class OrbitDBReplicatedStateRegistry {
     return false;
   }
 
-  /** Every head key held, or dropped for want of room, in any network. */
-  private *pendingHeadKeys(): Generator<string> {
-    for (const networkId of this.overflowedHeadNetworks.keys()) {
-      yield* this.droppedHeadKeys.get(networkId) ?? [];
+  /**
+   * Every head key held in any network, and those a network dropped for want
+   * of room: the keys this node restored always, the others unless
+   * `onlyRestored`.
+   */
+  private *pendingHeadKeys(onlyRestored: boolean): Generator<string> {
+    for (const keys of this.droppedRestoredHeadKeys.values()) yield* keys;
+
+    if (!onlyRestored) {
+      for (const keys of this.droppedHeadKeys.values()) yield* keys;
     }
 
-    for (const heads of this.unverifiedHeads.values()) {
-      yield* heads.keys();
-    }
+    for (const heads of this.unverifiedHeads.values()) yield* heads.keys();
   }
 
   public registerHeadRecordMerger(
@@ -3040,7 +3063,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.unverifiedHeads.clear();
     this.overflowedHeadNetworks.clear();
     this.droppedHeadKeys.clear();
-    this.unscopedHeadNetworks.clear();
+    this.droppedRestoredHeadKeys.clear();
     this.restoredHeadKeys.clear();
     this.verifiedHeadKeys.clear();
     this.expiredHeadKeys.clear();
@@ -3211,8 +3234,9 @@ export default class OrbitDBReplicatedStateRegistry {
    * re-admission overflowed and has not been readmitted in full since. The
    * wait for a pending document is bounded, so a forged document keeps this
    * answer for a short while at most; an overflow lasts until the store is
-   * readmitted, and only for the documents it dropped (all of them once it
-   * dropped more than it can name). Another store's overflow never counts.
+   * readmitted, and only for the documents it dropped and remembers (a peer
+   * that makes it drop more than it can remember delays no other document).
+   * Another store's overflow never counts.
    */
   public isDocumentPendingAdmission(
     storeName: OrbitDBReplicatedDocumentStoreName,
@@ -3347,19 +3371,20 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   /**
-   * Whether a head under the prefix is held, not yet admitted, or was dropped
-   * for want of room. A held head keeps its admitted part in the cache, but
-   * reads and lists do not expose it: they wait for the head to be admitted.
+   * Whether a head under the prefix is held in any network, or was dropped
+   * for want of room. A peer drives all of it, so it is for observation only:
+   * no read of a list may wait on it (see `hasPendingRestoredHeadAdmissions`).
    */
   public hasPendingHeadAdmissions(prefix: string): boolean {
     return this.hasPendingHeadUnder(prefix, false);
   }
 
   /**
-   * Like `hasPendingHeadAdmissions`, for the heads this node already knew: it
-   * restored them from its own head cache at start. A head a peer plants under
-   * a key this node never had is not one of them, so it never makes a list
-   * of the node's own state wait.
+   * Whether a head under the prefix that this node restored from its own head
+   * cache at start is held, or was dropped for want of room, and has not been
+   * admitted yet: the only state a list read waits on. A head a peer plants
+   * under a key this node never had is not one of them, however many it
+   * plants, so it never makes a list wait.
    */
   public hasPendingRestoredHeadAdmissions(prefix: string): boolean {
     return this.hasPendingHeadUnder(prefix, true);

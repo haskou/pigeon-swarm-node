@@ -274,6 +274,28 @@ describe('OrbitDBRecordReadmission', () => {
     expect(readmission.isOverflowed(scope)).toBe(true);
   });
 
+  it('never makes another subject wait once a flood dropped more subjects than it remembers', () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const scope = {};
+    const offer = (): Promise<boolean> => Promise.resolve(false);
+
+    for (let index = 0; index < 2_000; index++) {
+      readmission.schedule({
+        isCurrent: current,
+        key: `record-${index}`,
+        offer,
+        scope,
+        subject: `store:${index}`,
+      });
+    }
+
+    expect(readmission.isOverflowed(scope)).toBe(true);
+    expect(readmission.isOverflowedFor(scope, 'store:512')).toBe(true);
+    // Dropped past the bound of remembered subjects: waits for nothing.
+    expect(readmission.isOverflowedFor(scope, 'store:1999')).toBe(false);
+    expect(readmission.isOverflowedFor(scope, 'store:own')).toBe(false);
+  });
+
   it('tells the overflow of a scope only for the subjects it dropped', () => {
     const readmission = new OrbitDBRecordReadmission();
     const scope = {};
