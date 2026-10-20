@@ -20,7 +20,7 @@ permissions:
 jobs:
   changes:
     name: Detect changes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       heavy: ${{ steps.classify.outputs.heavy }}
@@ -38,7 +38,7 @@ jobs:
     name: Static checks
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
       - name: Checkout code
@@ -79,7 +79,7 @@ jobs:
     name: Unit tests
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -98,7 +98,7 @@ jobs:
     name: Device authorization repository spec
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -117,7 +117,7 @@ jobs:
     name: Cucumber suites
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -148,7 +148,7 @@ jobs:
     name: Container image (non-root smoke)
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     steps:
       - name: Checkout code
@@ -165,7 +165,7 @@ jobs:
     name: In-process integration scripts
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
