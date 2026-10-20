@@ -26,6 +26,8 @@ paths:
           description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getCalls
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -74,6 +76,8 @@ paths:
               $ref: '#/components/schemas/PostCallBody'
       operationId: postCalls
       responses:
+        '401':
+          description: Invalid signed request.
         '415':
           description: Request body is not application/json.
         default:
@@ -110,6 +114,8 @@ paths:
         - $ref: '#/components/parameters/CallCapability'
       operationId: getCallsByCallId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -140,6 +146,8 @@ paths:
               $ref: '#/components/schemas/CallMutationBody'
       operationId: deleteCallsByCallId
       responses:
+        '401':
+          description: Invalid signed request.
         '415':
           description: Request body is not application/json.
         default:
@@ -171,6 +179,8 @@ paths:
               $ref: '#/components/schemas/CallMutationBody'
       operationId: postCallsByCallIdParticipants
       responses:
+        '401':
+          description: Invalid signed request.
         '415':
           description: Request body is not application/json.
         default:
@@ -202,6 +212,8 @@ paths:
               $ref: '#/components/schemas/CallMutationBody'
       operationId: deleteCallsByCallIdParticipantsMe
       responses:
+        '401':
+          description: Invalid signed request.
         '415':
           description: Request body is not application/json.
         default:
@@ -232,6 +244,8 @@ paths:
               $ref: '#/components/schemas/PatchCallParticipantBody'
       operationId: patchCallsByCallIdParticipantsMe
       responses:
+        '401':
+          description: Invalid signed request.
         '415':
           description: Request body is not application/json.
         default:
@@ -258,6 +272,8 @@ paths:
               $ref: '#/components/schemas/PostCallSignalBody'
       operationId: postCallsByCallIdSignals
       responses:
+        '401':
+          description: Invalid signed request.
         '415':
           description: Request body is not application/json.
         default:
@@ -282,6 +298,8 @@ paths:
       description: Returns the node-configured TURN server when this node exposes a calls relay. Otherwise it returns TURN URLs only from signed call relay records whose peer is a currently connected circuit relay; unrelated or disconnected relay records are ignored. Local temporary credentials require a private CALLS_TURN_SHARED_SECRET matching the local coturn server. Private-network v2 relays issue their own credentials over an authenticated encrypted stream, so different deployments keep independent secrets. Missing or known public local secrets disable local credential issuance and relay publication, but do not prevent fetching credentials from eligible v2 owners. Explicit static credentials remain supported for local TURN URLs only. The default response uses iceTransportPolicy all so clients can fall back to direct ICE candidates when an advertised TURN service is unreachable. Operators may explicitly configure relay only after verifying coturn reachability. Nodes with local TURN URLs and a private shared secret publish signed call relay records through the IPFS pubsub network. Local requests issue a fresh lifetime; remote v2 credentials are reused until thirty seconds before their ten-minute expiry while connection eligibility is rechecked; clients must fetch again before ICE restart and never cache temporary credentials beyond the Unix expiry in the username. V1 shared pools require the same secret on every selected server. V2 issuance is limited per peer and globally and credentials are never published through gossip. Rotate environment secrets with a coordinated issuer and coturn restart; seamless rotation is not guaranteed. Newer issuedAt replaces older relay URLs even when the new record expires sooner.
       operationId: getCallIceServers
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -311,6 +329,8 @@ paths:
           description: Opaque cursor returned as nextCursor. It is not a capability and grants no access; a cursor from another list or a malformed one is refused with 400 (code 400110).
       operationId: getPastCalls
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
