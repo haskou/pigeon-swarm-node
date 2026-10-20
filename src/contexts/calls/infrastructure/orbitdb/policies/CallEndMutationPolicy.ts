@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -70,7 +71,7 @@ export default class CallEndMutationPolicy extends PublicMutationPolicy {
         document.id === CallRecordIds.start(record.callId as string),
     );
 
-    if (!start) throw new InvalidPublicMutationError();
+    if (!start) throw new PublicMutationPendingError();
 
     const isCreator = start.creatorIdentityId === authorIdentityId;
     const isConversation =
