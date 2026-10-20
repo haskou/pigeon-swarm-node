@@ -2132,6 +2132,133 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     }
   });
 
+  it('queues the held heads past the active bound and answers 503020 once the queue overflows, until the network drains and is rescanned', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+      let verdict: 'accepted' | 'pending' = 'pending';
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.verdictOf.mockImplementation(() => Promise.resolve(verdict));
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+
+      // 256 active heads, 256 queued behind them, and one more than that.
+      for (let index = 1; index <= 513; index += 1) {
+        const value = {
+          communityOperations: [{ id: `op-${index}` }],
+          id: `c-${index}`,
+          updatedAt: 10,
+        };
+
+        await firstNetwork.heads.put(`community:c-${index}`, value);
+        firstNetwork.heads.emitUpdate({
+          payload: { key: `community:c-${index}`, value },
+        });
+      }
+      await jest.advanceTimersByTimeAsync(0);
+
+      // A queued head is held and counted as pending.
+      await expect(registry.findHead('community:c-300')).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      // Past the queue the network is overflowed: no read answers missing or
+      // partial, not even for a key the node never saw.
+      await expect(registry.findHead('community:c-513')).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(registry.findHead('community:unseen')).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(
+        registry.findPersistedHead('community:unseen'),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(registry.hasPendingHeadAdmissions('community-other:')).toBe(true);
+
+      // The held heads prove out: the network drains and is readmitted in full.
+      verdict = 'accepted';
+      await jest.advanceTimersByTimeAsync(10 * 60_000);
+
+      // The rescan yields between batches of heads on the event loop.
+      for (
+        let turn = 0;
+        turn < 1_000 && registry.hasPendingHeadAdmissions('community:');
+        turn += 1
+      ) {
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+
+      expect(registry.hasPendingHeadAdmissions('community:')).toBe(false);
+      await expect(registry.findHead('community:c-513')).resolves.toEqual(
+        expect.objectContaining({ id: 'c-513' }),
+      );
+      await expect(
+        registry.findHead('community:unseen'),
+      ).resolves.toBeUndefined();
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps one timer per held head however long it stays held or often it is received', async () => {
+    const timersAfter = async (receipts: number): Promise<number> => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const gate = mock<OrbitDBMutationGate>();
+        const registry = new OrbitDBReplicatedStateRegistry();
+        const firstNetwork = createStores();
+        let peak = 0;
+
+        gate.governs.mockImplementation(
+          (collection) => collection === 'communityOperations',
+        );
+        gate.governsHead.mockReturnValue(false);
+        gate.verdictOf.mockResolvedValue('pending');
+        registry.addMutationGate(gate);
+        await registry.register('network-1', firstNetwork.stores);
+
+        for (let receipt = 0; receipt < receipts; receipt += 1) {
+          firstNetwork.heads.emitUpdate({
+            payload: {
+              key: 'community:community-1',
+              value: {
+                communityOperations: [{ id: 'forged-1' }],
+                id: 'community-1',
+                updatedAt: 10,
+              },
+            },
+          });
+        }
+
+        // The head is re-armed every 60 s, with no cap, for two hours.
+        for (let second = 0; second < 7_200; second += 5) {
+          await jest.advanceTimersByTimeAsync(5_000);
+          peak = Math.max(peak, jest.getTimerCount());
+        }
+
+        expect(registry.hasPendingHeadAdmissions('community:')).toBe(true);
+        registry.clear();
+
+        return peak;
+      } finally {
+        jest.useRealTimers();
+      }
+    };
+
+    const once = await timersAfter(1);
+    const many = await timersAfter(50);
+
+    expect(many).toBe(once);
+  });
+
   describe('replicated documents the mutation gate has not admitted', () => {
     const gateOf = (
       collection: string,

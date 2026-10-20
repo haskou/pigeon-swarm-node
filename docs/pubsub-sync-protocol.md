@@ -725,10 +725,15 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   projected again in full, `isDocumentPendingAdmission` answers every document of that
   store as waiting, so a call endpoint answers `503020` for a call it does not hold. A
   failed rescan is retried every 60 s. A head with a pending record is held under its
-  network's bounds: at most 256 held head keys per network wait at once, past that such
-  a head is not held and is logged. A held head copy the queue cannot take stays held and
-  is offered again on the next 60 s retry. A flood in one store never takes the place of
-  another store's records, and one network's held heads never take another's places.
+  network's bounds: at most 256 held head keys per network are offered at once, and 256
+  more queue behind them in arrival order. A head past both bounds is dropped and the
+  network is overflowed: until its held heads drained and its heads were rescanned in
+  full without dropping again, every head read answers `503020` (never missing, never
+  partial) and `hasPendingHeadAdmissions` answers true. One flag per network; only the
+  count of dropped heads is logged. A held head is offered again on every 60 s retry, with
+  no cap on re-arms and one retry timer for the node, so offers never stack. A flood in one
+  store never takes the place of another store's records, and one network's held heads
+  never take another's places.
 - A held head waits under its key and its value. A copy received again is not held
   twice; a different value under the same key waits beside it, and at most 8 copies
   per key wait: past that the oldest is dropped.
