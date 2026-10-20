@@ -1,4 +1,5 @@
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IdentitySignature, KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
@@ -443,6 +444,86 @@ describe('IpfsIdentityRepository', () => {
       ).rejects.toThrow(IdentityNotFoundError);
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
+
+    it('should throw ReplicatedStateNotReadyError when the announced document is unavailable', async () => {
+      const externalIdentifier = new IdentityExternalIdentifier(
+        'bafy-unavailable-announced-identity',
+      );
+
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findCandidateByExternalIdentifier(
+          mother.id,
+          externalIdentifier,
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when the announced document has a JSON read that is unavailable and a bytes read that answers not found', async () => {
+      const externalIdentifier = new IdentityExternalIdentifier(
+        'bafy-mixed-announced-identity',
+      );
+
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-mixed-announced-identity'),
+      );
+
+      await expect(
+        repository.findCandidateByExternalIdentifier(
+          mother.id,
+          externalIdentifier,
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requireByExternalIdentifier', () => {
+    it('should throw ReplicatedStateNotReadyError when the identity document is unavailable', async () => {
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.requireByExternalIdentifier(
+          new IdentityExternalIdentifier('bafy-required-unavailable'),
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw IdentityNotFoundError when the identity document is absent on every network', async () => {
+      ipfsManager.getJSON.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-required-absent'),
+      );
+      ipfsManager.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-required-absent'),
+      );
+
+      await expect(
+        repository.requireByExternalIdentifier(
+          new IdentityExternalIdentifier('bafy-required-absent'),
+        ),
+      ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when the JSON read is unavailable and the bytes read answers not found', async () => {
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-required-mixed'),
+      );
+
+      await expect(
+        repository.requireByExternalIdentifier(
+          new IdentityExternalIdentifier('bafy-required-mixed'),
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
   });
 
   describe('holds', () => {
@@ -854,6 +935,33 @@ describe('IpfsIdentityRepository', () => {
       expect(ipfsManager.getRecordCandidates).toHaveBeenCalled();
     });
 
+    it('should throw ReplicatedStateNotReadyError instead of local candidates when the remote race is not ready', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCid = new IPFSId('bafyidentity-v1');
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: previousCid.valueOf(),
+          identity: previousIdentity,
+          identityId: previousPrimitives.id,
+          previousCid: previousPrimitives.previousIdentityExternalIdentifier,
+          version: previousPrimitives.version,
+        },
+      ]);
+      ipfsManager.calculateJSONId.mockResolvedValue(previousCid);
+      ipfsManager.hasConnectedPeers.mockResolvedValue(true);
+      ipfsManager.getRecordCandidates.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(
+        repository.findFreshCandidateReferencesById(
+          new IdentityId(previousPrimitives.id),
+        ),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+    });
+
     it('should fallback to DHT and cache metadata when mongo has no candidates', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
@@ -1064,6 +1172,80 @@ describe('IpfsIdentityRepository', () => {
       expect(result.toPrimitives()).toEqual(candidate.toPrimitives());
     });
 
+    it('should throw ReplicatedStateNotReadyError when the previous identity of metadata is unreachable', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafy-unreachable-metadata-previous';
+      const currentCidString = 'bafy-unreachable-metadata-current';
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: currentCidString,
+          identity: candidate,
+          identityId: previousPrimitives.id,
+          previousCid: previousCidString,
+          version: candidate.toPrimitives().version,
+        },
+      ]);
+      ipfsManager.calculateJSONId.mockResolvedValue(
+        new IPFSId(currentCidString),
+      );
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findById(new IdentityId(previousPrimitives.id)),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when the local previous identity of metadata is unreachable', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafy-unreachable-local-previous';
+      const currentCidString = 'bafy-unreachable-local-current';
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
+
+      metadataRepository.findByIdentityId.mockResolvedValue([
+        {
+          cid: currentCidString,
+          identity: candidate,
+          identityId: previousPrimitives.id,
+          previousCid: previousCidString,
+          version: candidate.toPrimitives().version,
+        },
+      ]);
+      ipfsManager.calculateJSONId.mockResolvedValue(
+        new IPFSId('bafy-unreachable-local-other'),
+      );
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findById(new IdentityId(previousPrimitives.id)),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when the identity metadata index is unavailable', async () => {
+      const primitives = (await mother.build()).toPrimitives();
+
+      metadataRepository.findByIdentityId.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(
+        repository.findById(new IdentityId(primitives.id)),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+    });
+
     it('should use local identity metadata before DHT fallback', async () => {
       const identity = await mother.build();
       const primitives = identity.toPrimitives();
@@ -1107,6 +1289,29 @@ describe('IpfsIdentityRepository', () => {
       await expect(
         repository.findById(new IdentityId(previousPrimitives.id)),
       ).rejects.toThrow(IdentityNotFoundError);
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should answer ReplicatedStateNotReadyError when a previous identity cannot be reached', async () => {
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafyunreachablepreviousidentity';
+      const candidateCidString = 'bafyupdatedidentity';
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(new ProfileName('Jane')).toPrimitives(),
+      });
+
+      metadataRepository.findByIdentityId.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([candidateCidString]);
+      ipfsManager.getJSON
+        .mockResolvedValueOnce(mapper.toDocument(candidate))
+        .mockRejectedValueOnce(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        repository.findById(new IdentityId(previousPrimitives.id)),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
       expect(metadataRepository.save).not.toHaveBeenCalled();
     });
   });
@@ -1178,6 +1383,63 @@ describe('IpfsIdentityRepository', () => {
         new IdentityExternalIdentifier(cidString),
       );
       expect(result.getIdentity().toPrimitives()).toEqual(primitives);
+    });
+
+    it('should throw ReplicatedStateNotReadyError when a remote handle candidate has a JSON read that is unavailable and a bytes read that answers not found', async () => {
+      const handle = new ProfileHandle('mixed');
+
+      metadataRepository.findByHandle.mockResolvedValue([]);
+      ipfsManager.getRecordCandidates.mockResolvedValue([
+        'bafy-mixed-remote-handle',
+      ]);
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-mixed-remote-handle'),
+      );
+
+      await expect(repository.findCandidateByHandle(handle)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(metadataRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should throw ReplicatedStateNotReadyError when a metadata handle candidate has an unreachable previous identity', async () => {
+      const handle = new ProfileHandle('jane');
+      const previousIdentity = await mother.build();
+      const previousPrimitives = previousIdentity.toPrimitives();
+      const previousCidString = 'bafy-unreachable-handle-previous';
+      const currentCidString = 'bafy-handle-current';
+      const candidate = await mother.buildNext({
+        previousIdentityExternalIdentifier: previousCidString,
+        profile: new Profile(
+          new ProfileName('Jane'),
+          undefined,
+          undefined,
+          undefined,
+          handle,
+        ).toPrimitives(),
+      });
+
+      metadataRepository.findByHandle.mockResolvedValue([
+        {
+          cid: currentCidString,
+          handle: 'jane',
+          identity: candidate,
+          identityId: previousPrimitives.id,
+          previousCid: previousCidString,
+          version: candidate.toPrimitives().version,
+        },
+      ]);
+      ipfsManager.calculateJSONId.mockResolvedValue(
+        new IPFSId(currentCidString),
+      );
+      ipfsManager.getJSON.mockRejectedValue(new ReplicatedStateNotReadyError());
+      ipfsManager.getBytes.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(repository.findCandidateByHandle(handle)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(metadataRepository.save).not.toHaveBeenCalled();
     });
 
     it('should resolve the handle owner returned by the metadata index without fetching content', async () => {

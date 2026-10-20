@@ -67,6 +67,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/IdentityResource'
+        '503':
+          description: Node not ready (code 503020). The node has not finished startup, a configured network has not finished opening its replicated state, for example right after it restarted while it replays, or its stored configuration cannot be read. The identity is not reported missing. Retry.
     put:
       tags:
         - identities

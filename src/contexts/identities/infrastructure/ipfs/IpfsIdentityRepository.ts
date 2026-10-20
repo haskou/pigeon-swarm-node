@@ -1,6 +1,8 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { IPFSContentNotFoundError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { IdentityNotFoundError } from '../../domain/errors/IdentityNotFoundError';
 import { InvalidIdentityCandidateError } from '../../domain/errors/InvalidIdentityCandidateError';
@@ -47,7 +49,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       return this.versions.newestFirst(
         await this.metadataIndex.findByIdentityId(id),
       );
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       return [];
     }
   }
@@ -103,22 +109,41 @@ export default class IpfsIdentityRepository extends IdentityRepository {
             cid,
             IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
           );
-    } catch {
-      const bytes =
-        networkIds && networkIds.length > 0
-          ? await this.ipfsManager.getBytesFromNetworks(
-              cid,
-              networkIds,
-              IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
-            )
-          : await this.ipfsManager.getBytes(
-              cid,
-              IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
-            );
+    } catch (jsonError: unknown) {
+      const bytes = await this.readDocumentBytes(cid, networkIds, jsonError);
 
       const document: unknown = JSON.parse(Buffer.from(bytes).toString('utf8'));
 
       return document;
+    }
+  }
+
+  private async readDocumentBytes(
+    cid: IPFSId,
+    networkIds: string[] | undefined,
+    jsonError: unknown,
+  ): Promise<Buffer> {
+    try {
+      return networkIds && networkIds.length > 0
+        ? await this.ipfsManager.getBytesFromNetworks(
+            cid,
+            networkIds,
+            IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+          )
+        : await this.ipfsManager.getBytes(
+            cid,
+            IpfsIdentityRepository.MAX_DOCUMENT_BYTES,
+          );
+    } catch (bytesError: unknown) {
+      // A NotFound verdict counts only when the JSON read also verified absence.
+      if (
+        bytesError instanceof IPFSContentNotFoundError &&
+        !(jsonError instanceof IPFSContentNotFoundError)
+      ) {
+        throw new ReplicatedStateNotReadyError();
+      }
+
+      throw bytesError;
     }
   }
 
@@ -149,7 +174,27 @@ export default class IpfsIdentityRepository extends IdentityRepository {
         new IPFSId(externalIdentifier.valueOf()),
         networkIds,
       );
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
+      return undefined;
+    }
+  }
+
+  // A not-ready local read is rethrown. It never reads as "no previous identity".
+  private async findLocalPreviousIdentity(
+    externalIdentifier: IdentityExternalIdentifier,
+    networkIds?: string[],
+  ): Promise<Identity | undefined> {
+    try {
+      return await this.findPreviousIdentity(externalIdentifier, networkIds);
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       return undefined;
     }
   }
@@ -179,7 +224,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       return identity;
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       return undefined;
     }
   }
@@ -213,7 +262,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       }
 
       return candidate;
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       this.identityByCid.delete(metadata.cid);
 
       return undefined;
@@ -245,7 +298,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     const externalIdentifier = new IdentityExternalIdentifier(
       metadata.previousCid,
     );
-    const identity = await this.findPreviousIdentity(
+    const identity = await this.findLocalPreviousIdentity(
       externalIdentifier,
       metadata.networkIds,
     );
@@ -258,7 +311,7 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       new IdentityId(metadata.identityId),
       identity,
       (previousExternalIdentifier) =>
-        this.findPreviousIdentity(
+        this.findLocalPreviousIdentity(
           previousExternalIdentifier,
           metadata.networkIds,
         ),
@@ -354,6 +407,12 @@ export default class IpfsIdentityRepository extends IdentityRepository {
     try {
       return await this.findRemoteCandidateReferences(id, knownCids);
     } catch (error) {
+      // A not-ready race is not an answer: local metadata may be older than
+      // the record the open network would return, so it must not stand in.
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       if (localCandidates.length > 0) {
         return [];
       }
@@ -451,7 +510,11 @@ export default class IpfsIdentityRepository extends IdentityRepository {
       await this.saveMetadata(identity, cid);
 
       return identity;
-    } catch {
+    } catch (error: unknown) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        throw error;
+      }
+
       this.identityByCid.delete(cid.valueOf());
 
       return undefined;

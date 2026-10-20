@@ -3,6 +3,7 @@ import ContentGetter from '@app/contexts/content-replication/application/get-con
 import { ContentGetMessage } from '@app/contexts/content-replication/application/get-content/messages/ContentGetMessage';
 import { ReplicatedContentNotFoundError } from '@app/contexts/content-replication/domain/errors/ReplicatedContentNotFoundError';
 import { ContentId } from '@app/contexts/content-replication/domain/value-objects/ContentId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 describe('ContentGetter', () => {
@@ -54,5 +55,44 @@ describe('ContentGetter', () => {
       ReplicatedContentNotFoundError,
     );
     expect(contentStorage.findJSON).not.toHaveBeenCalled();
+  });
+
+  it('serves JSON when the bytes read is unavailable, because a JSON block cannot be read as bytes', async () => {
+    contentStorage.findBytes.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+    contentStorage.findJSON.mockResolvedValue({ kind: 'document' });
+
+    const result = await getter.get(new ContentGetMessage('bafkreiacontent'));
+
+    expect(result.getJsonResponse()).toEqual({ kind: 'document' });
+  });
+
+  it('answers not ready, not absent, when the bytes read is unavailable and JSON is absent', async () => {
+    contentStorage.findBytes.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+    contentStorage.findJSON.mockRejectedValue(
+      new ReplicatedContentNotFoundError(new ContentId('bafkreiacontent')),
+    );
+
+    await expect(
+      getter.get(new ContentGetMessage('bafkreiacontent')),
+    ).rejects.toThrow(ReplicatedStateNotReadyError);
+  });
+
+  it('does not treat unavailable JSON as absent after the bytes are missing', async () => {
+    const cid = 'bafkreieo66jyunrnk3e462w4gzwtyjyfubkv6actsx5jcdgm6xwnmoq73y';
+
+    contentStorage.findBytes.mockRejectedValue(
+      new ReplicatedContentNotFoundError(new ContentId(cid)),
+    );
+    contentStorage.findJSON.mockRejectedValue(
+      new ReplicatedStateNotReadyError('Content is unavailable'),
+    );
+
+    await expect(getter.get(new ContentGetMessage(cid))).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
   });
 });

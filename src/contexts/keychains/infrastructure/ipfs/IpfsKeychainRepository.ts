@@ -11,6 +11,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import Kernel from '@haskou/ddd-kernel';
 
 import { IpfsKeychainDocument } from './documents/IpfsKeychainDocument';
@@ -34,29 +35,48 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     super();
   }
 
-  private async getDocumentFromCid(cid: IPFSId): Promise<IpfsKeychainDocument> {
-    try {
-      return await this.ipfsManager.getJSON<IpfsKeychainDocument>(cid);
-    } catch {
-      const bytes = await this.ipfsManager.getBytes(cid);
+  // Reads that fail do not prove the keychain is absent: a timeout, an
+  // unreachable provider or a stalled index says nothing about the owner. Such
+  // a failure is unverified. A replicated-state failure keeps its own error.
+  private unverified(error: unknown): Error {
+    return error instanceof KeychainOwnershipUnverifiedError ||
+      error instanceof ReplicatedStateNotReadyError
+      ? error
+      : new KeychainOwnershipUnverifiedError(error);
+  }
 
-      return JSON.parse(
-        Buffer.from(bytes).toString('utf8'),
-      ) as IpfsKeychainDocument;
+  private async getDocumentFromCid(cid: IPFSId): Promise<unknown> {
+    try {
+      return await this.ipfsManager.getJSON<unknown>(cid);
+    } catch {
+      // Not a JSON block: the raw bytes may still be a keychain document.
+    }
+
+    const bytes = await this.ipfsManager
+      .getBytes(cid)
+      .catch((error: unknown) => {
+        throw this.unverified(error);
+      });
+
+    try {
+      return JSON.parse(Buffer.from(bytes).toString('utf8')) as unknown;
+    } catch {
+      return undefined;
     }
   }
 
-  private async getKeychainFromCid(cid: IPFSId): Promise<Keychain> {
+  private async getKeychainFromCid(cid: IPFSId): Promise<Keychain | undefined> {
     const cached = this.keychainByCid.get(cid.valueOf());
 
     if (cached) {
       return cached;
     }
 
-    const document = await this.getDocumentFromCid(cid);
-    const keychain = this.mapper.toDomain(document);
+    const keychain = this.toKeychain(await this.getDocumentFromCid(cid));
 
-    this.keychainByCid.set(cid.valueOf(), keychain);
+    if (keychain) {
+      this.keychainByCid.set(cid.valueOf(), keychain);
+    }
 
     return keychain;
   }
@@ -65,22 +85,29 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     cid: IPFSId,
     shouldSaveMetadata: boolean = true,
   ): Promise<Keychain | undefined> {
-    try {
-      const keychain = await this.getKeychainFromCid(cid);
+    const keychain = await this.getKeychainFromCid(cid);
 
-      if (shouldSaveMetadata) {
-        await this.metadataIndex.save(
-          keychain,
-          new KeychainExternalIdentifier(cid.valueOf()),
-        );
+    if (!keychain || !shouldSaveMetadata) {
+      return keychain;
+    }
+
+    try {
+      await this.metadataIndex.save(
+        keychain,
+        new KeychainExternalIdentifier(cid.valueOf()),
+      );
+    } catch (error: unknown) {
+      // The replicated gate rejects a document that is not a public mutation,
+      // so it is not a keychain. Any other failure of the write is local and
+      // leaves the answer unknown.
+      if (error instanceof InvalidPublicMutationError) {
+        return undefined;
       }
 
-      return keychain;
-    } catch {
-      this.keychainByCid.delete(cid.valueOf());
-
-      return undefined;
+      throw this.unverified(error);
     }
+
+    return keychain;
   }
 
   private async findCandidateReferenceFromMetadata(
@@ -98,7 +125,7 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     const keychain = await this.findCandidateFromCid(
       new IPFSId(metadata.cid),
       false,
-    ).catch((): undefined => undefined);
+    );
 
     return keychain
       ? KeychainCandidate.localCandidate(externalIdentifier, keychain)
@@ -156,9 +183,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     ownerIdentityId: IdentityId,
     knownCids: Set<string>,
   ): Promise<KeychainCandidate[]> {
-    const cidStrings = await this.ipfsManager.getRecordCandidates(
-      this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf(),
-    );
+    const cidStrings = await this.ipfsManager
+      .getRecordCandidates(this.ROUTING_KEY_PREFIX + ownerIdentityId.valueOf())
+      .catch((error: unknown) => {
+        throw this.unverified(error);
+      });
     const candidates = await Promise.all(
       cidStrings
         .filter((cidString) => !knownCids.has(cidString))
@@ -186,8 +215,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
   private async loadByExternalIdentifier(
     externalIdentifier: KeychainExternalIdentifier,
   ): Promise<Keychain | undefined> {
-    const metadata =
-      await this.metadataIndex.findByExternalIdentifier(externalIdentifier);
+    const metadata = await this.metadataIndex
+      .findByExternalIdentifier(externalIdentifier)
+      .catch((error: unknown) => {
+        throw this.unverified(error);
+      });
 
     if (metadata?.keychain) {
       return metadata.keychain;
@@ -363,16 +395,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     }
   }
 
-  // Routed bytes that fail the keychain shape check are not the owner's
-  // keychain and are skipped (see isKeychainDocument). A keychain document
-  // that fails to map is not definitive, because the owner's keychain may
-  // carry content the domain rejects, so it throws. A document that cannot be
-  // fetched throws in readRoutedDocument.
-  private async readRoutedKeychain(
-    cidString: string,
-  ): Promise<Keychain | undefined> {
-    const document = await this.readRoutedDocument(cidString);
-
+  // A document that is not keychain-shaped is not the owner's keychain and is
+  // skipped (see isKeychainDocument). A keychain document that fails to map is
+  // not definitive, because the owner's keychain may carry content the domain
+  // rejects, so it throws.
+  private toKeychain(document: unknown): Keychain | undefined {
     if (!this.isKeychainDocument(document)) {
       return undefined;
     }
@@ -382,6 +409,15 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     } catch (error: unknown) {
       throw new KeychainOwnershipUnverifiedError(error);
     }
+  }
+
+  // Routed bytes that fail the keychain shape check are not the owner's
+  // keychain and are skipped. A document that cannot be fetched throws in
+  // readRoutedDocument.
+  private async readRoutedKeychain(
+    cidString: string,
+  ): Promise<Keychain | undefined> {
+    return this.toKeychain(await this.readRoutedDocument(cidString));
   }
 
   public async hasByExternalIdentifier(
@@ -417,7 +453,11 @@ export default class IpfsKeychainRepository extends KeychainRepository {
     ownerIdentityId: IdentityId,
   ): Promise<KeychainCandidate[]> {
     const metadata = this.deduplicateMetadata(
-      await this.metadataIndex.findByOwnerIdentityId(ownerIdentityId),
+      await this.metadataIndex
+        .findByOwnerIdentityId(ownerIdentityId)
+        .catch((error: unknown) => {
+          throw this.unverified(error);
+        }),
     );
     const localCandidates = await this.findLocalCandidateReferences(metadata);
 

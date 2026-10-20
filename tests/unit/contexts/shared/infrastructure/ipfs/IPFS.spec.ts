@@ -9,6 +9,7 @@ import IPFS from '../../../../../../src/contexts/shared/infrastructure/ipfs/IPFS
 import { IPFSNetwork } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
 import IPFSNetworkRegistry from '../../../../../../src/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import ReplicatedStateNotReadyError from '../../../../../../src/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 describe('IPFS', () => {
   let registry: MockProxy<IPFSNetworkRegistry>;
@@ -122,6 +123,76 @@ describe('IPFS', () => {
       expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
       expect(firstNetwork.stat).not.toHaveBeenCalled();
       expect(racer.raceStat).not.toHaveBeenCalled();
+    });
+
+    it('should try the next network when an offline check fails with a transport error', async () => {
+      const cid = new IPFSId('bafy-offline-transport');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(new Error('transport failed'));
+      secondNetwork.stat.mockResolvedValue(undefined);
+
+      await expect(ipfs.stat(cid, true)).resolves.toBe(true);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
+    });
+
+    it('should throw ReplicatedStateNotReadyError when offline checks fail without a not found answer', async () => {
+      const cid = new IPFSId('bafy-offline-unavailable');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(new Error('transport failed'));
+      secondNetwork.stat.mockRejectedValue(new Error('transport failed'));
+
+      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(racer.raceStat).not.toHaveBeenCalled();
+    });
+
+    it('should return false when offline checks answer not found on every network', async () => {
+      const cid = new IPFSId('bafy-offline-missing');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-offline-missing'),
+      );
+      secondNetwork.stat.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-offline-missing'),
+      );
+
+      await expect(ipfs.stat(cid, true)).resolves.toBe(false);
+    });
+
+    it('should throw ReplicatedStateNotReadyError when offline checks answer not found on one network and fail on another', async () => {
+      const cid = new IPFSId('bafy-offline-mixed');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-offline-mixed'),
+      );
+      secondNetwork.stat.mockRejectedValue(new Error('transport failed'));
+
+      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('should throw ReplicatedStateNotReadyError when offline checks have no networks to ask', async () => {
+      const cid = new IPFSId('bafy-offline-empty');
+
+      registry.getAll.mockReturnValue([]);
+
+      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
     });
 
     it('should throw when provided network ids do not match any network', async () => {

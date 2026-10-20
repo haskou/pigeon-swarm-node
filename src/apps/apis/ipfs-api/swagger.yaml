@@ -37,12 +37,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
-        '404':
-          description: CID not found.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IpfsContentNotFoundError'
+        '503':
+          description: Node not ready (code 503020). No reachable network served the CID before the lookup timed out, the CID could not be proven absent, or a network failed to answer. The endpoint never answers 404. Retry.
   /ipfs/contents:
     post:
       tags:
@@ -227,14 +223,6 @@ components:
         size:
           type: number
           example: 215040
-    IpfsContentNotFoundError:
-      type: object
-      required:
-        - error
-      properties:
-        error:
-          type: string
-          example: CID not found in any network
     ContentReplicationStatusResource:
       type: object
       required:

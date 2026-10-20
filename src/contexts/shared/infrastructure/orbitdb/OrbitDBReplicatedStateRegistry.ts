@@ -159,6 +159,13 @@ export default class OrbitDBReplicatedStateRegistry {
    */
   private readonly storesAwaitingReplay = new Set<OrbitDBDatabase>();
 
+  /**
+   * Networks whose head cache a register() has not yet rebuilt. A failed
+   * rebuild leaves the network registered but unreconciled, so readiness cannot
+   * open over heads that may be missing from the cache.
+   */
+  private readonly networksAwaitingHeadReconciliation = new Set<string>();
+
   private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
     string
@@ -1551,7 +1558,7 @@ export default class OrbitDBReplicatedStateRegistry {
     }
 
     if (!canCompareHeadSignatures) {
-      return true;
+      return false;
     }
 
     return (
@@ -1567,6 +1574,9 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Promise<void> {
     const startedAt = process.hrtime.bigint();
 
+    // The reset empties the cache, so stay not open until a rebuild succeeds.
+    this.networksAwaitingHeadReconciliation.add(networkId);
+
     if (!this.rebuildingHeadsByNetworkId.has(networkId)) {
       this.rebuildingHeadsByNetworkId.set(networkId, new Map());
     }
@@ -1581,6 +1591,7 @@ export default class OrbitDBReplicatedStateRegistry {
         reconciledHeadSignature,
       );
       succeeded = true;
+      this.networksAwaitingHeadReconciliation.delete(networkId);
     } finally {
       this.finishHeadCacheRebuild(networkId, succeeded);
     }
@@ -2256,6 +2267,7 @@ export default class OrbitDBReplicatedStateRegistry {
     stores: OrbitDBPrivateNetworkStores,
   ): Promise<void> {
     this.storesByNetworkId.set(networkId, stores);
+    this.networksAwaitingHeadReconciliation.add(networkId);
     for (const store of this.listenedStores(stores)) {
       this.storesAwaitingReplay.add(store);
     }
@@ -2277,6 +2289,8 @@ export default class OrbitDBReplicatedStateRegistry {
         Boolean(stores.heads.log),
       )
     ) {
+      this.networksAwaitingHeadReconciliation.delete(networkId);
+
       if (currentHeadSignature) {
         this.reconciledStoreHeadSignatures.set(
           stores.heads,
@@ -2310,6 +2324,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const stores = this.storesByNetworkId.get(networkId);
 
     this.storesByNetworkId.delete(networkId);
+    this.networksAwaitingHeadReconciliation.delete(networkId);
     this.persistedHeadKeysByNetworkId.delete(networkId);
     this.replicatedHeadsByNetworkId.delete(networkId);
     this.rebuildingHeadsByNetworkId.delete(networkId);
@@ -2326,6 +2341,7 @@ export default class OrbitDBReplicatedStateRegistry {
 
   public clear(): void {
     this.storesByNetworkId.clear();
+    this.networksAwaitingHeadReconciliation.clear();
     this.storesAwaitingReplay.clear();
     this.persistedHeadKeysByNetworkId.clear();
     this.replicatedHeadsByNetworkId.clear();
@@ -2522,13 +2538,20 @@ export default class OrbitDBReplicatedStateRegistry {
 
   /**
    * Whether the replicated state is open to reads: a network is registered,
-   * every store has finished the replay its registration started, and no
-   * store still waits on a subscriber replay that a missing local block
-   * deferred. None of these conditions lapses with time, so a store that never
-   * replays keeps the node not open.
+   * every store has finished the replay its registration started, every
+   * network's head cache has been rebuilt, and no store still waits on a
+   * subscriber replay that a missing local block deferred. None of these
+   * conditions lapses with time, so a store that never replays, or a head
+   * cache that never rebuilds, keeps the node not open.
+   * A rebuild that a peer join starts and fails keeps the node not open
+   * until a later join rebuilds the cache.
    */
   public isOpen(): boolean {
-    if (this.storesByNetworkId.size === 0 || this.storesAwaitingReplay.size > 0)
+    if (
+      this.storesByNetworkId.size === 0 ||
+      this.storesAwaitingReplay.size > 0 ||
+      this.networksAwaitingHeadReconciliation.size > 0
+    )
       return false;
 
     return ![...this.storesByNetworkId.values()].some((stores) =>

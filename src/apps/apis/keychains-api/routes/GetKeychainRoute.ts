@@ -3,6 +3,8 @@ import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequ
 import NodeReadiness from '@app/apps/NodeReadiness';
 import CurrentKeychainFinder from '@app/contexts/keychains/application/find-current/CurrentKeychainFinder';
 import { CurrentKeychainFindMessage } from '@app/contexts/keychains/application/find-current/messages/CurrentKeychainFindMessage';
+import { KeychainNotFoundError } from '@app/contexts/keychains/domain/errors/KeychainNotFoundError';
+import { KeychainOwnershipUnverifiedError } from '@app/contexts/keychains/domain/errors/KeychainOwnershipUnverifiedError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Route } from '@haskou/ddd-kernel/adapters/ui';
@@ -38,15 +40,30 @@ export class GetKeychainRoute extends Route {
       throw new InvalidSignedRequestError();
     }
 
-    // Not ready means the node is still starting or has not opened its replicated
-    // state, so a missing keychain cannot be told apart from one still replaying.
-    if (!this.readiness.isServingReplicatedState()) {
+    // Not ready: startup has not finished, or a registered network has not
+    // opened its replicated state yet. A missing keychain cannot be told apart
+    // from one still replaying, so answer the retryable code.
+    if (!(await this.readiness.isReady())) {
       throw new ReplicatedStateNotReadyError();
     }
 
-    const keychain = await this.finder.find(
-      new CurrentKeychainFindMessage(parsedIdentityId),
-    );
+    // A ready node that stores no network has nothing to replay, so a miss is
+    // genuine. It is answered without a lookup.
+    if (!this.readiness.hasNetworks()) {
+      throw new KeychainNotFoundError(ownerIdentityId);
+    }
+
+    const keychain = await this.finder
+      .find(new CurrentKeychainFindMessage(parsedIdentityId))
+      .catch((error: unknown) => {
+        // The keychain could not be verified, so it is neither found nor absent.
+        // Answer the retryable replicated-state code rather than a conflict.
+        if (error instanceof KeychainOwnershipUnverifiedError) {
+          throw new ReplicatedStateNotReadyError();
+        }
+
+        throw error;
+      });
 
     return response
       .status(HttpRouteStatusEnum.OK)

@@ -67,6 +67,11 @@ block that is missing locally. Neither lifts with time: readiness stays
 `not_ready` until the replay succeeds. A replay that failed at registration is
 retried on the next peer head exchange.
 
+While a peer join rebuilds a network's head cache, the node is not open. A
+rebuild that fails keeps it not open until a later join rebuilds the cache. A
+warm head cache that cannot be compared with the stored heads is rebuilt before
+the node opens.
+
 A node that stores no network has nothing to replay, so it is ready from its
 stored configuration alone. That configuration is read without starting any
 network, so a readiness poll does not change the node.
@@ -2527,7 +2532,13 @@ document, because identities and keychains are stored as JSON. Reading a CID
 may populate Helia's local block cache, but it does not
 pin the content or advertise this node as a provider.
 
-Unknown CIDs return `404` with body `{ "error": "CID not found in any network" }`.
+A read that no reachable network can serve answers `503` with code `503020`
+(`ReplicatedStateNotReadyError`) once the lookup times out. The endpoint never
+answers `404`: absence is not proven on this path, so a CID that no network
+holds also answers `503` with code `503020`. If any attempted network fails or
+times out, the answer is the same `503`, even when another network reported the
+CID absent: one network's absence does not prove the content is absent
+everywhere. Retry.
 
 ### Register content replication
 
@@ -2930,6 +2941,15 @@ Response:
 Use `identityExternalIdentifier` as the next update's
 `previousIdentityExternalIdentifier`.
 
+While the node is still starting, or a network it has configured has not
+finished opening its replicated state, or its stored configuration cannot be
+read, the lookup answers HTTP 503 with code `503020`
+(`ReplicatedStateNotReadyError`) instead of 409 `IdentityNotFoundError`. The
+identity is not reported missing, so retry. A 409 means the node is ready (see
+Node readiness) and every network it asked answered that it does not know the
+identity. If any network fails to answer, the lookup answers 503 with code
+`503020` instead, even when another network reported the identity absent.
+
 ### Publish identity
 
 ```http
@@ -3234,6 +3254,11 @@ Errors:
 
 - `409` code `KeychainNotFoundError`: the node holds no valid keychain candidate for the identity
 - `503` code `503020` (`ReplicatedStateNotReadyError`): the node is not ready: it has not finished startup or has not opened its replicated state yet, for example right after a restart while it replays. The keychain is not reported missing, so retry. A client must not publish a keychain version, or a first version, on this response.
+- `503` code `503020` also covers a lookup that cannot verify a candidate right now:
+  its routing record, replicated keychain document or local index entry cannot be
+  read or mapped. The keychain is not reported missing, so retry. A record or
+  document that stays unreadable keeps this answer at 503 rather than 409 until it
+  is repaired or removed.
 
 ## Conversation HTTP API
 
@@ -3289,6 +3314,11 @@ A direct conversation is private by nature, so the node refuses one on a public
 network with `409` `PrivateNetworkRequiredError`, before it stores anything. This
 holds for an existing 1:1 too: the refusal comes before the lookup, so a public
 1:1 is never returned. Only a private network carries a direct conversation.
+
+A keychain check that cannot verify the candidate keychain (its routing record, its
+replicated keychain document or its local index entry cannot be read or mapped right
+now) answers `503` with code `503020` (`ReplicatedStateNotReadyError`) and stores
+nothing. Retry: the conversation is neither created nor refused.
 
 Response:
 
