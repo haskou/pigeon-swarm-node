@@ -170,7 +170,7 @@ describe('PublicMutationGate over pins', () => {
     registry.clear();
   });
 
-  it('re-admits a demoted head once the permission data replicates', async () => {
+  it('holds a head until the permission data replicates, then admits it', async () => {
     jest.useFakeTimers();
     const registry = new OrbitDBReplicatedStateRegistry();
     const signed = await sign(pin, 'put', 1);
@@ -192,7 +192,7 @@ describe('PublicMutationGate over pins', () => {
 
     onUpdate({ payload: { key: 'pins-head', value: { pins: [signed] } } });
     await jest.advanceTimersByTimeAsync(10);
-    expect(registry.findCachedHead('pins-head')?.pins).toEqual([]);
+    expect(registry.findCachedHead('pins-head')).toBeUndefined();
 
     communityRepository.requireAtFrontier.mockResolvedValue(
       mock<Community>({ manageChannelMessages: jest.fn() }),

@@ -7,6 +7,7 @@ import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authoriz
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { signedMutation } from '../../../public-mutations/support/signedMutation';
 import {
@@ -392,6 +393,37 @@ describe('OrbitDBCommunityRepository', () => {
     await expect(
       repository.findDiscoverable({}, [communityId]),
     ).resolves.toEqual([]);
+  });
+
+  it('answers not ready instead of a partial list while a community head is held', async () => {
+    const created = genesis();
+
+    await save(created);
+    await save(join([created], alice));
+    await flushBackgroundTasks();
+
+    const pending = jest
+      .spyOn(registry, 'hasPendingHeadAdmissions')
+      .mockReturnValue(true);
+
+    await expect(repository.findByMember(alice)).rejects.toBeInstanceOf(
+      ReplicatedStateNotReadyError,
+    );
+    await expect(
+      repository.findDiscoverable({ networkId }),
+    ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+
+    pending.mockReturnValue(false);
+
+    const byMember = await repository.findByMember(alice);
+    const discoverable = await repository.findDiscoverable({ networkId });
+
+    expect(byMember.map((community) => community.getId().valueOf())).toEqual([
+      communityId.valueOf(),
+    ]);
+    expect(
+      discoverable.map((community) => community.getId().valueOf()),
+    ).toEqual([communityId.valueOf()]);
   });
 
   it('forgets a community once its last member left', async () => {

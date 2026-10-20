@@ -3,6 +3,7 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { Community } from '../../domain/Community';
 import { CommunityInvitations } from '../../domain/entities/invitations/CommunityInvitations';
@@ -204,6 +205,23 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
       .map((community) => this.copyOf(community));
   }
 
+  /**
+   * The cached communities once every community head held back by the gate is
+   * admitted. Until then a held head is missing from the cache, so the list is
+   * not ready: it must not answer a partial or an empty list.
+   */
+  private caughtUpCachedCommunities(): Promise<Community[]> {
+    if (
+      this.registry.hasPendingHeadAdmissions(
+        OrbitDBCommunityRepository.HEAD_PREFIX,
+      )
+    ) {
+      return Promise.reject(new ReplicatedStateNotReadyError());
+    }
+
+    return Promise.resolve(this.cachedCommunities());
+  }
+
   private copyOf(community: Community): Community {
     return Community.fromPrimitives(community.toPrimitives());
   }
@@ -344,7 +362,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  public findDiscoverable(
+  public async findDiscoverable(
     options: {
       networkId?: string;
       query?: string;
@@ -355,27 +373,25 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const regex = query ? new RegExp(this.escapeRegex(query), 'i') : undefined;
     const excluded = new Set(excludedIds.map((id) => id.valueOf()));
 
-    return Promise.resolve(
-      this.cachedCommunities().filter((community) => {
-        const { description, discoverable, id, name, networkId } =
-          community.toPrimitives();
+    const communities = await this.caughtUpCachedCommunities();
 
-        return (
-          discoverable &&
-          !excluded.has(id) &&
-          (!options.networkId || networkId === options.networkId) &&
-          (!regex || regex.test(name) || regex.test(description))
-        );
-      }),
-    );
+    return communities.filter((community) => {
+      const { description, discoverable, id, name, networkId } =
+        community.toPrimitives();
+
+      return (
+        discoverable &&
+        !excluded.has(id) &&
+        (!options.networkId || networkId === options.networkId) &&
+        (!regex || regex.test(name) || regex.test(description))
+      );
+    });
   }
 
-  public findByMember(identityId: IdentityId): Promise<Community[]> {
-    return Promise.resolve(
-      this.cachedCommunities().filter((community) =>
-        community.isMember(identityId),
-      ),
-    );
+  public async findByMember(identityId: IdentityId): Promise<Community[]> {
+    const communities = await this.caughtUpCachedCommunities();
+
+    return communities.filter((community) => community.isMember(identityId));
   }
 
   public async save(
