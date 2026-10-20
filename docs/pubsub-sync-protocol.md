@@ -717,12 +717,17 @@ of a subject that never arrives is dropped with its held copy after 15 minutes.
 
 A head with a pending record is held, not cached. It is offered again the same way.
 A held copy is a candidate a peer offered; it never makes a subject unavailable while
-a verified head exists for it. A head is verified once one copy of it was admitted in
-full (or the node wrote it itself); reads, the community list and saves use that head
-and ignore the held candidates. Error code 503020 answers only for a subject with no
-verified head and a held copy: the node has not proven any head of it yet, for
-instance a stored head right after a restart. A read of such a subject never serves
-the admitted part of a held head.
+a verified head exists for it. A key is verified, per network, by a head that was
+admitted in full with gated records kept under a key its gate accepts (or by the
+node writing it itself, which settles it in every hosted network); a trivial, empty,
+refused or ungoverned head never verifies a key. Reads, the community list and saves
+use that head and ignore the held candidates. Error code 503020 answers only for a
+subject with no verified head and a held copy: the node has not proven any head of
+it yet, for instance a stored head right after a restart. A read of such a subject
+never serves the admitted part of a held head. A key restored from the node's own
+head cache ends its wait only when that own copy is admitted, expires, or a full
+rescan of its network clears it: a head a peer offers under the key, in the same
+network or in another, neither verifies it nor supersedes the copy.
 
 A record the gate refuses never becomes valid, so it is dropped and never offered again.
 A head that carries one is delivered demoted, with `updatedAt` 0, and is not held.
@@ -752,14 +757,19 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   bounded by the persisted heads); any other key up to 1024 per network, and past
   that it is not remembered, so a peer that plants more keys than that delays no
   read of any other key. A key nobody dropped or holds, and a key with a verified
-  head, are read as usual. Holds, drops and cool-downs are kept per network and
-  key, but a read takes the key alone, because the head cache and the verified keys
-  are global by key: a copy held or dropped under a key in any network makes a
-  read of that key wait while no network has settled a head under it, and a head
-  settled under the key in any network ends that wait for every network. So a peer
-  in network B that offers a head under a key this node holds unverified in
-  network A, and that settles it, ungates A's read of that key (it never gates a
-  key that has a verified head). Only the count of dropped heads is logged. A held head is
+  head, are read as usual. Holds, drops, cool-downs and the verified and restored
+  keys are kept per network and key. A read takes the key alone and sums the
+  networks: a key restored from the own cache waits on its own network alone, and
+  nothing another network offers ends that wait; any other key waits while a
+  network holds or dropped a copy of it unsettled and no network has verified it.
+  So a genuinely admitted head with gated records under such a key in network B
+  ungates a key that network A only holds from a peer (it never gates a key with a
+  verified head, and never a restored one). The verified keys are peer-driven, so
+  they are bounded to 8192 per network and evicted oldest first, never a restored
+  own key; a peer that admits more distinct keys than that can evict an honest
+  verified key, which then waits again only if a copy of it is held. Unregistering a
+  network clears its verified and restored keys and its expiries. Only the count of
+  dropped heads is logged. A held head is
   offered again on every 60 s retry, with one retry timer for the node, so offers
   never stack. A flood in one store never takes the place of another store's
   records, and one network's held heads never take another's places.
@@ -806,8 +816,9 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   pending record is logged as a count, at most once a minute, and a node that is still
   opening answers `503020` and logs `node starting` instead. A head whose evidence
   check fails on an IPFS error is not cached, held or retried: the key is dropped with
-  a warning until a peer offers it again. A key is marked verified also for a head the
-  gate refused or that carried nothing to check.
+  a warning until a peer offers it again. A key is not marked verified by a head the
+  gate refused, by one that carried nothing to check, or by one under a key its gate
+  rejects.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).

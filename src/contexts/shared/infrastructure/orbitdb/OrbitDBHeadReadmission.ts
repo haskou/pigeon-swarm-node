@@ -7,4 +7,9 @@ export type OrbitDBHeadReadmission = {
   headKey: string;
   networkId: string;
   onAdmitted(admitted: Record<string, unknown>): void | Promise<void>;
+  /**
+   * Set for a head restored from this node's own persisted head cache. Only
+   * such a copy settles a key whose own copy still waits.
+   */
+  own?: boolean;
 };
