@@ -18,7 +18,10 @@ import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-author
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
-import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Timestamp } from '@haskou/value-objects';
@@ -67,11 +70,11 @@ class RejectingParticipantGate extends OrbitDBMutationGate {
     return collection === 'calls';
   }
 
-  public async accepts(
+  public async verdictOf(
     _collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
-    return record.scopeType !== 'call_participant';
+  ): Promise<OrbitDBMutationVerdict> {
+    return record.scopeType !== 'call_participant' ? 'accepted' : 'refused';
   }
 
   public governsHead(): boolean {
@@ -521,11 +524,13 @@ describe('OrbitDBCallRepository', () => {
 
       gate.governs.mockImplementation((collection) => collection === 'calls');
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation((_collection, record) =>
+      gate.verdictOf.mockImplementation((_collection, record) =>
         Promise.resolve(
           authorizationLoaded &&
             (participantAuthorizationLoaded ||
-              record.scopeType !== 'call_participant'),
+              record.scopeType !== 'call_participant')
+            ? 'accepted'
+            : 'pending',
         ),
       );
       registry.addMutationGate(gate);

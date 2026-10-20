@@ -34,7 +34,7 @@ recommended design does not need it.
 3. **Reuse the existing gates.** `PublicMutationGate` policies per
    `collection`/`scopeType`, `PublicMutationVerifier` (binding, device
    signature, device authorization), `OrbitDBMutationGate` head gating, and the
-   registry's fixpoint readmission of rejected records. No second convention.
+   registry's fixpoint readmission of unadmitted records. No second convention.
 4. **Ids bind to the author.** A record id is derived from the author and a
    nonce (or from the participant set for 1:1), and the policy recomputes it.
    Otherwise a lower `payloadDigest` ground by an attacker would win the
@@ -61,10 +61,10 @@ recommended design does not need it.
   set. `CommunityChannelMessageReactionMutationPolicy` is the template (derives
   the id from fields, rejects mismatch, looks up the community at the record's
   frontier through a `ShortLivedLookup`, checks membership).
-- `OrbitDBMutationGate.governs/accepts/governsHead/acceptsHead`, composed via
+- `OrbitDBMutationGate.governs/verdictOf/governsHead/acceptsHead`, composed via
   `OrbitDBReplicatedStateRegistry.addMutationGate`. The registry re-evaluates
-  rejected records in a loop until no progress (`OrbitDBReplicatedStateRegistry`
-  lines ~255-266), so in-batch dependency order between records is handled.
+  records not yet admitted in a loop until no progress (`admittedRecords`),
+  so in-batch dependency order between records is handled.
   Cross-batch ordering is an acknowledged risk, listed per slice below.
 - `OrbitDBHeadIndex` merges with `PublicMutationRecord.replaces` when proofs are
   present and falls back to `max(deletedAt, receivedAt, updatedAt, createdAt)`

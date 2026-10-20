@@ -692,38 +692,41 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   permissions of these records (pin, reaction, moderation log, request,
   poll, channel message) are still evaluated against the community state folded
   at admission, not at a causal frontier, so records of a member who later lost
-  the permission stop being admitted. A head rejected
+  the permission stop being admitted. A head held
   because the community has not replicated yet is re-admitted when it does
   (see below). Authorization lookups are coalesced for 1 s per batch.
 
-#### Readmission of rejected records
+#### Readmission of pending records
 
-A replicated document the gate rejects is offered to the gate again: 2 s, 10 s and
-60 s after the rejection, and in between, at most once every 2 s, whenever the node
+A replicated document the gate leaves pending is offered to the gate again: 2 s, 10 s and
+60 s after it was first held, and in between, at most once every 2 s, whenever the node
 admits new replicated state (an admitted document or a newly cached head, including a
 local projection such as the identity metadata of an admitted identity). The second
 trigger matters because the record usually rests on exactly that state: on a slow node
 a joiner's identity can replicate after the community head that lists its join, and
 the head would otherwise wait for the next retry.
 
-A head with a rejected record is held, not cached. It is offered again the same way,
+A head with a pending record is held, not cached. It is offered again the same way,
 and the community list answers 503 with error code 503020 for as long as any community
 head is held. A single-head read serves the last admitted copy from the cache; with
 none cached it answers 503 while the head is held.
+
+A record the gate refuses never becomes valid, so it is dropped and never offered again.
+A head that carries one is delivered demoted, with `updatedAt` 0, and is not held.
 
 - The gate decides every offer in full; a readmitted record is one the gate accepts
   now. Readmission never widens what is admitted.
 - A held head is delivered only once every record in it is admitted: a partial head is
   never delivered. Delivering an admitted head drops the held copies of its key that it
   supersedes (those not newer than it); a newer copy stays held.
-- At most 256 rejected documents per store wait in its readmission at once, and 256
-  more queue behind them in arrival order. A rejected document past both bounds is
+- At most 256 pending documents per store wait in its readmission at once, and 256
+  more queue behind them in arrival order. A pending document past both bounds is
   dropped and the store is overflowed: until its queue drains and its documents are
   projected again in full, `isDocumentPendingAdmission` answers every document of that
   store as waiting, so a call endpoint answers `503020` for a call it does not hold. A
-  failed rescan is retried every 60 s. A degraded head is held under its network's
-  bounds: at most 256 held head keys per network wait at once, past that a degraded
-  head is not held and is logged. A held head copy the queue cannot take stays held and
+  failed rescan is retried every 60 s. A head with a pending record is held under its
+  network's bounds: at most 256 held head keys per network wait at once, past that such
+  a head is not held and is logged. A held head copy the queue cannot take stays held and
   is offered again on the next 60 s retry. A flood in one store never takes the place of
   another store's records, and one network's held heads never take another's places.
 - A held head waits under its key and its value. A copy received again is not held
@@ -832,8 +835,9 @@ head cache and reads. `PublicMutationGate` returns `false` from `governsHead`
 because its heads are index wrappers checked per record.
 Gates accumulate with `OrbitDBReplicatedStateRegistry.addMutationGate`: the
 registry composes them in `CompositeOrbitDBMutationGate`, and a record is admitted
-only when every gate that governs it accepts. `PublicMutationGateInitializer` and
-`KeychainMutationGateInitializer` each register their own gate.
+only when every gate that governs it returns `accepted`: `refused` drops it, `pending`
+holds it. `PublicMutationGateInitializer` and `KeychainMutationGateInitializer` each
+register their own gate.
 
 No request contract changes: the keychain endpoints already carry the signature.
 A malicious peer can still flood the store with validly signed junk of its own

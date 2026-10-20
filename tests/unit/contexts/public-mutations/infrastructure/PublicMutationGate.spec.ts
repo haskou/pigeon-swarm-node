@@ -12,6 +12,8 @@ import PollMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/polic
 import PollMutationScopeAccess from '@app/contexts/polls/infrastructure/orbitdb/policies/PollMutationScopeAccess';
 import PollVoteMutationPolicy from '@app/contexts/polls/infrastructure/orbitdb/policies/PollVoteMutationPolicy';
 import { PublicMutationBodyPrimitives } from '@app/contexts/public-mutations/domain/PublicMutationBodyPrimitives';
+import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -170,7 +172,7 @@ describe('PublicMutationGate over pins', () => {
     registry.clear();
   });
 
-  it('holds a head until the permission data replicates, then admits it', async () => {
+  it('delivers a pins head whose community is unknown without holding it', async () => {
     jest.useFakeTimers();
     const registry = new OrbitDBReplicatedStateRegistry();
     const signed = await sign(pin, 'put', 1);
@@ -192,17 +194,40 @@ describe('PublicMutationGate over pins', () => {
 
     onUpdate({ payload: { key: 'pins-head', value: { pins: [signed] } } });
     await jest.advanceTimersByTimeAsync(10);
-    expect(registry.findCachedHead('pins-head')).toBeUndefined();
 
-    communityRepository.requireAtFrontier.mockResolvedValue(
-      mock<Community>({ manageChannelMessages: jest.fn() }),
-    );
-    await jest.advanceTimersByTimeAsync(2_500);
-
-    expect(registry.findCachedHead('pins-head')?.pins).toEqual([signed]);
+    expect(registry.hasPendingHeadAdmissions('pins')).toBe(false);
+    expect(registry.findCachedHead('pins-head')?.pins).toEqual([]);
     registry.clear();
     jest.useRealTimers();
   });
+
+  it('delivers a pins head whose author is no longer authorized without holding it', async () => {
+    jest.useFakeTimers();
+    const registry = new OrbitDBReplicatedStateRegistry();
+    const signed = await sign(pin, 'put', 1);
+    let onUpdate: (entry: unknown) => void = () => undefined;
+
+    authorization.isAuthorized.mockResolvedValueOnce(false);
+    await registry.register('n', {
+      heads: {
+        events: {
+          on: jest.fn((event: string, handler: (entry: unknown) => void) => {
+            if (event === 'update') onUpdate = handler;
+          }),
+        },
+      },
+    } as never);
+    registry.addMutationGate(gate);
+
+    onUpdate({ payload: { key: 'pins-head', value: { pins: [signed] } } });
+    await jest.advanceTimersByTimeAsync(10);
+
+    expect(registry.hasPendingHeadAdmissions('pins')).toBe(false);
+    expect(registry.findCachedHead('pins-head')?.pins).toEqual([]);
+    registry.clear();
+    jest.useRealTimers();
+  });
+
   it('requires the causal frontier a scoped record is judged at', async () => {
     await expect(
       gate.accepts('pins', await sign(pin, 'put', 1, null)),
@@ -233,6 +258,56 @@ describe('PublicMutationGate over pins', () => {
     await expect(
       gate.accepts('pins', await sign(pin, 'put', 2, newer)),
     ).resolves.toBe(false);
+  });
+
+  it('refuses a record that can never prove out or is unauthorized, and holds one on an infrastructure failure', async () => {
+    await expect(
+      gate.verdictOf('pins', {
+        ...tombstone,
+        updatedAt: Date.now() + 10 ** 12,
+      }),
+    ).resolves.toBe('refused');
+    await expect(
+      gate.verdictOf('pins', {
+        ...tombstone,
+        proof: (await sign(pin, 'put', 1)).proof,
+      }),
+    ).resolves.toBe('refused');
+
+    authorization.isAuthorized.mockResolvedValueOnce(false);
+    await expect(
+      gate.verdictOf('pins', await sign(pin, 'put', 1)),
+    ).resolves.toBe('refused');
+
+    authorization.isAuthorized.mockRejectedValueOnce(
+      new Error('timeline unavailable'),
+    );
+    await expect(
+      gate.verdictOf('pins', await sign(pin, 'put', 1)),
+    ).resolves.toBe('pending');
+
+    await expect(
+      gate.verdictOf('pins', await sign(pin, 'put', 1)),
+    ).resolves.toBe('accepted');
+  });
+
+  it('holds a record only on a pending policy or an infrastructure failure', async () => {
+    const permitted = jest.spyOn(
+      CommunityChannelMessagePinMutationPolicy.prototype,
+      'assertPermitted',
+    );
+    const signed = await sign(pin, 'put', 1);
+
+    permitted.mockRejectedValueOnce(new PublicMutationPendingError());
+    await expect(gate.verdictOf('pins', signed)).resolves.toBe('pending');
+
+    permitted.mockRejectedValueOnce(new Error('store unavailable'));
+    await expect(gate.verdictOf('pins', signed)).resolves.toBe('pending');
+
+    permitted.mockRejectedValueOnce(new InvalidPublicMutationError());
+    await expect(gate.verdictOf('pins', signed)).resolves.toBe('refused');
+
+    permitted.mockRestore();
   });
 });
 

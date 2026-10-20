@@ -251,4 +251,24 @@ describe('OrbitDBIdentityMutationGate', () => {
   it('should accept heads it does not govern', async () => {
     await expect(gate.acceptsHead('keychain:owner', {})).resolves.toBe(true);
   });
+
+  it('should leave an unavailable content id to the caller rather than refuse the record', async () => {
+    const signer = await SignedIdentityMother.create();
+    const record = await metadata(signer.build());
+
+    ipfs.calculateJSONId.mockRejectedValueOnce(new Error('ipfs unavailable'));
+
+    await expect(gate.verdictOf('identities', record)).rejects.toThrow(
+      'ipfs unavailable',
+    );
+  });
+
+  it('should refuse an identity whose cid is not its content id', async () => {
+    const signer = await SignedIdentityMother.create();
+    const record = await metadata(signer.build());
+
+    await expect(
+      gate.verdictOf('identities', { ...record, cid: 'bafy-not-canonical' }),
+    ).resolves.toBe('refused');
+  });
 });

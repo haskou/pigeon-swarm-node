@@ -6,6 +6,7 @@ import { CommunityInvitation } from '../entities/invitations/CommunityInvitation
 import { CommunityInvitations } from '../entities/invitations/CommunityInvitations';
 import { CommunityInvitationNotFoundError } from '../errors/CommunityInvitationNotFoundError';
 import { CommunityInvitationUnusableError } from '../errors/CommunityInvitationUnusableError';
+import { CommunityOperationParentsMissingError } from '../errors/CommunityOperationParentsMissingError';
 import { InvalidCommunityOperationError } from '../errors/InvalidCommunityOperationError';
 import { CommunityOperationAction } from '../value-objects/CommunityOperationAction';
 import { CommunityPermission } from '../value-objects/CommunityPermission';
@@ -23,8 +24,9 @@ type CommunityPast = {
 /**
  * The verified operations of one community. Admitting an operation applies it
  * to the state of its causal past, so a forged operation (an author without
- * the permission at that point of history, or a parent nobody has seen) is
- * refused before it is stored anywhere.
+ * the permission at that point of history) is refused and never stored. An
+ * operation whose parent has not arrived yet throws
+ * `CommunityOperationParentsMissingError` and is stored only once it has.
  *
  * The causal past also decides the invitation rules, which are never judged
  * again: an `invitation_created` reuses no invitation key of its past; an
@@ -229,11 +231,17 @@ export class CommunityOperationLedger {
     return this.operations.has(operation.getHash());
   }
 
-  /** Throws when `candidate` is not permitted in the history it builds on. */
+  /** Throws when `candidate` is not permitted in the history it builds on, or when a parent has not arrived yet. */
   public admit(candidate: CommunityOperation): void {
     if (this.has(candidate)) return;
 
-    if (!candidate.isGenesis()) this.assertWithinQuota(candidate);
+    if (!candidate.isGenesis()) {
+      assert(
+        candidate.getParents().every((parent) => this.operations.has(parent)),
+        new CommunityOperationParentsMissingError(),
+      );
+      this.assertWithinQuota(candidate);
+    }
 
     const { community, invitations } = candidate.isGenesis()
       ? {

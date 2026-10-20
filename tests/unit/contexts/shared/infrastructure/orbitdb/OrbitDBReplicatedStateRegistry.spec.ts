@@ -1612,8 +1612,8 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation(() =>
-        Promise.resolve(authorizationHeadReplicated),
+      gate.verdictOf.mockImplementation(() =>
+        Promise.resolve(authorizationHeadReplicated ? 'accepted' : 'pending'),
       );
       registry.addMutationGate(gate);
       await registry.register('network-1', firstNetwork.stores);
@@ -1631,7 +1631,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
       await expect(
         registry.findHead('community:community-1'),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
 
       authorizationHeadReplicated = true;
       await jest.advanceTimersByTimeAsync(2_000);
@@ -1658,9 +1658,11 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation(() =>
+      gate.verdictOf.mockImplementation(() =>
         Promise.resolve(
-          registry.findCachedHead('identity:joiner') !== undefined,
+          registry.findCachedHead('identity:joiner') !== undefined
+            ? 'accepted'
+            : 'pending',
         ),
       );
       registry.addMutationGate(gate);
@@ -1679,7 +1681,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
       await expect(
         registry.findHead('community:community-1'),
-      ).resolves.toBeUndefined();
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
 
       firstNetwork.heads.emitUpdate({
         payload: {
@@ -1712,9 +1714,11 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation(() =>
+      gate.verdictOf.mockImplementation(() =>
         Promise.resolve(
-          registry.findCachedHead('identity:joiner') !== undefined,
+          registry.findCachedHead('identity:joiner') !== undefined
+            ? 'accepted'
+            : 'pending',
         ),
       );
       registry.addMutationGate(gate);
@@ -1760,17 +1764,20 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
     try {
       const gate = mock<OrbitDBMutationGate>();
-      const registry = new OrbitDBReplicatedStateRegistry();
+      const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+      const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
       const firstNetwork = createStores();
 
       gate.governs.mockImplementation(
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation((_collection, record) =>
+      gate.verdictOf.mockImplementation((_collection, record) =>
         Promise.resolve(
           record.id === 'join-1' &&
-            registry.findCachedHead('identity:joiner') !== undefined,
+            registry.findCachedHead('identity:joiner') !== undefined
+            ? 'accepted'
+            : 'pending',
         ),
       );
       registry.addMutationGate(gate);
@@ -1805,11 +1812,180 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       });
       await jest.advanceTimersByTimeAsync(5_000);
 
-      await expect(registry.findHead('community:community-1')).resolves.toEqual(
-        expect.objectContaining({
+      // The admitted join-1 record is delivered while forged-1 stays withheld,
+      // so the key keeps answering 503020.
+      await expect(
+        headCache.findByNetworkId('network-1'),
+      ).resolves.toContainEqual({
+        key: 'community:community-1',
+        value: expect.objectContaining({
           communityOperations: [{ id: 'join-1' }],
         }),
+      });
+      await expect(
+        registry.findHead('community:community-1'),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('demotes and delivers a head whose refused record can never become valid', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
       );
+      gate.governsHead.mockReturnValue(false);
+      gate.verdictOf.mockImplementation((_collection, record) =>
+        Promise.resolve(record.id === 'forged-1' ? 'refused' : 'accepted'),
+      );
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community-operation-index:community-1',
+          value: {
+            communityOperations: [{ id: 'forged-1' }, { id: 'join-1' }],
+            id: 'community-1',
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(
+        registry.hasPendingHeadAdmissions('community-operation-index:'),
+      ).toBe(false);
+      await expect(
+        registry.findHead('community-operation-index:community-1'),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          communityOperations: [{ id: 'join-1' }],
+          updatedAt: 0,
+        }),
+      );
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('delivers the admitted records of a head while its pending record is withheld', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+      const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+      const firstNetwork = createStores();
+      let forgedProven = false;
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.verdictOf.mockImplementation((_collection, record) =>
+        Promise.resolve(
+          record.id === 'forged-1' && !forgedProven ? 'pending' : 'accepted',
+        ),
+      );
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community-operation-index:community-1',
+          value: {
+            communityOperations: [{ id: 'forged-1' }, { id: 'join-1' }],
+            id: 'community-1',
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(1);
+
+      // The admitted record is delivered while the pending one is withheld.
+      await expect(
+        headCache.findByNetworkId('network-1'),
+      ).resolves.toContainEqual({
+        key: 'community-operation-index:community-1',
+        value: expect.objectContaining({
+          communityOperations: [{ id: 'join-1' }],
+          updatedAt: 0,
+        }),
+      });
+      expect(
+        registry.hasPendingHeadAdmissions('community-operation-index:'),
+      ).toBe(true);
+      expect(
+        registry.findCachedHead('community-operation-index:community-1'),
+      ).toBeUndefined();
+      await expect(
+        registry.findHead('community-operation-index:community-1'),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
+
+      // Once the pending record proves out, the held head is delivered whole.
+      forgedProven = true;
+      await jest.advanceTimersByTimeAsync(120_000);
+
+      expect(
+        registry.hasPendingHeadAdmissions('community-operation-index:'),
+      ).toBe(false);
+      await expect(
+        registry.findHead('community-operation-index:community-1'),
+      ).resolves.toEqual(
+        expect.objectContaining({
+          communityOperations: expect.arrayContaining([
+            { id: 'forged-1' },
+            { id: 'join-1' },
+          ]),
+        }),
+      );
+      registry.clear();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('holds a head whose gate check fails unexpectedly rather than dropping it', async () => {
+    jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+    try {
+      const gate = mock<OrbitDBMutationGate>();
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const firstNetwork = createStores();
+
+      gate.governs.mockImplementation(
+        (collection) => collection === 'communityOperations',
+      );
+      gate.governsHead.mockReturnValue(false);
+      gate.verdictOf.mockRejectedValue(new Error('ipfs unavailable'));
+      registry.addMutationGate(gate);
+      await registry.register('network-1', firstNetwork.stores);
+      firstNetwork.heads.emitUpdate({
+        payload: {
+          key: 'community-operation-index:community-1',
+          value: {
+            communityOperations: [{ id: 'join-1' }],
+            id: 'community-1',
+            updatedAt: 10,
+          },
+        },
+      });
+      await jest.advanceTimersByTimeAsync(1);
+
+      expect(
+        registry.hasPendingHeadAdmissions('community-operation-index:'),
+      ).toBe(true);
+      await expect(
+        registry.findHead('community-operation-index:community-1'),
+      ).rejects.toThrow(ReplicatedStateNotReadyError);
       registry.clear();
     } finally {
       jest.useRealTimers();
@@ -1830,7 +2006,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockResolvedValue(false);
+      gate.verdictOf.mockResolvedValue('pending');
       registry.addMutationGate(gate);
       await registry.register('network-1', firstNetwork.stores);
       firstNetwork.heads.emitUpdate({
@@ -1851,10 +2027,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       await expect(
         registry.findPersistedHead('community:community-1'),
       ).rejects.toThrow(ReplicatedStateNotReadyError);
-      gate.accepts.mockClear();
+      gate.verdictOf.mockClear();
       await jest.advanceTimersByTimeAsync(2_000 + 10_000);
 
-      expect(gate.accepts).toHaveBeenCalled();
+      expect(gate.verdictOf).toHaveBeenCalled();
       registry.clear();
     } finally {
       jest.useRealTimers();
@@ -1873,7 +2049,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockResolvedValue(false);
+      gate.verdictOf.mockResolvedValue('pending');
       registry.addMutationGate(gate);
       await registry.register('network-1', firstNetwork.stores);
       firstNetwork.heads.emitUpdate({
@@ -1919,7 +2095,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         (collection) => collection === 'communityOperations',
       );
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockResolvedValue(false);
+      gate.verdictOf.mockResolvedValue('pending');
       registry.addMutationGate(gate);
       await registry.register('network-1', firstNetwork.stores);
       firstNetwork.heads.emitUpdate({
@@ -1933,22 +2109,22 @@ describe('OrbitDBReplicatedStateRegistry', () => {
         },
       });
       await jest.advanceTimersByTimeAsync(0);
-      gate.accepts.mockClear();
+      gate.verdictOf.mockClear();
 
       // The backoff offers at 2 s and 12 s. The retry interval at 60 s finds
       // the copy still pending and adds no offer of its own.
       await jest.advanceTimersByTimeAsync(60_000);
 
-      expect(gate.accepts).toHaveBeenCalledTimes(2);
+      expect(gate.verdictOf).toHaveBeenCalledTimes(2);
 
       // The backoff offers at 72 s, then retires the copy.
       await jest.advanceTimersByTimeAsync(12_000);
-      const backoffOffers = gate.accepts.mock.calls.length;
+      const backoffOffers = gate.verdictOf.mock.calls.length;
 
       // The retry interval at 120 s offers it again after the backoff.
       await jest.advanceTimersByTimeAsync(60_000);
 
-      expect(gate.accepts.mock.calls.length).toBeGreaterThan(backoffOffers);
+      expect(gate.verdictOf.mock.calls.length).toBeGreaterThan(backoffOffers);
       expect(registry.hasPendingHeadAdmissions('community:')).toBe(true);
       registry.clear();
     } finally {
@@ -1956,16 +2132,18 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     }
   });
 
-  describe('replicated documents the mutation gate rejected', () => {
+  describe('replicated documents the mutation gate has not admitted', () => {
     const gateOf = (
       collection: string,
-      accepts: () => boolean,
+      admitted: () => boolean,
     ): MockProxy<OrbitDBMutationGate> => {
       const gate = mock<OrbitDBMutationGate>();
 
       gate.governs.mockImplementation((name) => name === collection);
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockImplementation(() => Promise.resolve(accepts()));
+      gate.verdictOf.mockImplementation(() =>
+        Promise.resolve(admitted() ? 'accepted' : 'pending'),
+      );
 
       return gate;
     };
@@ -2177,7 +2355,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
         expect(
           registry.isDocumentPendingAdmission('identities', alias.key),
-        ).toBe(true);
+        ).toBe(false);
 
         await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
 
@@ -2214,7 +2392,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
-    it('offers a rejected document again as soon as the state it rests on replicates', async () => {
+    it('offers a held document again as soon as the state it rests on replicates', async () => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const { heads, identities, stores } = createStores();
       const projected: unknown[] = [];
@@ -2248,7 +2426,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
-    it('gives up on a document that stays rejected after the last attempt', async () => {
+    it('gives up on a document that stays pending after the last attempt', async () => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const { identities, stores } = createStores();
       const gate = gateOf('identities', () => false);
@@ -2264,16 +2442,16 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       });
       await jest.advanceTimersByTimeAsync(2_000 + 10_000 + 60_000);
 
-      expect(gate.accepts).toHaveBeenCalledTimes(4);
+      expect(gate.verdictOf).toHaveBeenCalledTimes(4);
 
       await jest.advanceTimersByTimeAsync(600_000);
 
-      expect(gate.accepts).toHaveBeenCalledTimes(4);
+      expect(gate.verdictOf).toHaveBeenCalledTimes(4);
       expect(projected).toEqual([]);
       registry.clear();
     });
 
-    it('gives up on a rejected document even when new state replicates after the last attempt', async () => {
+    it('gives up on a held document even when new state replicates after the last attempt', async () => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const { heads, identities, stores } = createStores();
       const gate = gateOf('identities', () => false);
@@ -2293,7 +2471,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       });
       await jest.advanceTimersByTimeAsync(600_000);
 
-      expect(gate.accepts).toHaveBeenCalledTimes(4);
+      expect(gate.verdictOf).toHaveBeenCalledTimes(4);
       registry.clear();
     });
 
@@ -2320,7 +2498,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       expect(projected).toEqual([]);
     });
 
-    it('bounds how many rejected documents wait to be offered again', async () => {
+    it('bounds how many held documents wait to be offered again', async () => {
       let memberReplicated = false;
       const registry = new OrbitDBReplicatedStateRegistry();
       const { identities, stores } = createStores();
@@ -2358,7 +2536,7 @@ describe('OrbitDBReplicatedStateRegistry', () => {
 
       gate.governs.mockImplementation((name) => name === 'contentReplication');
       gate.governsHead.mockReturnValue(false);
-      gate.accepts.mockResolvedValue(true);
+      gate.verdictOf.mockResolvedValue('accepted');
 
       return gate;
     };

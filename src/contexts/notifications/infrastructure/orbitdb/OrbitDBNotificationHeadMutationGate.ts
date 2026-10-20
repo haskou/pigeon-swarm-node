@@ -1,5 +1,8 @@
 import { PublicMutationGate } from '@app/contexts/public-mutations/infrastructure/PublicMutationGate';
-import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 
 /**
  * Admits a `notification:<recordId>` head only when it is the admitted signed
@@ -20,8 +23,8 @@ export class OrbitDBNotificationHeadMutationGate extends OrbitDBMutationGate {
     return false;
   }
 
-  public accepts(): Promise<boolean> {
-    return Promise.resolve(true);
+  public verdictOf(): Promise<OrbitDBMutationVerdict> {
+    return Promise.resolve('accepted');
   }
 
   public governsHead(key: string): boolean {

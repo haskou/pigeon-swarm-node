@@ -1,4 +1,11 @@
 /**
+ * `accepted` admits a record. `refused` means it can never become valid, so it
+ * is dropped for good. `pending` means it depends on replicated state or
+ * infrastructure that may still arrive, so it is held and judged again later.
+ */
+export type OrbitDBMutationVerdict = 'accepted' | 'pending' | 'refused';
+
+/**
  * Admission control for records that arrive through replicated OrbitDB state.
  * Collections it governs only enter canonical projections, heads and raw reads
  * after it accepts them; everything else passes through untouched.
@@ -10,10 +17,17 @@
 export abstract class OrbitDBMutationGate {
   public abstract governs(collection: string): boolean;
 
-  public abstract accepts(
+  public abstract verdictOf(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean>;
+  ): Promise<OrbitDBMutationVerdict>;
+
+  public async accepts(
+    collection: string,
+    record: Record<string, unknown>,
+  ): Promise<boolean> {
+    return (await this.verdictOf(collection, record)) === 'accepted';
+  }
 
   public abstract governsHead(key: string): boolean;
 

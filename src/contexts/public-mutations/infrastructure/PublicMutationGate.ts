@@ -1,11 +1,21 @@
-import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import { DomainError } from '@haskou/value-objects';
 
-import { InvalidPublicMutationError } from '../domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '../domain/errors/PublicMutationPendingError';
+import { PublicMutationProof } from '../domain/PublicMutationProof';
 import { PublicMutationRecord } from '../domain/PublicMutationRecord';
 import { PublicMutationPolicy } from '../domain/services/PublicMutationPolicy';
 import PublicMutationVerifier from '../domain/services/PublicMutationVerifier';
 
-/** Admits a replicated record only with a valid, authorized, scoped proof. */
+/**
+ * Admits a replicated record only with a valid, authorized, scoped proof.
+ * A record that can never be valid is refused, and so is one its policy or
+ * its author's authorization refuses. A record waiting on a parent that has
+ * not arrived yet, or on an infrastructure failure, is held until judged.
+ */
 export class PublicMutationGate extends OrbitDBMutationGate {
   private readonly policies: Map<string, PublicMutationPolicy>;
   private readonly collections: Set<string>;
@@ -28,6 +38,36 @@ export class PublicMutationGate extends OrbitDBMutationGate {
     this.collections = new Set(policies.map((policy) => policy.collection));
   }
 
+  /** Checks that need no replicated state; `undefined` means the record can never be valid. */
+  private intrinsicProof(
+    policy: PublicMutationPolicy,
+    record: Record<string, unknown>,
+  ): PublicMutationProof | undefined {
+    try {
+      const proof = PublicMutationRecord.proofOf(record);
+      const payload = PublicMutationRecord.payloadOf(record);
+
+      if (!proof || proof.isDeletion() !== (payload.removed === true)) {
+        return undefined;
+      }
+
+      const hasFrontier = proof.getBody().frontier !== undefined;
+
+      if (policy.requiresFrontier !== hasFrontier) {
+        return undefined;
+      }
+
+      this.verifier.assertIntrinsic(proof, {
+        ...policy.expectationOf(payload),
+        payload,
+      });
+
+      return proof;
+    } catch {
+      return undefined;
+    }
+  }
+
   public governs(collection: string): boolean {
     return this.collections.has(collection);
   }
@@ -41,53 +81,38 @@ export class PublicMutationGate extends OrbitDBMutationGate {
     return Promise.resolve(true);
   }
 
-  public async accepts(
+  public async verdictOf(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
-    if (!this.governs(collection)) return true;
+  ): Promise<OrbitDBMutationVerdict> {
+    if (!this.governs(collection)) return 'accepted';
+
+    const policy = this.policies.get(
+      PublicMutationGate.key(collection, record.scopeType),
+    );
+
+    if (!policy) return 'refused';
+
+    const proof = this.intrinsicProof(policy, record);
+
+    if (!proof) return 'refused';
 
     try {
-      const policy = this.policies.get(
-        PublicMutationGate.key(collection, record.scopeType),
+      await this.verifier.assertAuthorized(proof);
+      await policy.assertPermitted(
+        PublicMutationRecord.payloadOf(record),
+        proof.getAuthor().identityId,
+        proof.isDeletion(),
+        proof.getBody().frontier ?? [],
       );
 
-      if (!policy) return false;
-      await this.assertAccepted(policy, record);
+      return 'accepted';
+    } catch (error) {
+      const refusal =
+        error instanceof DomainError &&
+        !(error instanceof PublicMutationPendingError);
 
-      return true;
-    } catch {
-      return false;
+      return refusal ? 'refused' : 'pending';
     }
-  }
-
-  /** Throws when the record is not an authentic, permitted mutation. */
-  public async assertAccepted(
-    policy: PublicMutationPolicy,
-    record: Record<string, unknown>,
-  ): Promise<void> {
-    const proof = PublicMutationRecord.proofOf(record);
-    const payload = PublicMutationRecord.payloadOf(record);
-
-    if (!proof || proof.isDeletion() !== (payload.removed === true)) {
-      throw new InvalidPublicMutationError();
-    }
-
-    const frontier = proof.getBody().frontier;
-
-    if (policy.requiresFrontier !== (frontier !== undefined)) {
-      throw new InvalidPublicMutationError();
-    }
-
-    await this.verifier.verify(proof, {
-      ...policy.expectationOf(payload),
-      payload,
-    });
-    await policy.assertPermitted(
-      payload,
-      proof.getAuthor().identityId,
-      proof.isDeletion(),
-      frontier ?? [],
-    );
   }
 }

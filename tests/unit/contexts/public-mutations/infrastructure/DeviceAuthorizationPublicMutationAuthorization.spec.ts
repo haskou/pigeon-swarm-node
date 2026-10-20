@@ -3,6 +3,7 @@ import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTimeline';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationAuthorPrimitives } from '@app/contexts/public-mutations/domain/PublicMutationAuthorPrimitives';
 import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -97,12 +98,12 @@ describe(DeviceAuthorizationPublicMutationAuthorization.name, () => {
     }
   });
 
-  it('never trusts a revision above the head and accepts it once the head reaches it', async () => {
+  it('holds a revision above the head until the head reaches it', async () => {
     const lagging = authorization();
 
-    await expect(lagging.isAuthorized(authorOf(laptop, 4))).resolves.toBe(
-      false,
-    );
+    await expect(
+      lagging.isAuthorized(authorOf(laptop, 4)),
+    ).rejects.toBeInstanceOf(PublicMutationPendingError);
 
     repository.requireTimeline.mockResolvedValue(
       new DeviceAuthorizationTimeline([...states, states[3].enroll(phone)]),
@@ -113,12 +114,12 @@ describe(DeviceAuthorizationPublicMutationAuthorization.name, () => {
     ).resolves.toBe(true);
   });
 
-  it('refuses an identity without a replayable authorization', async () => {
+  it('holds an identity whose authorization chain has not arrived yet', async () => {
     repository.has.mockResolvedValue(false);
 
     await expect(
       authorization().isAuthorized(authorOf(owner, 0)),
-    ).resolves.toBe(false);
+    ).rejects.toBeInstanceOf(PublicMutationPendingError);
     expect(repository.requireTimeline).not.toHaveBeenCalled();
   });
 
@@ -133,7 +134,7 @@ describe(DeviceAuthorizationPublicMutationAuthorization.name, () => {
 
       return Promise.all(
         [owner, phone, laptop].flatMap((credential) =>
-          [0, 1, 2, 3, 4].map((revision) =>
+          [0, 1, 2, 3].map((revision) =>
             fresh.isAuthorized(authorOf(credential, revision)),
           ),
         ),

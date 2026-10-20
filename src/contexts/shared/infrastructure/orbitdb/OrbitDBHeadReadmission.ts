@@ -1,5 +1,5 @@
 /**
- * Where a degraded head is delivered once its gated records prove out.
+ * Where a held head is delivered once its gated records prove out.
  * `headKey` is the head's own key, without any alias, so the copies held for
  * one head, and the community heads that rest on it, can be found by it.
  */

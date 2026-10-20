@@ -237,7 +237,7 @@ export class OrbitDBRecordReadmission {
   /**
    * The offers are bounded per scope (a network or a store): past the active
    * bound a record waits in a FIFO queue of the same size, and past both it
-   * is dropped and the scope is overflowed. So a flood of rejected records
+   * is dropped and the scope is overflowed. So a flood of pending records
    * cannot pin them in memory, multiply the work of a wake, or take the place
    * of the records of another scope. A record whose key is already pending is
    * not scheduled again, so a record received many times waits once and keeps

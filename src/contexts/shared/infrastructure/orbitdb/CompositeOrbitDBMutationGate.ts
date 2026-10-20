@@ -1,6 +1,12 @@
-import { OrbitDBMutationGate } from './OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from './OrbitDBMutationGate';
 
-/** Combines gates; a record or head key is admitted only by every gate that governs it. */
+/**
+ * Combines gates; a record or head key is admitted only by every gate that governs it.
+ * A refusal from any governing gate refuses the record, and otherwise a pending gate holds it.
+ */
 export class CompositeOrbitDBMutationGate extends OrbitDBMutationGate {
   constructor(private readonly gates: OrbitDBMutationGate[]) {
     super();
@@ -10,16 +16,23 @@ export class CompositeOrbitDBMutationGate extends OrbitDBMutationGate {
     return this.gates.some((gate) => gate.governs(collection));
   }
 
-  public async accepts(
+  public async verdictOf(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
+  ): Promise<OrbitDBMutationVerdict> {
+    let verdict: OrbitDBMutationVerdict = 'accepted';
+
     for (const gate of this.gates) {
-      if (gate.governs(collection) && !(await gate.accepts(collection, record)))
-        return false;
+      if (!gate.governs(collection)) continue;
+
+      const next = await gate.verdictOf(collection, record);
+
+      if (next === 'refused') return 'refused';
+
+      if (next === 'pending') verdict = 'pending';
     }
 
-    return true;
+    return verdict;
   }
 
   public governsHead(key: string): boolean {

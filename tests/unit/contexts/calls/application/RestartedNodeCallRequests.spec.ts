@@ -121,11 +121,13 @@ describe('join and heartbeat against a restarted node', () => {
 
     gate.governs.mockImplementation((collection) => collection === 'calls');
     gate.governsHead.mockReturnValue(false);
-    gate.accepts.mockImplementation((_collection, record) =>
+    gate.verdictOf.mockImplementation((_collection, record) =>
       Promise.resolve(
         authorizationLoaded &&
           (calleeAuthorizationLoaded ||
-            record.scopeType !== 'call_participant'),
+            record.scopeType !== 'call_participant')
+          ? 'accepted'
+          : 'pending',
       ),
     );
     registry.addMutationGate(gate);

@@ -17,7 +17,10 @@ import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
 import { OrbitDBHeadRepairPublisher } from './OrbitDBHeadRepairPublisher';
 import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
-import { OrbitDBMutationGate } from './OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from './OrbitDBMutationGate';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBRecordReadmission } from './OrbitDBRecordReadmission';
@@ -36,19 +39,28 @@ type PersistedHeadCacheHydration = {
 type UnverifiedCopyKey = string | symbol;
 
 type UnverifiedHeadCopy = {
+  /** Digest of the admitted part last delivered for this copy. */
+  delivered?: UnverifiedCopyKey;
   onAdmitted: OrbitDBHeadReadmission['onAdmitted'];
   value: Record<string, unknown>;
 };
 
+/** A head's admitted part, and how many of its gated records were kept. */
+type GatedAdmission = {
+  admitted: Record<string, unknown>;
+  kept: number;
+  verdict: OrbitDBMutationVerdict;
+};
+
 type UnverifiedHeadCopies = Map<UnverifiedCopyKey, UnverifiedHeadCopy>;
 
-/** Held degraded heads of one network, by head key. */
+/** Held heads of one network, by head key. */
 type UnverifiedHeads = Map<string, UnverifiedHeadCopies>;
 
 /** Oldest held copies beyond this are dropped, per head key. */
 const MAX_UNVERIFIED_COPIES_PER_HEAD = 8;
 
-/** Held head keys per network; a degraded head beyond this is not held. */
+/** Held head keys per network; a head beyond this is not held. */
 const MAX_UNVERIFIED_HEADS_PER_NETWORK = 256;
 
 /** Held heads are offered again this often once their offers retire. */
@@ -56,6 +68,35 @@ const HEAD_RETRY_INTERVAL_MS = 60_000;
 
 const updatedAtOf = (value: Record<string, unknown>): number | undefined =>
   typeof value.updatedAt === 'number' ? value.updatedAt : undefined;
+
+/**
+ * A head that is not accepted is delivered demoted, so the records it does
+ * admit still reach readers without outranking a valid head.
+ */
+const deliveredHead = (
+  admitted: Record<string, unknown>,
+  verdict: OrbitDBMutationVerdict,
+): Record<string, unknown> =>
+  verdict === 'accepted' ? admitted : { ...admitted, updatedAt: 0 };
+
+/**
+ * The admitted part of a head with withheld records. Nothing is delivered
+ * until a gated record is kept, so a head with none admitted stays absent.
+ */
+const withheldPart = ({
+  admitted,
+  kept,
+}: GatedAdmission): Record<string, unknown> | undefined =>
+  kept > 0 ? deliveredHead(admitted, 'pending') : undefined;
+
+/** Pending outranks refused, and refused outranks accepted. */
+const worstVerdict = (
+  verdicts: OrbitDBMutationVerdict[],
+): OrbitDBMutationVerdict => {
+  if (verdicts.includes('pending')) return 'pending';
+
+  return verdicts.includes('refused') ? 'refused' : 'accepted';
+};
 
 export default class OrbitDBReplicatedStateRegistry {
   private static readonly DOCUMENT_STORE_NAMES: OrbitDBReplicatedDocumentStoreName[] =
@@ -351,22 +392,23 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  /** A throw is treated as pending: a record is refused only by a verdict. */
   private async admitRecord(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
+  ): Promise<OrbitDBMutationVerdict> {
     const gate = this.mutationGate;
 
-    if (!gate?.governs(collection)) return true;
+    if (!gate?.governs(collection)) return 'accepted';
 
     try {
-      return await gate.accepts(collection, record);
+      return await gate.verdictOf(collection, record);
     } catch {
       Kernel.logger.warn?.(
-        `Rejected unauthenticated replicated record: collection=${collection}`,
+        `Replicated record not yet verified: collection=${collection}`,
       );
 
-      return false;
+      return 'pending';
     }
   }
 
@@ -392,67 +434,91 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
     cleanDocument: Record<string, unknown>,
   ): Promise<void> {
-    if (!(await this.admitRecord(storeName, cleanDocument))) {
+    const verdict = await this.admitRecord(storeName, cleanDocument);
+
+    if (verdict !== 'accepted') {
       throw new InvalidPublicMutationError();
     }
   }
 
   /**
    * A record can depend on another record of the same batch (an operation
-   * lists its parents), so rejected records are offered again while the
-   * batch keeps admitting new ones. The order of the batch never matters.
+   * lists its parents), so records not yet admitted are offered again while
+   * the batch keeps admitting new ones. The order of the batch never matters.
    */
   private async admittedRecords(
     collection: string,
     records: Record<string, unknown>[],
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<{
+    admitted: Record<string, unknown>[];
+    unproven: OrbitDBMutationVerdict[];
+  }> {
     const admitted: Record<string, unknown>[] = [];
     let pending = records;
+    let unproven: OrbitDBMutationVerdict[] = [];
 
     while (pending.length > 0) {
-      const rejected: Record<string, unknown>[] = [];
+      const unadmitted: Record<string, unknown>[] = [];
+      const verdicts: OrbitDBMutationVerdict[] = [];
 
       for (const record of pending) {
-        if (await this.admitRecord(collection, record)) admitted.push(record);
-        else rejected.push(record);
+        const verdict = await this.admitRecord(collection, record);
+
+        if (verdict === 'accepted') {
+          admitted.push(record);
+        } else {
+          unadmitted.push(record);
+          verdicts.push(verdict);
+        }
       }
 
-      if (rejected.length === pending.length) break;
-      pending = rejected;
+      unproven = verdicts;
+
+      if (unadmitted.length === pending.length) break;
+
+      pending = unadmitted;
     }
 
-    return admitted;
+    return { admitted, unproven };
   }
 
   /**
-   * Admits the gated records of a head. A degraded head, one whose gated
-   * records do not all prove out, is held until it is admitted and yields
-   * `undefined`, so no partial head reaches the cache or a read. A degraded
-   * head without a `readmission` has no head key to be held under: it is
-   * dropped.
+   * Admits the gated records of a head. A pending record is withheld: the head
+   * is held under its key until that record can be verified, and only its
+   * admitted records are delivered, demoted, in the meantime. A head whose
+   * gated records can never prove out is delivered demoted. A pending head
+   * with no `readmission` has no key to be held under, so it is dropped, and
+   * so is a head that cannot be held.
    */
   private async admitHead(
     value: Record<string, unknown>,
     readmission?: OrbitDBHeadReadmission,
   ): Promise<Record<string, unknown> | undefined> {
     if (!this.mutationGate) return value;
-    const { admitted, degraded } = await this.admitGatedCollections(value);
 
-    if (!degraded) {
-      if (readmission) {
-        this.supersedeUnverifiedCopies(
-          readmission.networkId,
-          readmission.headKey,
-          admitted,
-        );
-      }
+    const admission = await this.admitGatedCollections(value);
 
-      return admitted;
+    if (admission.verdict === 'pending') {
+      const part = withheldPart(admission);
+
+      if (!readmission) return undefined;
+
+      if (!this.holdUnverifiedHead(value, readmission, part)) return undefined;
+
+      return part;
     }
 
-    if (readmission) this.holdUnverifiedHead(value, readmission);
+    const delivered = deliveredHead(admission.admitted, admission.verdict);
 
-    return undefined;
+    if (readmission) {
+      this.supersedeUnverifiedCopies(
+        readmission.networkId,
+        readmission.headKey,
+        delivered,
+      );
+    }
+
+    return delivered;
   }
 
   /**
@@ -505,47 +571,64 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  /**
+   * A head's verdict is its worst gated record. A non-record item in a gated
+   * list is refused: it can never prove out. An empty gated list has nothing
+   * unproven, so it is accepted. `kept` counts the gated records admitted.
+   */
   private async admitGatedCollections(
     value: Record<string, unknown>,
-  ): Promise<{ admitted: Record<string, unknown>; degraded: boolean }> {
+  ): Promise<GatedAdmission> {
     const admitted = { ...value };
-    let degraded = false;
+    const verdicts: OrbitDBMutationVerdict[] = [];
+    let kept = 0;
 
     for (const [collection, records] of Object.entries(value)) {
       if (!this.isGatedHeadCollection(collection, records)) continue;
 
-      const kept = await this.admittedRecords(
-        collection,
-        records.filter((record) => this.isRecord(record)),
-      );
+      const stored = records.filter((record) => this.isRecord(record));
+      const proven = await this.admittedRecords(collection, stored);
 
-      degraded ||= kept.length === 0 || kept.length !== records.length;
-      admitted[collection] = kept;
+      if (stored.length !== records.length) verdicts.push('refused');
+
+      verdicts.push(...proven.unproven);
+      kept += proven.admitted.length;
+      admitted[collection] = proven.admitted;
     }
 
-    return { admitted, degraded };
+    return { admitted, kept, verdict: worstVerdict(verdicts) };
   }
 
   /**
-   * Holds a degraded head under its head key and a digest of its value, so a
-   * copy received again waits once. A head key keeps its newest copies only.
-   * A copy is offered on every wake and every retry interval until the gate
-   * admits it, with no time limit: a head is held exactly as long as its gated
-   * records stay unproven. A head that is not plain JSON has no digest, so it
-   * is held under a fresh key.
+   * Holds a head whose gated records are pending under its head key and a
+   * digest of its value, so a copy received again waits once. A head key
+   * keeps its newest copies only. A copy is offered on every wake and every
+   * retry interval until the gate admits it, with no time limit: a head is
+   * held exactly as long as its gated records stay unproven. A head that is
+   * not plain JSON has no digest, so it is held under a fresh key. `delivered`
+   * is the admitted part already delivered for the copy. Returns whether the
+   * head is held.
    */
   private holdUnverifiedHead(
     value: Record<string, unknown>,
     { headKey, networkId, onAdmitted }: OrbitDBHeadReadmission,
-  ): void {
+    delivered?: Record<string, unknown>,
+  ): boolean {
     const heads: UnverifiedHeads =
       this.unverifiedHeads.get(networkId) ?? new Map();
     const copies: UnverifiedHeadCopies = heads.get(headKey) ?? new Map();
     const copyKey = this.unverifiedCopyKey(value);
 
-    if (copies.has(copyKey) || !this.canHoldHead(heads, headKey)) return;
+    if (copies.has(copyKey)) return true;
 
-    const copy: UnverifiedHeadCopy = { onAdmitted, value };
+    if (!this.canHoldHead(heads, headKey)) return false;
+
+    const deliveredKey = delivered && this.unverifiedCopyKey(delivered);
+    const copy: UnverifiedHeadCopy = {
+      delivered: deliveredKey,
+      onAdmitted,
+      value,
+    };
 
     copies.set(copyKey, copy);
 
@@ -559,6 +642,8 @@ export default class OrbitDBReplicatedStateRegistry {
     this.unverifiedHeads.set(networkId, heads);
     this.startHeadRetries();
     this.scheduleUnverifiedCopy(networkId, headKey, copyKey, copy);
+
+    return true;
   }
 
   /** A held head key keeps its copies; a new key needs a free slot. */
@@ -598,13 +683,27 @@ export default class OrbitDBReplicatedStateRegistry {
       return true;
     }
 
-    const { admitted, degraded } = await this.admitGatedCollections(copy.value);
+    const admission = await this.admitGatedCollections(copy.value);
 
-    if (degraded) return false;
+    if (admission.verdict === 'pending') {
+      // The admitted part is delivered whenever it changes, so a record that
+      // proves out is not held back by a sibling that is still pending.
+      const part = withheldPart(admission);
+      const partKey = part && this.unverifiedCopyKey(part);
 
-    await copy.onAdmitted(admitted);
+      if (part && partKey !== copy.delivered) {
+        copy.delivered = partKey;
+        await copy.onAdmitted(part);
+      }
+
+      return false;
+    }
+
+    const delivered = deliveredHead(admission.admitted, admission.verdict);
+
+    await copy.onAdmitted(delivered);
     this.unverifiedCopiesOf(networkId, headKey)?.delete(copyKey);
-    this.supersedeUnverifiedCopies(networkId, headKey, copy.value);
+    this.supersedeUnverifiedCopies(networkId, headKey, delivered);
 
     return true;
   }
@@ -753,7 +852,7 @@ export default class OrbitDBReplicatedStateRegistry {
     for (const record of await this.allRecords(store)) {
       if (
         this.isOfStoreNetwork(storeName, record.value, networkId) &&
-        (await this.admitRecord(storeName, record.value))
+        (await this.admitRecord(storeName, record.value)) === 'accepted'
       )
         admitted.push(record);
     }
@@ -840,17 +939,27 @@ export default class OrbitDBReplicatedStateRegistry {
     )
       return;
 
-    if (await this.admitRecord(storeName, document)) {
+    const verdict = await this.admitRecord(storeName, document);
+
+    if (verdict === 'accepted') {
       await deliver();
       this.wakeReadmissions();
 
       return;
     }
 
+    // Refused documents can never prove out: dropped, not offered again.
+    if (verdict === 'refused') return;
+
     this.readmissions.schedule({
       isCurrent: () => this.networkIdOfStore(storeName, store) !== undefined,
       offer: async (): Promise<boolean> => {
-        if (!(await this.admitRecord(storeName, document))) return false;
+        const latest = await this.admitRecord(storeName, document);
+
+        if (latest === 'pending') return false;
+
+        // A refused document is retired without delivery.
+        if (latest === 'refused') return true;
         await deliver();
         this.wakeReadmissions();
 
@@ -2362,35 +2471,48 @@ export default class OrbitDBReplicatedStateRegistry {
     let held = this.holdsUnverifiedHead(key);
 
     for (const [networkId, stores] of this.storesByNetworkId) {
-      const stored = this.recordValue(await stores.heads.get?.(key));
+      const cachedHead = await this.cacheStoredHead(networkId, stores, key);
 
-      if (!stored) continue;
+      held = this.holdsUnverifiedHead(key) || held;
 
-      const directRecord = await this.admitHead(
-        stored,
-        this.cachedHeadReadmission(networkId, key),
-      );
-
-      if (!directRecord) {
-        held = true;
-        continue;
-      }
-
-      if ((await this.admittedHeadKeys([key], directRecord)).length > 0) {
-        const cachedHead = this.cacheReplicatedHead(
-          networkId,
-          key,
-          directRecord,
-        );
-
-        return cachedHead ?? this.cachedHead(key);
-      }
+      if (cachedHead && !held) return cachedHead;
     }
 
-    // Never a partial head: a held head is read only once it is admitted.
+    // A held head is never read as a partial head: its admitted part waits
+    // in the cache until the held head is admitted.
     if (held) throw new ReplicatedStateNotReadyError();
 
     return undefined;
+  }
+
+  /**
+   * Admits the head one network stores under `key` and caches its admitted
+   * part; undefined when nothing is admitted.
+   */
+  private async cacheStoredHead(
+    networkId: string,
+    stores: OrbitDBPrivateNetworkStores,
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const stored = this.recordValue(await stores.heads.get?.(key));
+
+    if (!stored) return undefined;
+
+    const directRecord = await this.admitHead(
+      stored,
+      this.cachedHeadReadmission(networkId, key),
+    );
+
+    if (!directRecord) return undefined;
+
+    if ((await this.admittedHeadKeys([key], directRecord)).length === 0) {
+      return undefined;
+    }
+
+    return (
+      this.cacheReplicatedHead(networkId, key, directRecord) ??
+      this.cachedHead(key)
+    );
   }
 
   private registerHeadCacheListeners(
@@ -2668,12 +2790,14 @@ export default class OrbitDBReplicatedStateRegistry {
                 .map((record) => record.value)
                 .filter(matcher);
 
-          return this.admittedRecords(
+          const { admitted } = await this.admittedRecords(
             storeName,
             matched.filter((record) =>
               this.isOfStoreNetwork(storeName, record, networkId),
             ),
           );
+
+          return admitted;
         },
       ),
     );
@@ -2792,7 +2916,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.assertReady();
     const cleanDocument = this.cleanDocument(document);
 
-    if (!(await this.admitRecord(storeName, cleanDocument))) {
+    if ((await this.admitRecord(storeName, cleanDocument)) !== 'accepted') {
       throw new InvalidPublicMutationError();
     }
 
@@ -2815,6 +2939,10 @@ export default class OrbitDBReplicatedStateRegistry {
 
   public findHead(key: string): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
+
+    if (this.holdsUnverifiedHead(key)) {
+      return Promise.reject(new ReplicatedStateNotReadyError());
+    }
 
     return Promise.resolve(this.cachedHead(key));
   }
@@ -2846,15 +2974,15 @@ export default class OrbitDBReplicatedStateRegistry {
     prefix: string,
   ): Array<Record<string, unknown>> {
     return [...this.cachedHeadKeys()]
-      .filter((key) => key.startsWith(prefix))
+      .filter((key) => key.startsWith(prefix) && !this.holdsUnverifiedHead(key))
       .map((key) => this.cachedHead(key))
       .filter((head): head is Record<string, unknown> => head !== undefined);
   }
 
   /**
-   * Whether a degraded head under the prefix is held, not yet admitted. A held
-   * head is never cached, so answers built from the cache would miss it: they
-   * wait for it to be admitted instead.
+   * Whether a head under the prefix is held, not yet admitted. A held head
+   * keeps its admitted part in the cache, but reads and lists do not expose
+   * it: they wait for the head to be admitted instead.
    */
   public hasPendingHeadAdmissions(prefix: string): boolean {
     for (const heads of this.unverifiedHeads.values()) {
@@ -2866,7 +2994,13 @@ export default class OrbitDBReplicatedStateRegistry {
     return false;
   }
 
+  /**
+   * The cached head of a key, or nothing while the key is held: a held head's
+   * admitted part is not complete, so a write built on it would be partial.
+   */
   public findCachedHead(key: string): Record<string, unknown> | undefined {
+    if (this.holdsUnverifiedHead(key)) return undefined;
+
     return this.cachedHead(key);
   }
 
