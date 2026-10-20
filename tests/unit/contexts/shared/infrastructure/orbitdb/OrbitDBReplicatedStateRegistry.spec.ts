@@ -2169,18 +2169,18 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       await expect(registry.findHead('community:c-300')).rejects.toThrow(
         ReplicatedStateNotReadyError,
       );
-      // Past the queue the network is overflowed: no read answers missing or
-      // partial, not even for a key the node never saw.
+      // Past the queue the network is overflowed: a key it dropped waits.
       await expect(registry.findHead('community:c-513')).rejects.toThrow(
         ReplicatedStateNotReadyError,
       );
-      await expect(registry.findHead('community:unseen')).rejects.toThrow(
-        ReplicatedStateNotReadyError,
-      );
+      // A key nobody dropped or holds is not delayed by the overflow.
+      await expect(
+        registry.findHead('community:unseen'),
+      ).resolves.toBeUndefined();
       await expect(
         registry.findPersistedHead('community:unseen'),
-      ).rejects.toThrow(ReplicatedStateNotReadyError);
-      expect(registry.hasPendingHeadAdmissions('community-other:')).toBe(true);
+      ).resolves.toBeUndefined();
+      expect(registry.hasPendingHeadAdmissions('community:')).toBe(true);
 
       // The held heads prove out: the network drains and is readmitted in full.
       verdict = 'accepted';
@@ -2369,30 +2369,178 @@ describe('OrbitDBReplicatedStateRegistry', () => {
           });
         }
         await jest.advanceTimersByTimeAsync(0);
-        await expect(registry.findHead('community:unseen')).rejects.toThrow(
+        await expect(registry.findHead('community:c-530')).rejects.toThrow(
           ReplicatedStateNotReadyError,
         );
 
-        // 300 of the 600 prove out; 300 stay held, below the 512 bound.
-        provenUpTo = 300;
+        // 560 of the 600 prove out; 40 stay held, below the 512 bound.
+        provenUpTo = 560;
         await jest.advanceTimersByTimeAsync(10 * 60_000);
 
         for (
           let turn = 0;
-          turn < 1_000 && registry.hasPendingHeadAdmissions('community-other:');
+          turn < 1_000 && registry.hasPendingHeadAdmissions('community:c-530');
           turn += 1
         ) {
           await new Promise((resolve) => setImmediate(resolve));
         }
 
-        expect(registry.hasPendingHeadAdmissions('community-other:')).toBe(
+        // c-530 was dropped for want of room; the rescan proved it out.
+        expect(registry.hasPendingHeadAdmissions('community:c-530')).toBe(
           false,
+        );
+        await expect(registry.findHead('community:c-530')).resolves.toEqual(
+          expect.objectContaining({ id: 'c-530' }),
         );
         await expect(
           registry.findHead('community:unseen'),
         ).resolves.toBeUndefined();
-        await expect(registry.findHead('community:c-1')).resolves.toEqual(
-          expect.objectContaining({ id: 'c-1' }),
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('never makes a read of a key nobody dropped wait because the network overflowed, and never in another network', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const { network, registry } = await setup((record) =>
+          String(record.id).startsWith('honest'),
+        );
+        const other = createStores();
+
+        await registry.register('network-2', other.stores);
+        emit(other, 'community:b-1', 'honest-b', 10, true);
+
+        for (let index = 1; index <= 600; index += 1) {
+          emit(network, `community:a-${index}`, `junk-${index}`, 10, true);
+        }
+        await jest.advanceTimersByTimeAsync(0);
+
+        // Network 1 overflowed: a key it dropped waits.
+        await expect(registry.findHead('community:a-600')).rejects.toThrow(
+          ReplicatedStateNotReadyError,
+        );
+        // The verified head of network 2 and a key nobody holds do not.
+        await expect(registry.findHead('community:b-1')).resolves.toEqual(
+          expect.objectContaining({
+            communityOperations: [{ id: 'honest-b' }],
+          }),
+        );
+        await expect(
+          registry.findHead('community:unseen'),
+        ).resolves.toBeUndefined();
+        await expect(
+          registry.findPersistedHead('community:unseen'),
+        ).resolves.toBeUndefined();
+        expect(registry.hasPendingHeadAdmissions('community-b:')).toBe(false);
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not renew the hold of a key that expired unverified when fresh copies keep arriving, and gives up on it for good after three expiries', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const { network, registry } = await setup(() => false);
+
+        emit(network, 'community:c-3', 'planted-0', 10 ** 15);
+        await jest.advanceTimersByTimeAsync(16 * 60_000);
+        expect(registry.hasPendingHeadAdmissions('community:')).toBe(false);
+
+        // A fresh digest every 5 minutes for 14 minutes after the expiry.
+        for (let fresh = 1; fresh <= 2; fresh += 1) {
+          emit(network, 'community:c-3', `planted-${fresh}`, 10 ** 15);
+          await jest.advanceTimersByTimeAsync(5 * 60_000);
+          expect(registry.hasPendingHeadAdmissions('community:')).toBe(false);
+        }
+        await expect(
+          registry.findHead('community:c-3'),
+        ).resolves.toBeUndefined();
+
+        // After the cool-down the key is held again, and expires again.
+        await jest.advanceTimersByTimeAsync(6 * 60_000);
+        emit(network, 'community:c-3', 'planted-3', 10 ** 15);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(registry.hasPendingHeadAdmissions('community:')).toBe(true);
+        await jest.advanceTimersByTimeAsync(16 * 60_000);
+        await jest.advanceTimersByTimeAsync(16 * 60_000);
+        emit(network, 'community:c-3', 'planted-4', 10 ** 15);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(registry.hasPendingHeadAdmissions('community:')).toBe(true);
+        await jest.advanceTimersByTimeAsync(16 * 60_000);
+
+        // Three expiries: no fresh copy holds the key again.
+        await jest.advanceTimersByTimeAsync(60 * 60_000);
+        emit(network, 'community:c-3', 'planted-5', 10 ** 15);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(registry.hasPendingHeadAdmissions('community:')).toBe(false);
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('never makes the list wait on a key a peer planted, only on a head this node restored from its own cache', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const { network, registry } = await setup(() => false);
+
+        emit(network, 'community:random-planted', 'planted', 10 ** 15);
+        await jest.advanceTimersByTimeAsync(0);
+
+        // The read of the planted key waits; the list of known state does not.
+        expect(registry.hasPendingHeadAdmissions('community:')).toBe(true);
+        expect(registry.hasPendingRestoredHeadAdmissions('community:')).toBe(
+          false,
+        );
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('keeps the list waiting on an own head restored at start that its gate has not admitted yet', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+        const registry =
+          OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+        const { heads, stores } = createStores();
+        const gate = mock<OrbitDBMutationGate>();
+        let admitted = false;
+
+        gate.governs.mockImplementation(
+          (collection) => collection === 'communityOperations',
+        );
+        gate.governsHead.mockReturnValue(false);
+        gate.verdictOf.mockImplementation(() =>
+          Promise.resolve(admitted ? 'accepted' : 'pending'),
+        );
+        await headCache.save('network-1', 'community:own', {
+          communityOperations: [{ id: 'own-1' }],
+          id: 'own',
+          updatedAt: 10,
+        });
+        await headCache.markWarm('network-1', JSON.stringify(['head-1']));
+        heads.log = { heads: jest.fn(async () => [{ hash: 'head-1' }]) };
+        registry.addMutationGate(gate);
+        await registry.register('network-1', stores);
+
+        expect(registry.hasPendingRestoredHeadAdmissions('community:')).toBe(
+          true,
+        );
+
+        admitted = true;
+        await jest.advanceTimersByTimeAsync(5_000);
+
+        expect(registry.hasPendingRestoredHeadAdmissions('community:')).toBe(
+          false,
         );
         registry.clear();
       } finally {

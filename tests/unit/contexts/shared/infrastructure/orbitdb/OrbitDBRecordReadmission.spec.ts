@@ -274,6 +274,17 @@ describe('OrbitDBRecordReadmission', () => {
     expect(readmission.isOverflowed(scope)).toBe(true);
   });
 
+  it('tells the overflow of a scope only for the subjects it dropped', () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const scope = {};
+
+    flood(readmission, scope, async () => false);
+
+    expect(readmission.isOverflowedFor(scope, 'store:512')).toBe(true);
+    expect(readmission.isOverflowedFor(scope, 'store:1')).toBe(false);
+    expect(readmission.isOverflowedFor({}, 'store:512')).toBe(false);
+  });
+
   it('clears the overflow once the scope drained and was rescanned in full', async () => {
     const readmission = new OrbitDBRecordReadmission();
     const scope = {};

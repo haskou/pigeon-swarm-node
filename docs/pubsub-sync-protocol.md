@@ -743,10 +743,13 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   8 a key holds, is dropped and the network is overflowed. The flag is per network and
   clears as soon as the network's held heads fit again (fewer than 256 keys, no key at
   its 8 copies) and its heads were rescanned without dropping again; it does not wait
-  for the network to drain. While a network is overflowed, a read of a subject with no
-  verified head answers `503020` (never missing, never partial) and
-  `hasPendingHeadAdmissions` answers true; a subject with a verified head is read as
-  usual. Only the count of dropped heads is logged. A held head is offered again on
+  for the network to drain. The overflow is scoped: a read of a head key or a
+  document that the overflowed network or store dropped (up to 1024 are remembered;
+  past that the whole network or store waits) answers `503020` (never missing, never
+  partial) while it has no verified head, and `hasPendingHeadAdmissions` answers
+  true for it; every key of another network, a key nobody dropped or holds, and a
+  subject with a verified head are read as usual. Only the count of dropped heads is
+  logged. A held head is offered again on
   every 60 s retry, with one retry timer for the node, so offers never stack. A flood
   in one store never takes the place of another store's records, and one network's held
   heads never take another's places.
@@ -769,18 +772,25 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   so it never starts a second chain beside one that waits. A copy received again is not
   held twice when its value has a digest; a value without one is held as a new copy on
   each receipt, at most 8 per key, each with its own chain.
-- A held copy that never proves out is held for 15 minutes and then dropped. A
-  copy dropped this way is remembered (up to 1024 of them) and not held again, so a
-  peer cannot keep a subject waiting by re-sending it. Until then it can make only a
-  subject with no verified head answer `503020`; a peer that plants copies for a
-  subject the node never verified (an unknown parent, a proof signed with a future
-  `authorizationRevision`, a far future `updatedAt`) holds that subject, and the
-  community list while it lasts, for at most those 15 minutes per new copy. Residual: a
-  genuine head that needs more than 15 minutes of replication reads as missing until a
-  peer offers it again, and a peer can renew the hold with new copies, at the cost of
-  one distinct copy per renewal, bounded by the 256 + 256 keys and 8 copies. Held and
-  dropped copies are logged as counts with the prefix `Peer-induced hold`; a node that
-  is still opening answers `503020` and logs `node starting` instead.
+- A held copy that never proves out is held for 15 minutes and then dropped. The
+  expiry is remembered per head key (up to 1024 keys), not per copy: the key is not
+  held again for 15 minutes whatever digests arrive, and after 3 expiries it is never
+  held again while remembered, so a peer cannot keep a subject waiting by renewing
+  the hold with fresh copies. Until then a held copy makes only a subject with no
+  verified head answer `503020` on a read of that subject. It never delays the
+  community list: the list (`GET /communities`, and the discoverable list) waits only
+  for a head this node restored from its own persisted head cache at start and has not
+  verified yet, or one it dropped; a key a peer planted that this node never stored
+  is no reason to fail a list read. A community the node learns from a peer while
+  running is listed once its head is admitted. Residual: a planted key that was also
+  persisted gates the list for at most 15 minutes after a restart; a genuine head that
+  needs more than 15 minutes of replication reads as missing until a peer offers it
+  again after the cool-down. Held and dropped copies are logged as counts with the
+  prefix `Peer-induced hold`; a pending record is logged as a count, at most once a
+  minute, and a node that is still opening answers `503020` and logs `node starting`
+  instead. A head whose evidence check fails on an IPFS error is not cached, held or
+  retried: the key is dropped with a warning until a peer offers it again. A key is
+  marked verified also for a head the gate refused or that carried nothing to check.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).

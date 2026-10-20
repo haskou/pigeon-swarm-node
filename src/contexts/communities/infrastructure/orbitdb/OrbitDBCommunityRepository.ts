@@ -179,15 +179,19 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  /** The fold of the causal past of `frontier`; a hash not held yet is missing parents. */
+  /**
+   * The fold of the causal past of `frontier`. Only a frontier hash not held
+   * yet is missing parents (pending); an operation the fold refuses stays
+   * refused.
+   */
   private foldAtFrontier(
     operations: CommunityOperation[],
     frontier: string[],
-  ): ReturnType<typeof CommunityStateFold.fold> {
+  ): CommunityState {
+    let closure: CommunityOperation[];
+
     try {
-      return CommunityStateFold.fold(
-        CommunityStateFold.closureOf(operations, frontier),
-      );
+      closure = CommunityStateFold.closureOf(operations, frontier);
     } catch (error) {
       if (error instanceof InvalidCommunityOperationError) {
         throw new CommunityOperationParentsMissingError();
@@ -195,6 +199,8 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
 
       throw error;
     }
+
+    return CommunityStateFold.fold(closure);
   }
 
   /** Every community whose operations are cached locally, newest first. */
@@ -226,13 +232,16 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
   }
 
   /**
-   * The cached communities once every community head held back by the gate is
-   * admitted. Until then a held head is missing from the cache, so the list is
-   * not ready: it must not answer a partial or an empty list.
+   * The cached communities once every community head this node already knew
+   * (restored from its own head cache) and held back by the gate is admitted,
+   * and no community head was dropped for want of room. Until then a held head
+   * is missing from the cache, so the list is not ready: it must not answer a
+   * partial or an empty list. A head a peer plants under a key this node never
+   * had does not count: it is not part of the node's own list.
    */
   private caughtUpCachedCommunities(): Promise<Community[]> {
     if (
-      this.registry.hasPendingHeadAdmissions(
+      this.registry.hasPendingRestoredHeadAdmissions(
         OrbitDBCommunityRepository.HEAD_PREFIX,
       )
     ) {
