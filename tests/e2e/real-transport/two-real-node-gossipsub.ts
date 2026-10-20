@@ -4,6 +4,7 @@ import { ConversationId } from '@app/contexts/conversations/domain/value-objects
 import { ConversationOperationAction } from '@app/contexts/conversations/domain/value-objects/ConversationOperationAction';
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import {
   IdentitySignature,
   KeychainSignature,
@@ -1130,6 +1131,21 @@ function signRequest(
   return keyPair.sign(payload).valueOf();
 }
 
+/**
+ * `503020` is the node's "not ready yet" answer (`ReplicatedStateNotReadyError`):
+ * the replicated state has not loaded or been replayed yet, for example right
+ * after a restart. Waits retry it until their deadline. Any other failure,
+ * including a 503 with another body code, still fails at once.
+ */
+function isNotReadyAnswer(error: unknown): boolean {
+  return (
+    isHttpRequestError(error) &&
+    error.response.status === 503 &&
+    isRecord(error.response.data) &&
+    error.response.data.code === ReplicatedStateNotReadyError.CODE
+  );
+}
+
 async function waitFor(
   predicate: () => Promise<boolean> | boolean,
   label: string,
@@ -1137,17 +1153,24 @@ async function waitFor(
   describeState?: () => Promise<string> | string,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  let lastAnswerNotReady = false;
 
   while (Date.now() < deadline) {
     let satisfied: boolean;
 
     try {
       satisfied = await predicate();
+      lastAnswerNotReady = false;
     } catch (error) {
-      throw new Error(
-        `Failed while waiting for ${label}: ${error instanceof Error ? error.message : String(error)}`,
-        { cause: error },
-      );
+      if (!isNotReadyAnswer(error)) {
+        throw new Error(
+          `Failed while waiting for ${label}: ${error instanceof Error ? error.message : String(error)}`,
+          { cause: error },
+        );
+      }
+
+      lastAnswerNotReady = true;
+      satisfied = false;
     }
 
     if (satisfied) {
@@ -1160,6 +1183,7 @@ async function waitFor(
     await promise;
   }
 
+  const notReadyState = lastAnswerNotReady ? 'HTTP 503 (not ready)' : undefined;
   const state = describeState
     ? await Promise.resolve()
         .then(describeState)
@@ -1167,7 +1191,7 @@ async function waitFor(
           (error: unknown) =>
             `state unavailable (${error instanceof Error ? error.message : String(error)})`,
         )
-    : undefined;
+    : notReadyState;
 
   throw new Error(
     `Timed out waiting for ${label} after ${timeoutMs} ms${state === undefined ? '' : `; last observed state: ${state}`}`,
