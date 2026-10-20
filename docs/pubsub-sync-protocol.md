@@ -716,11 +716,16 @@ none cached it answers 503 while the head is held.
 - A held head is delivered only once every record in it is admitted: a partial head is
   never delivered. Delivering an admitted head drops the held copies of its key that it
   supersedes (those not newer than it); a newer copy stays held.
-- At most 256 rejected documents per store and 256 held head keys per network wait at
-  once. Past that a rejection of that store is final, and a degraded head of that
-  network is not held and is logged. A flood in one network never takes the place of
-  the records of another; communities that share a network (and its stores) share its
-  places.
+- At most 256 rejected documents per store wait in its readmission at once, and 256
+  more queue behind them in arrival order. A rejected document past both bounds is
+  dropped and the store is overflowed: until its queue drains and its documents are
+  projected again in full, `isDocumentPendingAdmission` answers every document of that
+  store as waiting, so a call endpoint answers `503020` for a call it does not hold. A
+  failed rescan is retried every 60 s. A degraded head is held under its network's
+  bounds: at most 256 held head keys per network wait at once, past that a degraded
+  head is not held and is logged. A held head copy the queue cannot take stays held and
+  is offered again on the next 60 s retry. A flood in one store never takes the place of
+  another store's records, and one network's held heads never take another's places.
 - A held head waits under its key and its value. A copy received again is not held
   twice; a different value under the same key waits beside it, and at most 8 copies
   per key wait: past that the oldest is dropped.
@@ -732,6 +737,11 @@ none cached it answers 503 while the head is held.
   72 s (at most 87 s when offers stall), and then the rejection is final. A held head
   has no final rejection: once its backoff retires it is offered again every 60 s, for
   as long as the node runs.
+- A held copy has one offer chain: its backoff, then the 60 s retry once the backoff
+  retires. The retry adds a copy only while no copy of its head key has an offer pending,
+  so it never starts a second chain beside one that waits. A copy received again is not
+  held twice when its value has a digest; a value without one is held as a new copy on
+  each receipt, at most 8 per key, each with its own chain.
 - A held copy that never proves out is held for as long as the node runs. A peer can
   publish a head with records that never admit, or with an `updatedAt` newer than the
   state it rests on, and hold the community list at 503020 across restarts, since the
@@ -743,6 +753,9 @@ none cached it answers 503 while the head is held.
   the state that woke it. Worst case per scope: 256 records offered about 39
   times each (3 retries and a wake every 2 s for 72 s); a head offer runs the
   gate once per gated record it carries.
+- A membership-request lookup by identity answers `503020` while a request head under
+  that identity's index is held, as the community list does, so a request is not
+  reported missing while it waits.
 - A read can ask whether a document waits for readmission, by store and id
   (`isDocumentPendingAdmission`), to tell "not admitted yet" from "missing". A
   call endpoint answers a call whose start waits as `503020` not ready instead
