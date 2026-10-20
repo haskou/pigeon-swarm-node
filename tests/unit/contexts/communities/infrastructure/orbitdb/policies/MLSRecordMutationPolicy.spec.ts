@@ -7,6 +7,9 @@ import { CommunityName } from '@app/contexts/communities/domain/value-objects/Co
 import { MLSRecordId } from '@app/contexts/communities/domain/value-objects/MLSRecordId';
 import { MLSRecordDocumentId } from '@app/contexts/communities/infrastructure/orbitdb/MLSRecordDocumentId';
 import MLSRecordMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/MLSRecordMutationPolicy';
+import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '@app/contexts/communities/domain/errors/CommunityOperationParentsMissingError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
@@ -99,6 +102,25 @@ describe('MLSRecordMutationPolicy', () => {
       await expect(
         policy.assertPermitted(record(), member.valueOf(), false, FRONTIER),
       ).resolves.toBeUndefined();
+    });
+
+    it('holds a record for a community, or a frontier, not replicated yet', async () => {
+      const communities = mock<CommunityRepository>();
+
+      policy = new MLSRecordMutationPolicy(communities);
+      communities.requireAtFrontier.mockRejectedValueOnce(
+        new CommunityNotFoundError(),
+      );
+      await expect(
+        policy.assertPermitted(record(), member.valueOf(), false, FRONTIER),
+      ).rejects.toThrow(PublicMutationPendingError);
+
+      communities.requireAtFrontier.mockRejectedValueOnce(
+        new CommunityOperationParentsMissingError(),
+      );
+      await expect(
+        policy.assertPermitted(record(), member.valueOf(), false, FRONTIER),
+      ).rejects.toThrow(PublicMutationPendingError);
     });
 
     it('rejects a non-member', async () => {

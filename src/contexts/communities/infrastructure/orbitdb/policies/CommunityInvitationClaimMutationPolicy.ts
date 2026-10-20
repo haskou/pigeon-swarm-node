@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
@@ -15,6 +16,7 @@ import { Community } from '../../../domain/Community';
 import { CommunityInvitationClaim } from '../../../domain/entities/invitations/CommunityInvitationClaim';
 import { CommunityInvitations } from '../../../domain/entities/invitations/CommunityInvitations';
 import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '../../../domain/errors/CommunityOperationParentsMissingError';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import OrbitDBCommunityRepository from '../OrbitDBCommunityRepository';
 
@@ -72,8 +74,11 @@ export default class CommunityInvitationClaimMutationPolicy extends PublicMutati
         ),
       )
       .catch((error: unknown) => {
-        if (error instanceof CommunityNotFoundError) {
-          throw new InvalidPublicMutationError();
+        if (
+          error instanceof CommunityNotFoundError ||
+          error instanceof CommunityOperationParentsMissingError
+        ) {
+          throw new PublicMutationPendingError();
         }
 
         throw error;

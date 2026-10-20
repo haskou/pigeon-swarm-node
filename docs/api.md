@@ -3809,7 +3809,7 @@ the full request target, query string included, exactly as sent.
 
 Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
 
-While any community head is held, because a record it rests on has not been admitted yet, the list answers `503` (code 503020) rather than a partial list, so a `200` never leaves out such a community. Retry; the request is safe to repeat.
+A community whose head the node has not verified yet, because a record it rests on has not been admitted and no earlier head of it was verified, makes the list answer `503` (code 503020) rather than a partial list, so a `200` never leaves out such a community. A community with a verified head is listed from it even while a peer's unverified copy of its head is held; held copies expire after 15 minutes. Retry; the request is safe to repeat.
 
 Response:
 
@@ -4109,7 +4109,7 @@ GET /community-membership-requests
 
 Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Requests are ordered by `updatedAt` descending, then request id descending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
 
-While any community head is held, because a record it rests on has not been admitted yet, the list answers `503` (code 503020) rather than a partial list, so a `200` never leaves out such a community. Retry; the request is safe to repeat.
+A community whose head the node has not verified yet, because a record it rests on has not been admitted and no earlier head of it was verified, makes the list answer `503` (code 503020) rather than a partial list, so a `200` never leaves out such a community. A community with a verified head is listed from it even while a peer's unverified copy of its head is held; held copies expire after 15 minutes. Retry; the request is safe to repeat.
 
 Response: `{ "requests": [...], "nextCursor": "<cursor or null>" }`.
 

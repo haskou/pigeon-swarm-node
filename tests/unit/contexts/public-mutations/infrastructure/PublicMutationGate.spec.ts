@@ -1,5 +1,7 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '@app/contexts/communities/domain/errors/CommunityOperationParentsMissingError';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityModerationLogId } from '@app/contexts/communities/domain/value-objects/CommunityModerationLogId';
 import CommunityChannelMessageMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityChannelMessageMutationPolicy';
@@ -172,7 +174,7 @@ describe('PublicMutationGate over pins', () => {
     registry.clear();
   });
 
-  it('delivers a pins head whose community is unknown without holding it', async () => {
+  it('holds a pins head whose community is not replicated yet', async () => {
     jest.useFakeTimers();
     const registry = new OrbitDBReplicatedStateRegistry();
     const signed = await sign(pin, 'put', 1);
@@ -195,8 +197,8 @@ describe('PublicMutationGate over pins', () => {
     onUpdate({ payload: { key: 'pins-head', value: { pins: [signed] } } });
     await jest.advanceTimersByTimeAsync(10);
 
-    expect(registry.hasPendingHeadAdmissions('pins')).toBe(false);
-    expect(registry.findCachedHead('pins-head')?.pins).toEqual([]);
+    expect(registry.hasPendingHeadAdmissions('pins')).toBe(true);
+    expect(registry.findCachedHead('pins-head')).toBeUndefined();
     registry.clear();
     jest.useRealTimers();
   });
@@ -289,6 +291,20 @@ describe('PublicMutationGate over pins', () => {
     await expect(
       gate.verdictOf('pins', await sign(pin, 'put', 1)),
     ).resolves.toBe('accepted');
+  });
+
+  it('holds a pin for a frontier this node does not hold yet, and maps a node that is still opening to pending explicitly', async () => {
+    const signed = await sign(pin, 'put', 1);
+
+    communityRepository.requireAtFrontier.mockRejectedValueOnce(
+      new CommunityOperationParentsMissingError(),
+    );
+    await expect(gate.verdictOf('pins', signed)).resolves.toBe('pending');
+
+    authorization.isAuthorized.mockRejectedValueOnce(
+      new ReplicatedStateNotReadyError(),
+    );
+    await expect(gate.verdictOf('pins', signed)).resolves.toBe('pending');
   });
 
   it('holds a record only on a pending policy or an infrastructure failure', async () => {
@@ -809,6 +825,20 @@ describe('PublicMutationGate over community membership requests', () => {
     await expect(
       gate.accepts('requests', await sign(request, requester)),
     ).resolves.toBe(true);
+  });
+
+  it('holds a join request for a community, or a frontier, this node has not replicated yet', async () => {
+    const signed = await sign(request, requester);
+
+    communityRepository.requireAtFrontier.mockRejectedValueOnce(
+      new CommunityNotFoundError(),
+    );
+    await expect(gate.verdictOf('requests', signed)).resolves.toBe('pending');
+
+    communityRepository.requireAtFrontier.mockRejectedValueOnce(
+      new CommunityOperationParentsMissingError(),
+    );
+    await expect(gate.verdictOf('requests', signed)).resolves.toBe('pending');
   });
 
   it('rejects an unsigned request', async () => {

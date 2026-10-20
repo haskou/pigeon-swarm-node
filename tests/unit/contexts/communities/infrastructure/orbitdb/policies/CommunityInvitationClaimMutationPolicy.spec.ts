@@ -5,6 +5,7 @@ import { CommunityStateFold } from '@app/contexts/communities/domain/operations/
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import OrbitDBCommunityRepository from '@app/contexts/communities/infrastructure/orbitdb/OrbitDBCommunityRepository';
 import CommunityInvitationClaimMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityInvitationClaimMutationPolicy';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { PublicMutationAuthorAuthorization } from '@app/contexts/public-mutations/domain/services/PublicMutationAuthorAuthorization';
@@ -173,13 +174,13 @@ describe('CommunityInvitationClaimMutationPolicy', () => {
       );
     });
 
-    it('rejects a claim for an unknown community', async () => {
+    it('holds a claim for a community not replicated yet', async () => {
       communityRepository.requireStateAtFrontier.mockRejectedValue(
         new CommunityNotFoundError(),
       );
 
       await expect(permit(claimOf(alice))).rejects.toThrow(
-        InvalidPublicMutationError,
+        PublicMutationPendingError,
       );
     });
 

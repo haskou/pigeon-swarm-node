@@ -683,7 +683,7 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   be removed. `removed`, `deletedAt` or `updatedAt` alone never win. A signed record
   outranks an unsigned one; unsigned records are rejected.
 - Index heads are unsigned wrappers: a head with records the gate does not admit is
-  held, not cached. The cache keeps the last admitted head until the held one is
+  held, not cached. The cache keeps the last verified head until the held one is
   admitted or superseded.
 - The unsigned reaction cascade tombstones on channel/community deletion are gone;
   the node cannot sign on behalf of users.
@@ -706,10 +706,14 @@ trigger matters because the record usually rests on exactly that state: on a slo
 a joiner's identity can replicate after the community head that lists its join, and
 the head would otherwise wait for the next retry.
 
-A head with a pending record is held, not cached. It is offered again the same way,
-and the community list answers 503 with error code 503020 for as long as any community
-head is held. A single-head read serves the last admitted copy from the cache; with
-none cached it answers 503 while the head is held.
+A head with a pending record is held, not cached. It is offered again the same way.
+A held copy is a candidate a peer offered; it never makes a subject unavailable while
+a verified head exists for it. A head is verified once one copy of it was admitted in
+full (or the node wrote it itself); reads, the community list and saves use that head
+and ignore the held candidates. Error code 503020 answers only for a subject with no
+verified head and a held copy: the node has not proven any head of it yet, for
+instance a stored head right after a restart. A read of such a subject never serves
+the admitted part of a held head.
 
 A record the gate refuses never becomes valid, so it is dropped and never offered again.
 A head that carries one is delivered demoted, with `updatedAt` 0, and is not held.
@@ -726,17 +730,23 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   store as waiting, so a call endpoint answers `503020` for a call it does not hold. A
   failed rescan is retried every 60 s. A head with a pending record is held under its
   network's bounds: at most 256 held head keys per network are offered at once, and 256
-  more queue behind them in arrival order. A head past both bounds is dropped and the
-  network is overflowed: until its held heads drained and its heads were rescanned in
-  full without dropping again, every head read answers `503020` (never missing, never
-  partial) and `hasPendingHeadAdmissions` answers true. One flag per network; only the
-  count of dropped heads is logged. A held head is offered again on every 60 s retry, with
-  no cap on re-arms and one retry timer for the node, so offers never stack. A flood in one
-  store never takes the place of another store's records, and one network's held heads
-  never take another's places.
+  more queue behind them in arrival order. A head past both bounds, or a copy past the
+  8 a key holds, is dropped and the network is overflowed. The flag is per network and
+  clears as soon as the network's held heads fit again (fewer than 256 keys, no key at
+  its 8 copies) and its heads were rescanned without dropping again; it does not wait
+  for the network to drain. While a network is overflowed, a read of a subject with no
+  verified head answers `503020` (never missing, never partial) and
+  `hasPendingHeadAdmissions` answers true; a subject with a verified head is read as
+  usual. Only the count of dropped heads is logged. A held head is offered again on
+  every 60 s retry, with one retry timer for the node, so offers never stack. A flood
+  in one store never takes the place of another store's records, and one network's held
+  heads never take another's places.
 - A held head waits under its key and its value. A copy received again is not held
   twice; a different value under the same key waits beside it, and at most 8 copies
-  per key wait: past that the oldest is dropped.
+  per key wait. A key that is full keeps the copies it holds, so junk copies cannot
+  evict a copy held earlier; a copy past the 8 overflows the network (see above) and is
+  offered again from the store when room is back. Copies are not ranked by the
+  `updatedAt` they claim before they are admitted.
 - A wake offers the pending records one after the other, and at most one wake runs at a
   time; one offer per record runs at a time. Neither a wake nor the backoff waits more
   than 5 s for an offer it started, nor at all for one already running, so an offer that
@@ -750,10 +760,18 @@ A head that carries one is delivered demoted, with `updatedAt` 0, and is not hel
   so it never starts a second chain beside one that waits. A copy received again is not
   held twice when its value has a digest; a value without one is held as a new copy on
   each receipt, at most 8 per key, each with its own chain.
-- A held copy that never proves out is held for as long as the node runs. A peer can
-  publish a head with records that never admit, or with an `updatedAt` newer than the
-  state it rests on, and hold the community list at 503020 across restarts, since the
-  head replays and is held again. The caps bound memory, not the hold.
+- A held copy that never proves out is held for 15 minutes and then dropped. A
+  copy dropped this way is remembered (up to 1024 of them) and not held again, so a
+  peer cannot keep a subject waiting by re-sending it. Until then it can make only a
+  subject with no verified head answer `503020`; a peer that plants copies for a
+  subject the node never verified (an unknown parent, a proof signed with a future
+  `authorizationRevision`, a far future `updatedAt`) holds that subject, and the
+  community list while it lasts, for at most those 15 minutes per new copy. Residual: a
+  genuine head that needs more than 15 minutes of replication reads as missing until a
+  peer offers it again, and a peer can renew the hold with new copies, at the cost of
+  one distinct copy per renewal, bounded by the 256 + 256 keys and 8 copies. Held and
+  dropped copies are logged as counts with the prefix `Peer-induced hold`; a node that
+  is still opening answers `503020` and logs `node starting` instead.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).

@@ -2,6 +2,7 @@ import {
   OrbitDBMutationGate,
   OrbitDBMutationVerdict,
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { DomainError } from '@haskou/value-objects';
 
 import { PublicMutationPendingError } from '../domain/errors/PublicMutationPendingError';
@@ -19,6 +20,21 @@ import PublicMutationVerifier from '../domain/services/PublicMutationVerifier';
 export class PublicMutationGate extends OrbitDBMutationGate {
   private readonly policies: Map<string, PublicMutationPolicy>;
   private readonly collections: Set<string>;
+
+  /**
+   * A refusal is a domain error about the record itself. A record that waits
+   * on replicated state is pending, and so is anything the node itself failed
+   * to judge, including a node that is still opening
+   * (`ReplicatedStateNotReadyError`, which is not a domain error).
+   */
+  private static isRefusal(error: unknown): boolean {
+    if (error instanceof ReplicatedStateNotReadyError) return false;
+
+    return (
+      error instanceof DomainError &&
+      !(error instanceof PublicMutationPendingError)
+    );
+  }
 
   private static key(collection: string, scopeType: unknown): string {
     return `${collection}\n${String(scopeType)}`;
@@ -108,11 +124,7 @@ export class PublicMutationGate extends OrbitDBMutationGate {
 
       return 'accepted';
     } catch (error) {
-      const refusal =
-        error instanceof DomainError &&
-        !(error instanceof PublicMutationPendingError);
-
-      return refusal ? 'refused' : 'pending';
+      return PublicMutationGate.isRefusal(error) ? 'refused' : 'pending';
     }
   }
 }

@@ -7,6 +7,7 @@ import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authoriz
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { CommunityOperationParentsMissingError } from '@app/contexts/communities/domain/errors/CommunityOperationParentsMissingError';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { signedMutation } from '../../../public-mutations/support/signedMutation';
@@ -309,7 +310,7 @@ describe('OrbitDBCommunityRepository', () => {
 
       await expect(
         repository.requireAtFrontier(communityId, ['B'.repeat(43)]),
-      ).rejects.toThrow();
+      ).rejects.toThrow(CommunityOperationParentsMissingError);
     });
 
     it('states the invitations as they were at the frontier', async () => {

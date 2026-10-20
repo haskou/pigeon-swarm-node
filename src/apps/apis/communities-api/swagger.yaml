@@ -118,7 +118,7 @@ paths:
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
         '503':
-          description: Node not ready (code 503020). While any community head is held, because a record it rests on has not been admitted yet, the node answers 503 rather than a partial list, so a 200 never leaves out such a community. Retry; the request is safe to repeat.
+          description: Node not ready (code 503020). A community whose head the node has not verified yet (a record it rests on is not admitted and no earlier head of it was verified) makes the node answer 503 rather than a partial list, so a 200 never leaves out such a community. A community with a verified head is listed from it while a peer's unverified copy is held; held copies expire after 15 minutes. Retry; the request is safe to repeat.
   /community-membership-requests:
     get:
       tags:
@@ -154,7 +154,7 @@ paths:
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
         '503':
-          description: Node not ready (code 503020). While any community head is held, because a record it rests on has not been admitted yet, the node answers 503 rather than a partial list, so a 200 never leaves out such a community. Retry; the request is safe to repeat.
+          description: Node not ready (code 503020). A community whose head the node has not verified yet (a record it rests on is not admitted and no earlier head of it was verified) makes the node answer 503 rather than a partial list, so a 200 never leaves out such a community. A community with a verified head is listed from it while a peer's unverified copy is held; held copies expire after 15 minutes. Retry; the request is safe to repeat.
     post:
       tags:
         - communities

@@ -8,6 +8,8 @@ import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/or
 import { Community } from '../../domain/Community';
 import { CommunityInvitations } from '../../domain/entities/invitations/CommunityInvitations';
 import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '../../domain/errors/CommunityOperationParentsMissingError';
+import { InvalidCommunityOperationError } from '../../domain/errors/InvalidCommunityOperationError';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
 import { CommunityOperationLimits } from '../../domain/operations/CommunityOperationLimits';
 import { CommunityState } from '../../domain/operations/CommunityState';
@@ -177,6 +179,24 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
+  /** The fold of the causal past of `frontier`; a hash not held yet is missing parents. */
+  private foldAtFrontier(
+    operations: CommunityOperation[],
+    frontier: string[],
+  ): ReturnType<typeof CommunityStateFold.fold> {
+    try {
+      return CommunityStateFold.fold(
+        CommunityStateFold.closureOf(operations, frontier),
+      );
+    } catch (error) {
+      if (error instanceof InvalidCommunityOperationError) {
+        throw new CommunityOperationParentsMissingError();
+      }
+
+      throw error;
+    }
+  }
+
   /** Every community whose operations are cached locally, newest first. */
   private cachedCommunities(): Community[] {
     return this.registry
@@ -254,11 +274,9 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     frontier: string[],
   ): Promise<{ community: Community; invitations: CommunityInvitations }> {
     const records = await this.operationIndex.findRecords(this.headKey(id));
-    const state = CommunityStateFold.fold(
-      CommunityStateFold.closureOf(
-        this.operationsOf(id.valueOf(), records),
-        frontier,
-      ),
+    const state = this.foldAtFrontier(
+      this.operationsOf(id.valueOf(), records),
+      frontier,
     );
     const community = this.activeCommunityOf(state);
 

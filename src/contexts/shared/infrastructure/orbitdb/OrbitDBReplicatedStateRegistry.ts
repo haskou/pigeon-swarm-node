@@ -41,6 +41,7 @@ type UnverifiedCopyKey = string | symbol;
 type UnverifiedHeadCopy = {
   /** Digest of the admitted part last delivered for this copy. */
   delivered?: UnverifiedCopyKey;
+  heldAt: number;
   onAdmitted: OrbitDBHeadReadmission['onAdmitted'];
   value: Record<string, unknown>;
 };
@@ -62,6 +63,15 @@ const MAX_UNVERIFIED_COPIES_PER_HEAD = 8;
 
 /** Held head keys per network that are offered to the gate first. */
 const MAX_UNVERIFIED_HEADS_PER_NETWORK = 256;
+
+/**
+ * A held copy no longer gates reads once it has waited this long. A peer
+ * plants copies that never prove out, so a hold must end by itself. The copy
+ * is remembered as expired and is not held again.
+ */
+const MAX_HELD_COPY_AGE_MS = 15 * 60_000;
+
+const MAX_EXPIRED_COPIES_REMEMBERED = 1024;
 
 /**
  * Held head keys per network that queue behind the active ones, in arrival
@@ -280,6 +290,13 @@ export default class OrbitDBReplicatedStateRegistry {
    */
   private readonly overflowedHeadNetworks = new Map<string, number>();
 
+  /** Head keys with a complete admission cached: their reads never wait on a held copy. */
+  private readonly verifiedHeadKeys = new Set<string>();
+
+  private readonly expiredHeadCopies = new Set<string>();
+
+  private loggedNodeStarting = false;
+
   private readonly rescanningHeadNetworks = new Set<string>();
 
   private headRetryTimer?: NodeJS.Timeout;
@@ -359,9 +376,22 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private assertReady(): void {
-    if (this.storesByNetworkId.size === 0) {
-      throw new ReplicatedStateNotReadyError();
+    if (this.storesByNetworkId.size > 0) {
+      this.loggedNodeStarting = false;
+
+      return;
     }
+
+    // Once per start, so a node that is opening is told apart from a hold a
+    // peer induced (see `recordHeadDrop`) without a line per read.
+    if (!this.loggedNodeStarting) {
+      this.loggedNodeStarting = true;
+      Kernel.logger.debug?.(
+        'Node starting: replicated state is not ready, reads answer not ready',
+      );
+    }
+
+    throw new ReplicatedStateNotReadyError();
   }
 
   private isStoreOverflowed(
@@ -527,6 +557,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const delivered = deliveredHead(admission.admitted, admission.verdict);
 
     if (readmission) {
+      this.verifiedHeadKeys.add(readmission.headKey);
       this.supersedeUnverifiedCopies(
         readmission.networkId,
         readmission.headKey,
@@ -637,22 +668,30 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (copies.has(copyKey)) return true;
 
+    if (this.expiredHeadCopies.has(this.expiredCopyId(headKey, copyKey))) {
+      return false;
+    }
+
     if (!this.canHoldHead(networkId, heads, headKey)) return false;
+
+    // A full key keeps the copies it has: a flood of junk copies cannot evict
+    // the copy that was held first. The refused copy overflows the network,
+    // so it is offered again once the held copies expire or prove out.
+    if (copies.size >= MAX_UNVERIFIED_COPIES_PER_HEAD) {
+      this.recordHeadDrop(networkId);
+
+      return false;
+    }
 
     const deliveredKey = delivered && this.unverifiedCopyKey(delivered);
     const copy: UnverifiedHeadCopy = {
       delivered: deliveredKey,
+      heldAt: Date.now(),
       onAdmitted,
       value,
     };
 
     copies.set(copyKey, copy);
-
-    for (const staleKey of copies.keys()) {
-      if (copies.size <= MAX_UNVERIFIED_COPIES_PER_HEAD) break;
-
-      copies.delete(staleKey);
-    }
 
     heads.set(headKey, copies);
     this.unverifiedHeads.set(networkId, heads);
@@ -680,17 +719,96 @@ export default class OrbitDBReplicatedStateRegistry {
       return true;
     }
 
+    this.recordHeadDrop(networkId);
+
+    return false;
+  }
+
+  /** Counts a head that could not be held; the count is the only thing logged. */
+  private recordHeadDrop(networkId: string): void {
     const dropped = (this.overflowedHeadNetworks.get(networkId) ?? 0) + 1;
 
     if (dropped === 1) {
       Kernel.logger.warn?.(
-        'Held head queue overflowed: head reads answer not ready until it drains',
+        'Peer-induced hold: held head bound reached, unverified head reads answer not ready until it has room',
       );
     }
     this.overflowedHeadNetworks.set(networkId, dropped);
     this.startHeadRetries();
+  }
 
-    return false;
+  private expiredCopyId(headKey: string, copyKey: UnverifiedCopyKey): string {
+    return `${headKey}\u0000${typeof copyKey === 'string' ? copyKey : ''}`;
+  }
+
+  /** Whether the held heads of a network leave room for a new key and copy. */
+  private hasHeadRoom(networkId: string): boolean {
+    const heads = this.unverifiedHeads.get(networkId);
+
+    if (!heads) return true;
+
+    if (heads.size >= MAX_UNVERIFIED_HEADS_PER_NETWORK) return false;
+
+    for (const copies of heads.values()) {
+      if (copies.size >= MAX_UNVERIFIED_COPIES_PER_HEAD) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Ends the hold of copies that waited too long. They stop gating reads and
+   * are not held again, so a peer cannot keep a key unavailable.
+   */
+  private expireHeldCopies(): void {
+    const oldest = Date.now() - MAX_HELD_COPY_AGE_MS;
+    let expired = 0;
+
+    for (const [networkId, heads] of this.unverifiedHeads) {
+      for (const [headKey, copies] of heads) {
+        expired += this.expireCopiesOf(headKey, copies, oldest);
+        this.pruneUnverifiedHead(networkId, headKey);
+      }
+    }
+
+    if (expired > 0) {
+      Kernel.logger.warn?.(
+        `Peer-induced hold: expired held head copies: count=${expired}`,
+      );
+    }
+  }
+
+  private expireCopiesOf(
+    headKey: string,
+    copies: UnverifiedHeadCopies,
+    oldest: number,
+  ): number {
+    let expired = 0;
+
+    for (const [copyKey, copy] of copies) {
+      if (copy.heldAt > oldest) continue;
+
+      copies.delete(copyKey);
+      expired += 1;
+      this.rememberExpiredCopy(headKey, copyKey);
+    }
+
+    return expired;
+  }
+
+  private rememberExpiredCopy(
+    headKey: string,
+    copyKey: UnverifiedCopyKey,
+  ): void {
+    if (typeof copyKey !== 'string') return;
+
+    this.expiredHeadCopies.add(this.expiredCopyId(headKey, copyKey));
+
+    for (const id of this.expiredHeadCopies) {
+      if (this.expiredHeadCopies.size <= MAX_EXPIRED_COPIES_REMEMBERED) break;
+
+      this.expiredHeadCopies.delete(id);
+    }
   }
 
   private isHeadScopeOverflowed(): boolean {
@@ -701,7 +819,7 @@ export default class OrbitDBReplicatedStateRegistry {
   private settleHeadOverflows(): void {
     for (const [networkId, dropped] of this.overflowedHeadNetworks) {
       if (
-        this.unverifiedHeads.has(networkId) ||
+        !this.hasHeadRoom(networkId) ||
         this.rescanningHeadNetworks.has(networkId)
       ) {
         continue;
@@ -788,6 +906,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const delivered = deliveredHead(admission.admitted, admission.verdict);
 
     await copy.onAdmitted(delivered);
+    this.verifiedHeadKeys.add(headKey);
     this.unverifiedCopiesOf(networkId, headKey)?.delete(copyKey);
     this.supersedeUnverifiedCopies(networkId, headKey, delivered);
 
@@ -842,6 +961,17 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  /**
+   * Whether a read of the key must wait. A key with a verified head never
+   * waits: a copy a peer offers, held or not, cannot make it unavailable. Only
+   * a key with nothing verified waits on its held copy.
+   */
+  private awaitsVerifiedHead(headKey: string): boolean {
+    if (this.verifiedHeadKeys.has(headKey)) return false;
+
+    return this.isHeadScopeOverflowed() || this.holdsUnverifiedHead(headKey);
+  }
+
   private holdsUnverifiedHead(headKey: string): boolean {
     for (const heads of this.unverifiedHeads.values()) {
       if (heads.has(headKey)) return true;
@@ -863,6 +993,7 @@ export default class OrbitDBReplicatedStateRegistry {
    * and on each retry interval, so a held head is never given up on.
    */
   private retryUnverifiedHeads(): void {
+    this.expireHeldCopies();
     this.settleHeadOverflows();
 
     if (this.unverifiedHeads.size === 0 && !this.isHeadScopeOverflowed()) {
@@ -2563,19 +2694,19 @@ export default class OrbitDBReplicatedStateRegistry {
   private async findStoredHead(
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
-    let held = this.holdsUnverifiedHead(key);
+    let cached: Record<string, unknown> | undefined;
 
     for (const [networkId, stores] of this.storesByNetworkId) {
-      const cachedHead = await this.cacheStoredHead(networkId, stores, key);
-
-      held = this.holdsUnverifiedHead(key) || held;
-
-      if (cachedHead && !held) return cachedHead;
+      cached = (await this.cacheStoredHead(networkId, stores, key)) ?? cached;
     }
 
-    // A held head is never read as a partial head: its admitted part waits
-    // in the cache until the held head is admitted.
-    if (held) throw new ReplicatedStateNotReadyError();
+    if (this.verifiedHeadKeys.has(key) && cached) return cached;
+
+    // A key with nothing verified never reads as a partial head: its admitted
+    // part waits in the cache until the held head is admitted.
+    if (this.awaitsVerifiedHead(key)) throw new ReplicatedStateNotReadyError();
+
+    if (cached) return cached;
 
     return undefined;
   }
@@ -2775,6 +2906,8 @@ export default class OrbitDBReplicatedStateRegistry {
     this.exactProjectedHeadKeys.clear();
     this.unverifiedHeads.clear();
     this.overflowedHeadNetworks.clear();
+    this.verifiedHeadKeys.clear();
+    this.expiredHeadCopies.clear();
     this.stopHeadRetries();
   }
 
@@ -3037,7 +3170,7 @@ export default class OrbitDBReplicatedStateRegistry {
   public findHead(key: string): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
 
-    if (this.isHeadScopeOverflowed() || this.holdsUnverifiedHead(key)) {
+    if (this.awaitsVerifiedHead(key)) {
       return Promise.reject(new ReplicatedStateNotReadyError());
     }
 
@@ -3048,8 +3181,6 @@ export default class OrbitDBReplicatedStateRegistry {
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
-
-    if (this.isHeadScopeOverflowed()) throw new ReplicatedStateNotReadyError();
 
     return this.findStoredHead(key);
   }
@@ -3073,7 +3204,7 @@ export default class OrbitDBReplicatedStateRegistry {
     prefix: string,
   ): Array<Record<string, unknown>> {
     return [...this.cachedHeadKeys()]
-      .filter((key) => key.startsWith(prefix) && !this.holdsUnverifiedHead(key))
+      .filter((key) => key.startsWith(prefix) && !this.awaitsVerifiedHead(key))
       .map((key) => this.cachedHead(key))
       .filter((head): head is Record<string, unknown> => head !== undefined);
   }
@@ -3088,7 +3219,9 @@ export default class OrbitDBReplicatedStateRegistry {
 
     for (const heads of this.unverifiedHeads.values()) {
       for (const headKey of heads.keys()) {
-        if (headKey.startsWith(prefix)) return true;
+        if (headKey.startsWith(prefix) && !this.verifiedHeadKeys.has(headKey)) {
+          return true;
+        }
       }
     }
 
@@ -3100,9 +3233,7 @@ export default class OrbitDBReplicatedStateRegistry {
    * admitted part is not complete, so a write built on it would be partial.
    */
   public findCachedHead(key: string): Record<string, unknown> | undefined {
-    if (this.isHeadScopeOverflowed() || this.holdsUnverifiedHead(key)) {
-      return undefined;
-    }
+    if (this.awaitsVerifiedHead(key)) return undefined;
 
     return this.cachedHead(key);
   }
@@ -3112,6 +3243,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const cleanValue = this.cleanDocument(value);
 
     for (const headKey of this.headKeyDeriver.cachedKeys(key, cleanValue)) {
+      this.verifiedHeadKeys.add(headKey);
       this.cacheProjectedHead(headKey, cleanValue);
     }
   }
