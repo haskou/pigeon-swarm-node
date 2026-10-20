@@ -58,6 +58,8 @@ paths:
               $ref: '#/components/schemas/CreateStickerPackBody'
       operationId: postStickersPacks
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
@@ -159,6 +161,8 @@ paths:
               $ref: '#/components/schemas/UpdateStickerPackBody'
       operationId: patchStickersPacksByPackId
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -191,6 +195,8 @@ paths:
               $ref: '#/components/schemas/AddStickerBody'
       operationId: postStickersPacksByPackIdStickers
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -223,6 +229,8 @@ paths:
               $ref: '#/components/schemas/StickerBody'
       operationId: patchStickersPacksByPackIdStickersByStickerId
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -254,6 +262,8 @@ paths:
               $ref: '#/components/schemas/DeleteStickerBody'
       operationId: deleteStickersPacksByPackIdStickersByStickerId
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -285,6 +295,10 @@ paths:
               $ref: '#/components/schemas/PutSavedStickerPackBody'
       operationId: putStickersPacksByPackIdSaved
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -311,6 +325,10 @@ paths:
               $ref: '#/components/schemas/SignedMutationBody'
       operationId: deleteStickersPacksByPackIdSaved
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -339,6 +357,10 @@ paths:
               $ref: '#/components/schemas/PutFavoriteStickerBody'
       operationId: putStickersPacksByPackIdStickersByStickerIdFavorite
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -366,6 +388,10 @@ paths:
               $ref: '#/components/schemas/SignedMutationBody'
       operationId: deleteStickersPacksByPackIdStickersByStickerIdFavorite
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -395,6 +421,10 @@ paths:
               $ref: '#/components/schemas/PutStickerUsageBody'
       operationId: putStickersPacksByPackIdStickersByStickerIdUsage
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

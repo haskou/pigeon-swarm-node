@@ -88,6 +88,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getNodeRelayConfiguration
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -115,6 +117,10 @@ paths:
               $ref: '#/components/schemas/NodeRelayConfigurationResource'
       operationId: putNodeRelayConfiguration
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -139,6 +145,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getNodeBlocks
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -201,6 +209,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getNodeBlocksPublication
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -228,6 +238,10 @@ paths:
               $ref: '#/components/schemas/NodeBlockPublicationResource'
       operationId: putNodeBlocksPublication
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -275,6 +289,8 @@ paths:
         - $ref: '#/components/parameters/PageCursor'
       operationId: getNodeBlockSources
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -314,6 +330,10 @@ paths:
                   type: boolean
       operationId: putNodeBlockSourcesByOwnerIdentityId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -340,6 +360,8 @@ paths:
         - $ref: '#/components/parameters/OwnerIdentityId'
       operationId: deleteNodeBlockSourcesByOwnerIdentityId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -371,6 +393,8 @@ paths:
         - $ref: '#/components/parameters/OwnerIdentityId'
       operationId: getNodeBlockSourcesByOwnerIdentityIdPendingEntries
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -445,6 +469,10 @@ paths:
                     type: string
       operationId: postNodeBlockSourcesByOwnerIdentityIdApprovals
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -471,6 +499,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getNodeBlockExceptions
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -498,6 +528,10 @@ paths:
               $ref: '#/components/schemas/NodeBlockExceptionsResource'
       operationId: putNodeBlockExceptions
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -528,6 +562,10 @@ paths:
               $ref: '#/components/schemas/PutNodeDiagnosticsBody'
       operationId: putNodeDiagnostics
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -551,6 +589,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getNodeDiagnostics
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -574,6 +614,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: deleteNodeDiagnostics
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '204':
@@ -592,6 +634,8 @@ paths:
         - $ref: '#/components/parameters/XOptionalSignature'
       operationId: getNodeNetworks
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -617,6 +661,10 @@ paths:
               $ref: '#/components/schemas/PostNodeNetworkBody'
       operationId: postNodeNetworks
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -646,6 +694,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: deleteNodeNetworksByNetworkId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -676,6 +726,10 @@ paths:
               $ref: '#/components/schemas/PutNodeOwnerBody'
       operationId: putNodeOwner
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -706,6 +760,10 @@ paths:
               $ref: '#/components/schemas/PutNodeRegistrationBody'
       operationId: putNodeRegistration
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -736,6 +794,10 @@ paths:
               $ref: '#/components/schemas/PostNodeRegistrationCodeBody'
       operationId: postNodeRegistrationCodes
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
@@ -761,6 +823,8 @@ paths:
         - $ref: '#/components/parameters/PageCursor'
       operationId: getNodeRegistrationCodes
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -791,6 +855,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: deleteNodeRegistrationCodesByCodeId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '204':

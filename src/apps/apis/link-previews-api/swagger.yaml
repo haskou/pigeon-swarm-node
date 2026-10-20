@@ -31,6 +31,8 @@ paths:
               $ref: '#/components/schemas/PostLinkPreviewBody'
       operationId: postLinkPreviews
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

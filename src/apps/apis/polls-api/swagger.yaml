@@ -22,6 +22,10 @@ paths:
               $ref: '#/components/schemas/PostPollBody'
       operationId: postPolls
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
@@ -47,6 +51,8 @@ paths:
         - $ref: '#/components/parameters/PollId'
       operationId: getPollsByPollId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -73,6 +79,10 @@ paths:
               $ref: '#/components/schemas/PatchPollBody'
       operationId: patchPollsByPollId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -99,6 +109,10 @@ paths:
               $ref: '#/components/schemas/PostPollVoteBody'
       operationId: postPollsByPollIdVotes
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -125,6 +139,10 @@ paths:
               $ref: '#/components/schemas/DeletePollVoteBody'
       operationId: deletePollsByPollIdVotesMe
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

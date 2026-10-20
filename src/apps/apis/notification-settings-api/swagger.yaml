@@ -21,6 +21,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getNotificationSettings
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -60,6 +62,10 @@ paths:
               $ref: '#/components/schemas/PutNotificationScopeSettingsBody'
       operationId: putNotificationSettingsScopes
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -85,6 +91,10 @@ paths:
               $ref: '#/components/schemas/DeleteNotificationScopeSettingsBody'
       operationId: deleteNotificationSettingsScopes
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '204':

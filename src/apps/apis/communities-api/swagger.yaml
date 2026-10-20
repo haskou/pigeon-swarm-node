@@ -29,6 +29,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunities
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -56,6 +58,10 @@ paths:
               $ref: '#/components/schemas/PostCommunityBody'
       operationId: postCommunities
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '201':
@@ -105,6 +111,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getDiscoverableCommunities
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -139,6 +147,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunityMembershipRequests
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -166,6 +176,10 @@ paths:
               $ref: '#/components/schemas/PostCommunityJoinRequestBody'
       operationId: postCommunityMembershipRequests
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -199,6 +213,10 @@ paths:
               $ref: '#/components/schemas/PatchCommunityMembershipRequestBody'
       operationId: patchCommunityMembershipRequestsByRequestId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -220,6 +238,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityId
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -250,6 +270,10 @@ paths:
               $ref: '#/components/schemas/PatchCommunityBody'
       operationId: patchCommunitiesByCommunityId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -273,6 +297,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdFrontier
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -308,6 +334,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdOperations
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -341,6 +369,8 @@ paths:
               $ref: '#/components/schemas/PostCommunityInvitationBody'
       operationId: postCommunitiesByCommunityIdInvitations
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -440,6 +470,8 @@ paths:
               $ref: '#/components/schemas/PostCommunityInvitationClaimBody'
       operationId: postCommunitiesByCommunityIdInvitationsByInvitationIdClaims
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -502,6 +534,8 @@ paths:
               $ref: '#/components/schemas/PostCommunityInvitationAdmissionBody'
       operationId: postCommunitiesByCommunityIdInvitationsByInvitationIdAdmissions
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -539,6 +573,8 @@ paths:
               $ref: '#/components/schemas/PostCommunityInvitationRevocationBody'
       operationId: postCommunitiesByCommunityIdInvitationsByInvitationIdRevocation
       responses:
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -576,6 +612,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdModerationLogs
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -613,6 +651,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdMembers
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -648,6 +688,10 @@ paths:
               $ref: '#/components/schemas/PutCommunityMemberRolesBody'
       operationId: putCommunitiesByCommunityIdMembersByIdentityIdRoles
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -677,6 +721,10 @@ paths:
               $ref: '#/components/schemas/PostCommunityBanBody'
       operationId: postCommunitiesByCommunityIdBans
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -710,6 +758,10 @@ paths:
               $ref: '#/components/schemas/DeleteCommunityBanBody'
       operationId: deleteCommunitiesByCommunityIdBansByIdentityId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -743,6 +795,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdRoles
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -771,6 +825,10 @@ paths:
               $ref: '#/components/schemas/CommunityRoleBody'
       operationId: postCommunitiesByCommunityIdRoles
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -805,6 +863,10 @@ paths:
               $ref: '#/components/schemas/CommunityRoleBody'
       operationId: patchCommunitiesByCommunityIdRolesByRoleId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -836,6 +898,10 @@ paths:
               $ref: '#/components/schemas/DeleteCommunityRoleBody'
       operationId: deleteCommunitiesByCommunityIdRolesByRoleId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -863,6 +929,10 @@ paths:
               $ref: '#/components/schemas/DeleteCommunityMemberBody'
       operationId: deleteCommunitiesByCommunityIdMembersMe
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -898,6 +968,10 @@ paths:
               $ref: '#/components/schemas/DeleteCommunityMemberByIdBody'
       operationId: deleteCommunitiesByCommunityIdMembersByIdentityId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -933,6 +1007,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdChannels
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -963,6 +1039,10 @@ paths:
               $ref: '#/components/schemas/PostCommunityChannelBody'
       operationId: postCommunitiesByCommunityIdChannels
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -999,6 +1079,10 @@ paths:
               $ref: '#/components/schemas/PatchCommunityChannelBody'
       operationId: patchCommunitiesByCommunityIdChannelsByChannelId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1032,6 +1116,10 @@ paths:
               $ref: '#/components/schemas/DeleteCommunityChannelBody'
       operationId: deleteCommunitiesByCommunityIdChannelsByChannelId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1066,6 +1154,10 @@ paths:
               $ref: '#/components/schemas/PatchCommunityChannelPermissionsBody'
       operationId: patchCommunitiesByCommunityIdChannelsByChannelIdPermissions
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1098,6 +1190,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunityDrafts
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1131,6 +1225,10 @@ paths:
               $ref: '#/components/schemas/CommunityChannelDraftBody'
       operationId: putCommunitiesByCommunityIdChannelsByChannelIdDraft
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1155,6 +1253,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdDraft
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1189,6 +1289,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdChannelsByChannelIdPins
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1227,6 +1329,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdMlsRecords
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1257,6 +1361,10 @@ paths:
               $ref: '#/components/schemas/PostMLSRecordBody'
       operationId: postCommunitiesByCommunityIdMlsRecords
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1301,6 +1409,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdChannelsByChannelIdMessages
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1336,6 +1446,10 @@ paths:
               $ref: '#/components/schemas/PostCommunityChannelMessageBody'
       operationId: postCommunitiesByCommunityIdChannelsByChannelIdMessages
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1371,6 +1485,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdMessages
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1414,6 +1530,10 @@ paths:
               $ref: '#/components/schemas/PutCommunityChannelMessageBody'
       operationId: putCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1452,6 +1572,10 @@ paths:
               $ref: '#/components/schemas/DeleteCommunityChannelMessageBody'
       operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageId
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1491,6 +1615,10 @@ paths:
               $ref: '#/components/schemas/CommunityChannelMessagePinBody'
       operationId: postCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdPin
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1525,6 +1653,10 @@ paths:
               $ref: '#/components/schemas/CommunityChannelMessageUnpinBody'
       operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdPin
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1558,6 +1690,8 @@ paths:
         - $ref: '#/components/parameters/XSignature'
       operationId: getCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdThread
       responses:
+        '401':
+          description: Invalid signed request.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1597,6 +1731,10 @@ paths:
               $ref: '#/components/schemas/CommunityChannelMessageReactionBody'
       operationId: postCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdReactions
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
@@ -1635,6 +1773,10 @@ paths:
               $ref: '#/components/schemas/CommunityChannelMessageReactionBody'
       operationId: deleteCommunitiesByCommunityIdChannelsByChannelIdMessagesByMessageIdReactions
       responses:
+        '401':
+          description: Invalid signed request.
+        '415':
+          description: Request body is not application/json.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
