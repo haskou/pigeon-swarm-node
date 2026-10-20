@@ -3741,7 +3741,9 @@ invitation proofs from `GET /communities/{communityId}/invitation-preview`.
 GET /communities
 ```
 
-Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
+Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). A non-numeric `limit` takes the default and a numeric one is clamped to 1..100, so `limit` never returns 400. Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110). The readiness check runs before the query is validated: while the node is not ready, a malformed cursor answers 503 with code `503020`, not 400.
+
+An empty `communities` list is returned with HTTP 200 only once the node has verified its own readiness: startup has finished and the replicated state is open, or the node holds no network and its stored configuration is readable and empty, as a fresh node does. "Verified" refers to node readiness only. It does not certify that every private community the identity belongs to is listed. While startup has not finished or the replicated state is not open yet, for example right after a restart while a network's store replays, the route answers HTTP 503 with code `503020` (`ReplicatedStateNotReadyError`) instead of an empty list. The same 503 answers while any community head is held, because a record it rests on has not been admitted yet, so a 200 never leaves out such a community; the private projection is outside that wait, as stated above. Retry on `503020`; do not treat it as an empty list.
 
 Response:
 
@@ -3801,6 +3803,8 @@ The request is signed as `GET /discoverable-communities?<query>`: the signature 
 the full request target, query string included, exactly as sent.
 
 Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Communities are ordered by id ascending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
+
+While any community head is held, because a record it rests on has not been admitted yet, the list answers `503` (code 503020) rather than a partial list, so a `200` never leaves out such a community. Retry; the request is safe to repeat.
 
 Response:
 
@@ -4099,6 +4103,8 @@ GET /community-membership-requests
 ```
 
 Query: `limit` (1..100, default 50) and `cursor` (the `nextCursor` of the previous page). Requests are ordered by `updatedAt` descending, then request id descending. Pass `nextCursor` as `cursor` to read the next page; `nextCursor` is null on the last page. A malformed cursor, or one from another list, returns 400 (code 400110).
+
+While any community head is held, because a record it rests on has not been admitted yet, the list answers `503` (code 503020) rather than a partial list, so a `200` never leaves out such a community. Retry; the request is safe to repeat.
 
 Response: `{ "requests": [...], "nextCursor": "<cursor or null>" }`.
 

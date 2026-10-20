@@ -39,6 +39,8 @@ paths:
                 $ref: '#/components/schemas/CommunitiesResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Node not ready (code 503020). The node has not finished startup, or its replicated state is not open yet, for example right after a restart while a network's store replays. It also answers 503 while any community head is held, because a record it rests on has not been admitted yet, so a 200 never leaves out such a community. An empty list is returned only once the node has verified its own readiness, so a 503 never means the caller has no communities. Readiness is checked before the query is validated, so a malformed cursor on a node that is not ready answers 503, not 400. The verified state covers node readiness only; it does not certify that every private community is listed. Retry; the request is safe to repeat.
     post:
       tags:
         - communities
@@ -115,6 +117,8 @@ paths:
                 $ref: '#/components/schemas/CommunityDiscoveryResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Node not ready (code 503020). While any community head is held, because a record it rests on has not been admitted yet, the node answers 503 rather than a partial list, so a 200 never leaves out such a community. Retry; the request is safe to repeat.
   /community-membership-requests:
     get:
       tags:
@@ -149,6 +153,8 @@ paths:
                 $ref: '#/components/schemas/CommunityMembershipRequestsResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Node not ready (code 503020). While any community head is held, because a record it rests on has not been admitted yet, the node answers 503 rather than a partial list, so a 200 never leaves out such a community. Retry; the request is safe to repeat.
     post:
       tags:
         - communities

@@ -418,9 +418,8 @@ so an operator learns who asked to join which community. Admissions can overshoo
 `maxUses` by one `maxUses` per mutually concurrent branch; this accepted residual
 is never repaired and evicts nobody. An admission counts toward the operation
 quota of its admitter, its author, like every operation.
-An
-operation with an unknown parent or unreplicated evidence is not stored; its head
-is demoted and re-admitted when the evidence replicates (see
+An operation with an unknown parent or unreplicated evidence is not stored; its head
+is held, not cached, until the evidence replicates (see
 [readmission](#readmission-of-rejected-records)).
 
 Limits: a member that holds a valid device can sign as many operations as it likes,
@@ -683,8 +682,9 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   digest. A tombstone (`removed: true`) must be a signed `delete`; a `put` must not
   be removed. `removed`, `deletedAt` or `updatedAt` alone never win. A signed record
   outranks an unsigned one; unsigned records are rejected.
-- Index heads are unsigned wrappers: a head that lost records after admission is
-  demoted to `updatedAt: 0` and cannot replace an admitted head.
+- Index heads are unsigned wrappers: a head with records the gate does not admit is
+  held, not cached. The cache keeps the last admitted head until the held one is
+  admitted or superseded.
 - The unsigned reaction cascade tombstones on channel/community deletion are gone;
   the node cannot sign on behalf of users.
 - Limits: device authorization is evaluated at the revision the proof claims
@@ -698,35 +698,44 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
 
 #### Readmission of rejected records
 
-A replicated document the gate rejects, and a head demoted because some of its
-records were rejected, are offered to the gate again: 2 s, 10 s and 60 s after the
-rejection, and in between, at most once every 2 s, whenever the node admits new
-replicated state (an admitted document or a newly cached head, including a local
-projection such as the identity metadata of an admitted identity). The second
-trigger matters because the record usually rests on exactly that state: on a
-slow node a joiner's identity can replicate after the community head that lists
-its join, and the head would otherwise stay demoted until the 60 s retry.
+A replicated document the gate rejects is offered to the gate again: 2 s, 10 s and
+60 s after the rejection, and in between, at most once every 2 s, whenever the node
+admits new replicated state (an admitted document or a newly cached head, including a
+local projection such as the identity metadata of an admitted identity). The second
+trigger matters because the record usually rests on exactly that state: on a slow node
+a joiner's identity can replicate after the community head that lists its join, and
+the head would otherwise wait for the next retry.
 
-- The gate decides every offer in full; a readmitted record is one the gate
-  accepts now. Readmission never widens what is admitted.
-- A demoted head that admits more records than before is delivered again, still
-  demoted, until every record is admitted.
-- At most 256 rejected documents per store and 256 demoted heads per network
-  wait at once; past that a rejection of that store or network is final. A flood
-  in one network never takes the place of the records of another; communities
-  that share a network (and its stores) share its places.
-- A demoted head waits under its key and its value. A copy received again does
-  not wait twice and keeps its first wait; a different value under the same key,
-  from any peer, waits beside it and never takes the place of the pending one.
-- A wake offers the pending records one after the other, and at most one wake
-  runs at a time; one offer per record runs at a time. Neither a wake nor the
-  backoff waits more than 5 s for an offer it started, nor at all for one
-  already running, so an offer that never resolves stalls neither the later
-  wakes nor the retirement of its record.
-- New state never extends the wait: wake offers fall inside the same window of
-  72 s (at most 87 s when offers stall), after the 60 s attempt the rejection is
-  final, and a record of a store or network that is no longer registered is
-  dropped.
+A head with a rejected record is held, not cached. It is offered again the same way,
+and the community list answers 503 with error code 503020 for as long as any community
+head is held. A single-head read serves the last admitted copy from the cache; with
+none cached it answers 503 while the head is held.
+
+- The gate decides every offer in full; a readmitted record is one the gate accepts
+  now. Readmission never widens what is admitted.
+- A held head is delivered only once every record in it is admitted: a partial head is
+  never delivered. Delivering an admitted head drops the held copies of its key that it
+  supersedes (those not newer than it); a newer copy stays held.
+- At most 256 rejected documents per store and 256 held head keys per network wait at
+  once. Past that a rejection of that store is final, and a degraded head of that
+  network is not held and is logged. A flood in one network never takes the place of
+  the records of another; communities that share a network (and its stores) share its
+  places.
+- A held head waits under its key and its value. A copy received again is not held
+  twice; a different value under the same key waits beside it, and at most 8 copies
+  per key wait: past that the oldest is dropped.
+- A wake offers the pending records one after the other, and at most one wake runs at a
+  time; one offer per record runs at a time. Neither a wake nor the backoff waits more
+  than 5 s for an offer it started, nor at all for one already running, so an offer that
+  never resolves stalls neither the later wakes nor the retirement of its record.
+- New state never extends a record's wait: its offers fall inside the same window of
+  72 s (at most 87 s when offers stall), and then the rejection is final. A held head
+  has no final rejection: once its backoff retires it is offered again every 60 s, for
+  as long as the node runs.
+- A held copy that never proves out is held for as long as the node runs. A peer can
+  publish a head with records that never admit, or with an `updatedAt` newer than the
+  state it rests on, and hold the community list at 503020 across restarts, since the
+  head replays and is held again. The caps bound memory, not the hold.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).
