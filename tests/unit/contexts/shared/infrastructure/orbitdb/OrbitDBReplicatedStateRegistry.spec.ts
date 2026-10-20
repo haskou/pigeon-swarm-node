@@ -1629,11 +1629,9 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       });
       await jest.advanceTimersByTimeAsync(0);
 
-      await expect(registry.findHead('community:community-1')).resolves.toEqual(
-        expect.not.objectContaining({
-          communityOperations: [{ id: 'operation-1' }],
-        }),
-      );
+      await expect(
+        registry.findHead('community:community-1'),
+      ).resolves.toBeUndefined();
 
       authorizationHeadReplicated = true;
       await jest.advanceTimersByTimeAsync(2_000);
@@ -1679,11 +1677,9 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       });
       await jest.advanceTimersByTimeAsync(2_000 + 10_000);
 
-      await expect(registry.findHead('community:community-1')).resolves.toEqual(
-        expect.not.objectContaining({
-          communityOperations: [{ id: 'join-1' }],
-        }),
-      );
+      await expect(
+        registry.findHead('community:community-1'),
+      ).resolves.toBeUndefined();
 
       firstNetwork.heads.emitUpdate({
         payload: {
@@ -1939,11 +1935,17 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       await jest.advanceTimersByTimeAsync(0);
       gate.accepts.mockClear();
 
-      // The backoff offers at 2 s, 12 s and 72 s, then retires the copy.
-      await jest.advanceTimersByTimeAsync(72_000);
+      // The backoff offers at 2 s and 12 s. The retry interval at 60 s finds
+      // the copy still pending and adds no offer of its own.
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      expect(gate.accepts).toHaveBeenCalledTimes(2);
+
+      // The backoff offers at 72 s, then retires the copy.
+      await jest.advanceTimersByTimeAsync(12_000);
       const backoffOffers = gate.accepts.mock.calls.length;
 
-      // The retry interval at 60 s and 120 s offers it again after the backoff.
+      // The retry interval at 120 s offers it again after the backoff.
       await jest.advanceTimersByTimeAsync(60_000);
 
       expect(gate.accepts.mock.calls.length).toBeGreaterThan(backoffOffers);
@@ -2046,6 +2048,44 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       await jest.advanceTimersByTimeAsync(2_000);
 
       expect(registry.isDocumentPendingAdmission('calls', 'call:1')).toBe(
+        false,
+      );
+      registry.clear();
+    });
+
+    it('answers a read of an overflowed store as pending until it is readmitted', async () => {
+      let memberReplicated = false;
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { calls, stores } = createStores();
+      const entries = Array.from({ length: 513 }, (_, index): OrbitDBEntry => ({
+        hash: `call-${index}`,
+        next: [],
+        payload: { value: { id: `call:${index}` } },
+      }));
+
+      calls.log = {
+        get: () => Promise.resolve(undefined),
+        heads: jest.fn((): Promise<OrbitDBEntry[]> => Promise.resolve(entries)),
+      };
+      registry.addMutationGate(gateOf('calls', () => memberReplicated));
+      await registry.register('network-1', stores);
+      await registry.onDocumentUpdated('calls', () => undefined, {
+        includeHistory: true,
+      });
+
+      // The 513th replayed call was dropped: it is not pending, the store is.
+      expect(registry.isDocumentPendingAdmission('calls', 'call:512')).toBe(
+        true,
+      );
+      expect(
+        registry.isDocumentPendingAdmission('identities', 'call:512'),
+      ).toBe(false);
+
+      memberReplicated = true;
+      await jest.advanceTimersByTimeAsync(4_000);
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(registry.isDocumentPendingAdmission('calls', 'call:512')).toBe(
         false,
       );
       registry.clear();

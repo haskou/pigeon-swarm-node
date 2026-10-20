@@ -230,7 +230,8 @@ describe('OrbitDBRecordReadmission', () => {
     const readmission = new OrbitDBRecordReadmission();
     const offer = (): Promise<boolean> => Promise.resolve(false);
 
-    for (let index = 0; index < 256; index++) {
+    // The active bound and the queue behind it hold 512 records; the next is dropped.
+    for (let index = 0; index < 512; index++) {
       readmission.schedule({ isCurrent: current, offer, scope: 'network' });
     }
     readmission.schedule({
@@ -241,5 +242,77 @@ describe('OrbitDBRecordReadmission', () => {
     });
 
     expect(readmission.isPending('calls:call:1')).toBe(false);
+  });
+
+  const flood = (
+    readmission: OrbitDBRecordReadmission,
+    scope: object,
+    offer: () => Promise<boolean>,
+    reconcile?: () => Promise<void>,
+  ): void => {
+    for (let index = 0; index < 513; index++) {
+      readmission.schedule({
+        isCurrent: current,
+        key: `record-${index}`,
+        offer,
+        reconcile,
+        scope,
+        subject: `store:${index}`,
+      });
+    }
+  };
+
+  it('queues the records past the active bound and drops past the queue', () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const scope = {};
+
+    flood(readmission, scope, async () => false);
+
+    expect(readmission.isPending('store:255')).toBe(true);
+    expect(readmission.isPending('store:511')).toBe(true);
+    expect(readmission.isPending('store:512')).toBe(false);
+    expect(readmission.isOverflowed(scope)).toBe(true);
+  });
+
+  it('clears the overflow once the scope drained and was rescanned in full', async () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const scope = {};
+    const offer = jest.fn(async () => true);
+    const reconcile = jest.fn(async (): Promise<void> => undefined);
+
+    flood(readmission, scope, offer, reconcile);
+
+    expect(readmission.isOverflowed(scope)).toBe(true);
+
+    await jest.advanceTimersByTimeAsync(
+      OrbitDBRecordReadmission.DELAYS_MS[0] * 2,
+    );
+
+    expect(offer).toHaveBeenCalledTimes(512);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(readmission.isOverflowed(scope)).toBe(false);
+  });
+
+  it('retries the rescan of an overflowed scope until it completes', async () => {
+    const readmission = new OrbitDBRecordReadmission();
+    const scope = {};
+    let attempts = 0;
+    const reconcile = jest.fn(async (): Promise<void> => {
+      attempts += 1;
+
+      if (attempts === 1) throw new Error('rescan failed');
+    });
+
+    flood(readmission, scope, async () => true, reconcile);
+
+    await jest.advanceTimersByTimeAsync(4_000);
+
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(readmission.isOverflowed(scope)).toBe(true);
+
+    await jest.advanceTimersByTimeAsync(60_000);
+
+    expect(reconcile).toHaveBeenCalledTimes(2);
+    expect(readmission.isOverflowed(scope)).toBe(false);
   });
 });

@@ -307,6 +307,18 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  private isStoreOverflowed(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+  ): boolean {
+    for (const stores of this.storesByNetworkId.values()) {
+      const store = this.getStore(stores, storeName);
+
+      if (store && this.readmissions.isOverflowed(store)) return true;
+    }
+
+    return false;
+  }
+
   private getStore(
     stores: OrbitDBPrivateNetworkStores,
     storeName: OrbitDBReplicatedDocumentStoreName,
@@ -531,16 +543,7 @@ export default class OrbitDBReplicatedStateRegistry {
     const copies: UnverifiedHeadCopies = heads.get(headKey) ?? new Map();
     const copyKey = this.unverifiedCopyKey(value);
 
-    if (copies.has(copyKey)) return;
-
-    if (
-      !heads.has(headKey) &&
-      heads.size >= MAX_UNVERIFIED_HEADS_PER_NETWORK
-    ) {
-      Kernel.logger.warn?.('Degraded head not held: held head limit reached');
-
-      return;
-    }
+    if (copies.has(copyKey) || !this.canHoldHead(heads, headKey)) return;
 
     const copy: UnverifiedHeadCopy = { onAdmitted, value };
 
@@ -556,6 +559,17 @@ export default class OrbitDBReplicatedStateRegistry {
     this.unverifiedHeads.set(networkId, heads);
     this.startHeadRetries();
     this.scheduleUnverifiedCopy(networkId, headKey, copyKey, copy);
+  }
+
+  /** A held head key keeps its copies; a new key needs a free slot. */
+  private canHoldHead(heads: UnverifiedHeads, headKey: string): boolean {
+    if (heads.has(headKey) || heads.size < MAX_UNVERIFIED_HEADS_PER_NETWORK) {
+      return true;
+    }
+
+    Kernel.logger.warn?.('Degraded head not held: held head limit reached');
+
+    return false;
   }
 
   private scheduleUnverifiedCopy(
@@ -634,7 +648,9 @@ export default class OrbitDBReplicatedStateRegistry {
     const heads = this.unverifiedHeads.get(networkId);
 
     if (!heads) return;
+
     if (heads.get(headKey)?.size === 0) heads.delete(headKey);
+
     if (heads.size === 0) this.unverifiedHeads.delete(networkId);
   }
 
@@ -839,6 +855,11 @@ export default class OrbitDBReplicatedStateRegistry {
         this.wakeReadmissions();
 
         return true;
+      },
+      reconcile: async (): Promise<void> => {
+        if (this.networkIdOfStore(storeName, store) === undefined) return;
+
+        await this.projectCanonicalDocuments(storeName, store);
       },
       scope: store,
       subject:
@@ -2692,17 +2713,24 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   /**
-   * Whether this node holds the document but has not admitted it yet and still
-   * may: the gate rejected it, possibly because the authorization it rests on
-   * had not loaded yet (right after a restart), and it waits to be offered
-   * again. It lets a read tell "not ready yet" from "missing". The wait is
-   * bounded, so a forged document keeps this answer for a short while at most.
+   * Whether a read of the document must wait rather than answer "missing".
+   * This node holds the document but has not admitted it yet and still may:
+   * the gate rejected it, possibly because the authorization it rests on had
+   * not loaded yet (right after a restart), and it waits to be offered again.
+   * Or the store overflowed its record re-admission and has not been
+   * readmitted in full since, so the document may be among the dropped. The
+   * wait for a pending document is bounded, so a forged document keeps this
+   * answer for a short while at most; an overflow lasts until the store is
+   * readmitted.
    */
   public isDocumentPendingAdmission(
     storeName: OrbitDBReplicatedDocumentStoreName,
     id: string,
   ): boolean {
-    return this.readmissions.isPending(`${storeName}:${id}`);
+    return (
+      this.readmissions.isPending(`${storeName}:${id}`) ||
+      this.isStoreOverflowed(storeName)
+    );
   }
 
   /**
