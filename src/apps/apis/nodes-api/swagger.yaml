@@ -804,7 +804,7 @@ paths:
           description: 'Registration code issued. Sent with `Cache-Control: no-store`. `Location` names the code by its id.'
           headers:
             Location:
-              description: Relative URL of the issued code by id. The secret code is never included.
+              description: Relative URL of the issued code by id. The secret code is never included. Relative to the API base path (`ROUTE_PREFIX`).
               schema:
                 type: string
           content:

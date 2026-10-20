@@ -40,7 +40,7 @@ paths:
           description: Reservation created. `Location` names the reserved blob.
           headers:
             Location:
-              description: Relative URL of the reserved blob.
+              description: Relative URL of the reserved blob. Relative to the API base path (`ROUTE_PREFIX`).
               schema:
                 type: string
           content:

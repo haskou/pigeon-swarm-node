@@ -48,7 +48,7 @@ paths:
           description: Created. `Location` names the mailbox.
           headers:
             Location:
-              description: Relative URL of the mailbox.
+              description: Relative URL of the mailbox. Relative to the API base path (`ROUTE_PREFIX`).
               schema:
                 type: string
         '400':
@@ -258,7 +258,7 @@ paths:
           description: Reader added. `Location` names the reader by its read token hash.
           headers:
             Location:
-              description: Relative URL of the added reader.
+              description: Relative URL of the added reader. Relative to the API base path (`ROUTE_PREFIX`).
               schema:
                 type: string
         '404':

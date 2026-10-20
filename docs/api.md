@@ -355,6 +355,7 @@ spec against the route handlers and the OpenAPI documents:
 - **No trailing slash.** Routing is strict: `/calls/` is not `/calls` and
   answers `404`. A signed path is the route path exactly, with no trailing
   slash.
+- **`Location` is API-relative.** A `Location` header names the route path of the created resource, relative to the API base path (`ROUTE_PREFIX`, for example `/api`): `/calls/{callId}`, not `/api/calls/{callId}`. A client resolves it against the API base URL, not the origin.
 
 Replaced by issue #606, no longer served (they answer `404`; a client that
 signed one of the old paths must sign the new one):

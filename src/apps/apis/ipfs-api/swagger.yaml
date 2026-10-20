@@ -77,7 +77,7 @@ paths:
           description: Public content stored in IPFS. `Location` names the content.
           headers:
             Location:
-              description: Relative URL of the stored content.
+              description: Relative URL of the stored content. Relative to the API base path (`ROUTE_PREFIX`).
               schema:
                 type: string
           content:
