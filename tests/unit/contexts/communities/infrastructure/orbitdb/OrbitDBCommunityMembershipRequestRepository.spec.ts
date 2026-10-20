@@ -7,6 +7,7 @@ import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infras
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Timestamp } from '@haskou/value-objects';
 
 import { signedMutation } from '../../../public-mutations/support/signedMutation';
@@ -190,6 +191,19 @@ describe('OrbitDBCommunityMembershipRequestRepository', () => {
     expect(byIdentity.map((item) => item.getId().valueOf())).toEqual([
       request.getId().valueOf(),
     ]);
+  });
+
+  it('rejects a partial list while an identity request head is held', async () => {
+    const hasPending = jest
+      .spyOn(registry, 'hasPendingHeadAdmissions')
+      .mockReturnValue(true);
+
+    await expect(store.findByIdentity(requesterIdentityId)).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
+    expect(hasPending).toHaveBeenCalledWith(
+      `community-membership-request-identity-index:${requesterIdentityId.valueOf()}:`,
+    );
   });
 
   it('should find cached membership request heads from another repository when indexes lag', async () => {
