@@ -137,8 +137,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     try {
       let replicated = await this.registry.findHead(key);
 
-      if (!replicated) {
-        await this.registry.rehydrateHead(key);
+      if (!replicated && (await this.registry.rehydrateHead(key))) {
         replicated =
           (await this.registry.findHead(key)) ??
           (await this.registry.findPersistedHead(key));

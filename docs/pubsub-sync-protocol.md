@@ -1195,6 +1195,24 @@ another prefix. The replicated OrbitDB log is append-only and shared, so a node
 cannot remove those log entries: a rebuild replays them, and the merger refuses
 every record outside the two-day window before it parses the authorization.
 
+On a cold reconciliation a node replays the heads log newest first, so a
+sealing record can reach its merger before the authorization head it is judged
+against. The same happens live while that authorization head is held. The
+merger then answers not ready instead of refusing: the registry defers the
+key, logs no rejection, and offers every deferred head to its merger again
+once a reconciliation finishes or a held key stops waiting (one log pass per
+hosted network; past 4096 deferred keys, every mergeable head). Until then the
+sealing view of that identity answers `503020`, and the head cache is not
+marked warm, so a restart reconciles again instead of restoring a cache
+without the record. A settled read of a head that is absent while any network
+is still reconciling also answers not ready, never absent. While a head is
+deferred, or being settled and not merged yet by that settle, a head read or
+settled read of it answers not ready instead of its older cached copy; a
+sealing record whose authorization head is deferred is therefore deferred too,
+not refused. A settle repeats its log pass, at most four times, while each pass
+merges a head no earlier pass merged, so a record replayed before its
+authorization in the same pass is merged once that authorization is.
+
 ## Live call projection boundary
 
 Conversation lifecycle documents retain merge tombstones; runtime leases stay

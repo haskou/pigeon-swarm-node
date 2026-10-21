@@ -316,6 +316,46 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
     ).toBeUndefined();
   });
 
+  it('merger answers 503020 instead of refusing while the authorization head is unsettled', () => {
+    const record = sealingRecordOf({
+      identityId: fixture.identityId,
+      signer: fixture.owner,
+    });
+    jest.spyOn(registry, 'findSettledCachedHead').mockImplementation(() => {
+      throw new ReplicatedStateNotReadyError();
+    });
+
+    expect(() =>
+      mergerOf()(undefined, record.toPrimitives(), record.key()),
+    ).toThrow(ReplicatedStateNotReadyError);
+  });
+
+  it('answers 503020 instead of a partial list while the authorization head is unsettled', async () => {
+    await repository.publish(
+      sealingRecordOf({ identityId: fixture.identityId, signer: fixture.owner }),
+    );
+    jest.spyOn(registry, 'findSettledCachedHead').mockImplementation(() => {
+      throw new ReplicatedStateNotReadyError();
+    });
+
+    expect(() => repository.findCurrent(fixture.identityId)).toThrow(
+      ReplicatedStateNotReadyError,
+    );
+  });
+
+  it('answers 503020 instead of a partial list while a record of the identity is still deferred', () => {
+    const hasDeferredHeadsUnder = jest
+      .spyOn(registry, 'hasDeferredHeadsUnder')
+      .mockReturnValue(true);
+
+    expect(() => repository.findCurrent(fixture.identityId)).toThrow(
+      ReplicatedStateNotReadyError,
+    );
+    expect(hasDeferredHeadsUnder).toHaveBeenCalledWith(
+      `${DEVICE_SEALING_RECORD_HEAD_PREFIX}${fixture.identityId}:`,
+    );
+  });
+
   it('lists the admitted records for today and yesterday only', async () => {
     await repository.publish(
       sealingRecordOf({

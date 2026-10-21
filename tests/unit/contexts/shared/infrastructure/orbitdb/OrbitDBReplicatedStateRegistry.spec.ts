@@ -13,6 +13,7 @@ import OrbitDBReplicatedHeadCache, {
 } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedHeadCache';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
+import Kernel from '@haskou/ddd-kernel';
 import { mock, MockProxy } from 'jest-mock-extended';
 import { createHash } from 'node:crypto';
 
@@ -392,6 +393,363 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       members: ['alice', 'bob', 'owner'],
     });
     registry.clear();
+  });
+
+  describe('heads a merger cannot judge yet', () => {
+    type HeadRecord = { key: string; value: Record<string, unknown> };
+
+    const AUTHORIZATION = {
+      key: 'authorization:owner',
+      value: { owner: 'owner' },
+    };
+
+    /** Newest first, like the OrbitDB head history reader yields it. */
+    function logOf(records: HeadRecord[]): NonNullable<Store['log']> {
+      const entries: OrbitDBEntry[] = records.map((payload, index) => ({
+        hash: `entry-${index}`,
+        next: index + 1 < records.length ? [`entry-${index + 1}`] : [],
+        payload,
+      }));
+      const byHash = new Map(entries.map((entry) => [entry.hash, entry]));
+
+      return {
+        get: async (hash) => byHash.get(hash),
+        heads: jest.fn(async () => entries.slice(0, 1)),
+      };
+    }
+
+    function sealingOf(device: string): HeadRecord {
+      return { key: `sealing:owner:${device}`, value: { device } };
+    }
+
+    /** A sealing head is judged against the authorization head it depends on. */
+    function registerDependentMergers(
+      registry: OrbitDBReplicatedStateRegistry,
+    ): void {
+      registry.registerHeadRecordMerger(
+        'authorization:',
+        (_current, candidate) => candidate,
+      );
+      registry.registerHeadRecordMerger('sealing:', (current, candidate) =>
+        registry.findSettledCachedHead(AUTHORIZATION.key)
+          ? (current ?? candidate)
+          : undefined,
+      );
+    }
+
+    async function registeredWith(
+      records: HeadRecord[],
+      registry = new OrbitDBReplicatedStateRegistry(),
+    ): Promise<OrbitDBReplicatedStateRegistry> {
+      const { heads, stores } = createStores();
+
+      heads.all.mockResolvedValue(records);
+      heads.log = logOf(records);
+      registerDependentMergers(registry);
+      await registry.register('network-1', stores);
+
+      return registry;
+    }
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('answers a settled read as not ready before any network registers', () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+
+      expect(() => registry.findSettledCachedHead(AUTHORIZATION.key)).toThrow(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('answers a settled read of an uncached head as not ready while the head cache reconciles', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+      let release: (records: Entry[]) => void = () => undefined;
+
+      heads.all.mockReturnValue(
+        new Promise<Entry[]>((resolve) => {
+          release = resolve;
+        }),
+      );
+      const registering = registry.register('network-1', stores);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(() => registry.findSettledCachedHead(AUTHORIZATION.key)).toThrow(
+        ReplicatedStateNotReadyError,
+      );
+
+      release([]);
+      await registering;
+
+      expect(registry.findSettledCachedHead(AUTHORIZATION.key)).toBeUndefined();
+      registry.clear();
+    });
+
+    it('merges a head reconciled before the head its merger depends on', async () => {
+      const sealing = sealingOf('device');
+      const registry = await registeredWith([sealing, AUTHORIZATION]);
+
+      await expect(registry.findHead(sealing.key)).resolves.toEqual(
+        sealing.value,
+      );
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+      registry.clear();
+    });
+
+    it('merges every deferred head even when more were deferred than it tracks one by one', async () => {
+      const sealings = Array.from({ length: 4_097 }, (_, index) =>
+        sealingOf(`device-${index}`),
+      );
+      const registry = await registeredWith([...sealings, AUTHORIZATION]);
+
+      await expect(registry.findHead(sealings[0].key)).resolves.toEqual(
+        sealings[0].value,
+      );
+      await expect(registry.findHead(sealings[4_096].key)).resolves.toEqual(
+        sealings[4_096].value,
+      );
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+      registry.clear();
+    }, 30_000);
+
+    it('marks the head cache warm only once every deferred head is merged', async () => {
+      const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+      const registry = await registeredWith(
+        [sealingOf('device'), AUTHORIZATION],
+        OrbitDBReplicatedStateRegistry.withHeadCache(headCache),
+      );
+
+      await expect(headCache.isWarm('network-1')).resolves.toBe(true);
+      await expect(headCache.findByNetworkId('network-1')).resolves.toEqual(
+        expect.arrayContaining([
+          { key: 'sealing:owner:device', value: { device: 'device' } },
+        ]),
+      );
+      registry.clear();
+    });
+
+    it('merges a head deferred on a held key once the hold ends', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const gate = mock<OrbitDBMutationGate>();
+        const registry = new OrbitDBReplicatedStateRegistry();
+        const { heads, stores } = createStores();
+        const sealing = sealingOf('device');
+        const admitted = {
+          key: AUTHORIZATION.key,
+          value: { owner: 'owner', updatedAt: 12 },
+        };
+
+        gate.governs.mockImplementation(
+          (collection) => collection === 'communityOperations',
+        );
+        gate.governsHead.mockReturnValue(false);
+        gate.verdictOf.mockResolvedValue('pending');
+        registry.addMutationGate(gate);
+        registerDependentMergers(registry);
+        await registry.register('network-1', stores);
+        heads.emitUpdate({
+          payload: {
+            key: AUTHORIZATION.key,
+            value: {
+              communityOperations: [{ id: 'forged-1' }],
+              owner: 'owner',
+              updatedAt: 10,
+            },
+          },
+        });
+        await jest.advanceTimersByTimeAsync(0);
+        heads.emitUpdate({ payload: sealing });
+        await jest.advanceTimersByTimeAsync(0);
+        expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(true);
+
+        heads.log = logOf([admitted, sealing]);
+        heads.emitUpdate({ payload: admitted });
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+        expect(registry.findCachedHead(sealing.key)).toEqual(sealing.value);
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('refuses a read of a head whose merge is deferred instead of its stale copy', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+
+      registry.registerHeadRecordMerger(
+        'stale-test:',
+        (_current, candidate) => {
+          if (candidate.held) throw new ReplicatedStateNotReadyError();
+
+          return candidate;
+        },
+      );
+      heads.all.mockResolvedValue([
+        { key: 'stale-test:a', value: { version: 1 } },
+      ]);
+      await registry.register('network-1', stores);
+      heads.emitUpdate({
+        payload: { key: 'stale-test:a', value: { version: 2, held: true } },
+      });
+      await flushPromises();
+
+      expect(registry.hasDeferredHeadsUnder('stale-test:')).toBe(true);
+      await expect(registry.findHead('stale-test:a')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+      expect(() => registry.findSettledCachedHead('stale-test:a')).toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      registry.clear();
+    });
+
+    it('defers instead of refusing a head whose dependency is deferred but not held', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+      const sealing = sealingOf('device');
+
+      registry.registerHeadRecordMerger(
+        AUTHORIZATION.key,
+        (_current, candidate) => {
+          if (candidate.pending) throw new ReplicatedStateNotReadyError();
+
+          return candidate;
+        },
+      );
+      registry.registerHeadRecordMerger('sealing:', (current, candidate) =>
+        registry.findSettledCachedHead(AUTHORIZATION.key)
+          ? (current ?? candidate)
+          : undefined,
+      );
+      await registry.register('network-1', stores);
+      heads.emitUpdate({
+        payload: { key: AUTHORIZATION.key, value: { pending: true } },
+      });
+      await flushPromises();
+      heads.emitUpdate({ payload: sealing });
+      await flushPromises();
+
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(true);
+      expect(registry.findCachedHead(sealing.key)).toBeUndefined();
+      registry.clear();
+    });
+
+    it('settles a head replayed before the head it waits on in the same settle pass', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const network = createStores();
+      const otherNetwork = createStores();
+      let authorityReady = false;
+
+      registry.registerHeadRecordMerger('auth-test:', (_current, candidate) => {
+        if (!authorityReady) throw new ReplicatedStateNotReadyError();
+
+        return candidate;
+      });
+      registry.registerHeadRecordMerger('seal-test:', (_current, candidate) => {
+        if (!registry.findSettledCachedHead('auth-test:owner'))
+          throw new ReplicatedStateNotReadyError();
+
+        return candidate;
+      });
+      await registry.register('network-1', network.stores);
+      network.heads.emitUpdate({
+        payload: { key: 'auth-test:owner', value: { owner: 'owner' } },
+      });
+      network.heads.emitUpdate({
+        payload: { key: 'seal-test:device', value: { device: 'device' } },
+      });
+      await flushPromises();
+      expect(registry.hasDeferredHeadsUnder('seal-test:')).toBe(true);
+
+      // Newest first: the sealing record replays before its authorization.
+      network.heads.log = logOf([
+        { key: 'seal-test:device', value: { device: 'device' } },
+        { key: 'auth-test:owner', value: { owner: 'owner' } },
+      ]);
+      authorityReady = true;
+      await registry.register('network-2', otherNetwork.stores);
+
+      expect(registry.hasDeferredHeadsUnder('seal-test:')).toBe(false);
+      expect(registry.findCachedHead('seal-test:device')).toEqual({
+        device: 'device',
+      });
+      registry.clear();
+    });
+
+    describe('when the merger still cannot judge a head after reconciliation', () => {
+      const warn = jest.fn();
+      const debug = jest.fn();
+
+      async function registeredWithUnjudgeable(
+        registry = new OrbitDBReplicatedStateRegistry(),
+      ): Promise<OrbitDBReplicatedStateRegistry> {
+        const sealing = sealingOf('device');
+        const { heads, stores } = createStores();
+
+        jest
+          .spyOn(Kernel, 'logger', 'get')
+          .mockReturnValue({ debug, warn } as unknown as typeof Kernel.logger);
+        heads.all.mockResolvedValue([sealing]);
+        heads.log = logOf([sealing]);
+        registry.registerHeadRecordMerger('sealing:', () => {
+          throw new ReplicatedStateNotReadyError();
+        });
+        await registry.register('network-1', stores);
+
+        return registry;
+      }
+
+      it('keeps the head pending under its prefix only', async () => {
+        const registry = await registeredWithUnjudgeable();
+
+        expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(true);
+        expect(registry.hasDeferredHeadsUnder('authorization:')).toBe(false);
+        registry.clear();
+      });
+
+      it('does not report the head as incompatible state', async () => {
+        const registry = await registeredWithUnjudgeable();
+
+        expect(warn).not.toHaveBeenCalledWith(
+          'Rejected incompatible replicated state',
+        );
+        registry.clear();
+      });
+
+      it('leaves the head cache cold so the next start reconciles again', async () => {
+        const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+        const registry = await registeredWithUnjudgeable(
+          OrbitDBReplicatedStateRegistry.withHeadCache(headCache),
+        );
+
+        await expect(headCache.isWarm('network-1')).resolves.toBe(false);
+        registry.clear();
+      });
+    });
+  });
+
+  describe('rehydrateHead', () => {
+    it('resolves whether any network stores the key', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+
+      await registry.register('network-1', stores);
+      await heads.put('community:stored', { id: 'stored' });
+
+      await expect(registry.rehydrateHead('community:stored')).resolves.toBe(
+        true,
+      );
+      await expect(registry.rehydrateHead('community:unseen')).resolves.toBe(
+        false,
+      );
+      registry.clear();
+    });
   });
 
   it('replays call history for each new subscriber without resetting existing subscribers', async () => {
