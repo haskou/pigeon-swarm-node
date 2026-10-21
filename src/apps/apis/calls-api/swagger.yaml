@@ -38,6 +38,8 @@ paths:
                 $ref: '#/components/schemas/CallsResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Replicated state not ready (code 503020). An active call of the identity cannot be rebuilt from its stored start, or the conversation, community or private-community check that decides whether the identity sees it cannot be read right now. The list never leaves such a call out. Retry.
     post:
       tags:
         - calls
@@ -129,7 +131,7 @@ paths:
         '409':
           description: Call not found or not visible to the authenticated identity.
         '503':
-          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Retry.
+          description: Replicated state not ready (code 503020). The node holds the start of the call but has not admitted it yet, holds other records of the call without its start (at most 60 s), cannot rebuild the call from its stored start, or has not replayed the call history yet (at most 60 s), for example right after it restarted. Also answered when the conversation or community that decides access cannot be read right now. Retry.
     delete:
       tags:
         - calls
@@ -341,6 +343,8 @@ paths:
                 $ref: '#/components/schemas/CallHistoryResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Replicated state not ready (code 503020). A call of the history cannot be rebuilt from its stored start, or the conversation that decides whether the identity sees it cannot be read right now. The list never leaves such a call out. Retry.
 components:
   parameters:
     CallId:
