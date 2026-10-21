@@ -1,4 +1,5 @@
 import { DEVICE_SEALING_RECORD_HEAD_PREFIX } from '@app/contexts/identity-devices/domain/DeviceSealingRecord';
+import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceSealingRecordConflictError } from '@app/contexts/identity-devices/domain/errors/DeviceSealingRecordConflictError';
 import { DeviceSealingRecordRejectedError } from '@app/contexts/identity-devices/domain/errors/DeviceSealingRecordRejectedError';
 import OrbitDBDeviceSealingRecordRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository';
@@ -204,6 +205,34 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
     expect(
       mergerOf()(undefined, record.toPrimitives(), record.key()),
     ).toEqual(record.toPrimitives());
+  });
+
+  it('merger does not parse the device authorization for a record outside the day window', () => {
+    const parse = jest.spyOn(DeviceAuthorization, 'fromPrimitives');
+    const record = sealingRecordOf({
+      identityId: fixture.identityId,
+      signer: fixture.owner,
+      utcDay: '2026-04-30',
+    });
+
+    expect(
+      mergerOf()(undefined, record.toPrimitives(), record.key()),
+    ).toBeUndefined();
+    expect(parse).not.toHaveBeenCalled();
+  });
+
+  it('merger does not parse the device authorization for a forged signature', () => {
+    const parse = jest.spyOn(DeviceAuthorization, 'fromPrimitives');
+    const record = sealingRecordOf({
+      deviceCredential: credentialOf(fixture.owner),
+      identityId: fixture.identityId,
+      signer: stranger,
+    });
+
+    expect(
+      mergerOf()(undefined, record.toPrimitives(), record.key()),
+    ).toBeUndefined();
+    expect(parse).not.toHaveBeenCalled();
   });
 
   it('merger refuses a record filed under another key', () => {

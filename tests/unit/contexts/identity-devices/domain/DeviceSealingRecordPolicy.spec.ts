@@ -31,7 +31,7 @@ describe('DeviceSealingRecordPolicy', () => {
           signer: fixture.owner,
           utcDay: TODAY,
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         NOW,
       ),
     ).toBe(true);
@@ -45,7 +45,7 @@ describe('DeviceSealingRecordPolicy', () => {
           signer: fixture.owner,
           utcDay: YESTERDAY,
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         NOW,
       ),
     ).toBe(true);
@@ -59,7 +59,7 @@ describe('DeviceSealingRecordPolicy', () => {
           signer: fixture.owner,
           utcDay: '2026-04-30',
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         NOW,
       ),
     ).toBe(false);
@@ -73,7 +73,7 @@ describe('DeviceSealingRecordPolicy', () => {
           signer: fixture.owner,
           utcDay: '2026-05-03',
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         NOW,
       ),
     ).toBe(false);
@@ -126,7 +126,7 @@ describe('DeviceSealingRecordPolicy', () => {
           identityId: fixture.identityId,
           signer: stranger,
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         NOW,
       ),
     ).toBe(false);
@@ -139,7 +139,7 @@ describe('DeviceSealingRecordPolicy', () => {
           identityId: credentialOf(stranger),
           signer: fixture.owner,
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         NOW,
       ),
     ).toBe(false);
@@ -153,7 +153,55 @@ describe('DeviceSealingRecordPolicy', () => {
           identityId: fixture.identityId,
           signer: stranger,
         }),
-        fixture.authorization,
+        () => fixture.authorization,
+        NOW,
+      ),
+    ).toBe(false);
+  });
+
+  it('does not resolve the authorisation for a record outside the two-day window', () => {
+    const authorizationOf = jest.fn(() => fixture.authorization);
+
+    expect(
+      policy.admits(
+        sealingRecordOf({
+          identityId: fixture.identityId,
+          signer: fixture.owner,
+          utcDay: '2026-04-30',
+        }),
+        authorizationOf,
+        NOW,
+      ),
+    ).toBe(false);
+    expect(authorizationOf).not.toHaveBeenCalled();
+  });
+
+  it('does not resolve the authorisation for a record whose signature does not verify', () => {
+    const authorizationOf = jest.fn(() => fixture.authorization);
+
+    expect(
+      policy.admits(
+        sealingRecordOf({
+          deviceCredential: credentialOf(fixture.owner),
+          identityId: fixture.identityId,
+          signer: stranger,
+        }),
+        authorizationOf,
+        NOW,
+      ),
+    ).toBe(false);
+    expect(authorizationOf).not.toHaveBeenCalled();
+  });
+
+  it('refuses a record when no authorisation is known', () => {
+    expect(
+      policy.admits(
+        sealingRecordOf({
+          identityId: fixture.identityId,
+          signer: fixture.owner,
+          utcDay: TODAY,
+        }),
+        () => undefined,
         NOW,
       ),
     ).toBe(false);

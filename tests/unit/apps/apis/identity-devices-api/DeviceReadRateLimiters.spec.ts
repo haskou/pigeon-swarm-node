@@ -1,10 +1,12 @@
 import DeviceAuthorizationTransitionReadRateLimiter from '@app/apps/apis/identity-devices-api/DeviceAuthorizationTransitionReadRateLimiter';
+import DeviceSealingRecordRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingRecordRateLimiter';
 import DeviceSealingViewRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewRateLimiter';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
 describe.each([
   DeviceAuthorizationTransitionReadRateLimiter,
+  DeviceSealingRecordRateLimiter,
   DeviceSealingViewRateLimiter,
 ])('%p', (Limiter) => {
   const { IDENTITY_LIMIT, NODE_LIMIT, WINDOW_MS } = Limiter;
@@ -42,7 +44,12 @@ describe.each([
   });
 
   it('has its own budget, apart from the transition submission limiter', () => {
-    expect(IDENTITY_LIMIT).toBe(60);
-    expect(NODE_LIMIT).toBe(600);
+    const budgets = new Map<unknown, [number, number]>([
+      [DeviceAuthorizationTransitionReadRateLimiter, [60, 3000]],
+      [DeviceSealingRecordRateLimiter, [30, 600]],
+      [DeviceSealingViewRateLimiter, [300, 3000]],
+    ]);
+
+    expect([IDENTITY_LIMIT, NODE_LIMIT]).toEqual(budgets.get(Limiter));
   });
 });

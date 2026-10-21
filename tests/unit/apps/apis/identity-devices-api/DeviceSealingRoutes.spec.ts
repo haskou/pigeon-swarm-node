@@ -1,4 +1,8 @@
+import DeviceAuthorizationTransitionClientRateLimiter from '@app/apps/apis/identity-devices-api/DeviceAuthorizationTransitionClientRateLimiter';
 import DeviceAuthorizationTransitionReadRateLimiter from '@app/apps/apis/identity-devices-api/DeviceAuthorizationTransitionReadRateLimiter';
+import DeviceSealingRecordRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingRecordRateLimiter';
+import DeviceSealingViewCache from '@app/apps/apis/identity-devices-api/DeviceSealingViewCache';
+import DeviceSealingViewClientRateLimiter from '@app/apis/identity-devices-api/DeviceSealingViewClientRateLimiter';
 import DeviceSealingViewRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewRateLimiter';
 import { GetDeviceAuthorizationRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceAuthorizationRoute';
 import { GetDeviceSealingViewRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceSealingViewRoute';
@@ -50,12 +54,15 @@ import {
   sealingPublicKeyOf,
   signedRecordPrimitives,
 } from '../../../contexts/identity-devices/DeviceSealingRecordFixtures';
+import { IdentityIdMother } from '../../../mothers/IdentityIdMother';
 
 const ONE_DAY_MS = 86_400_000;
 const NOT_AUTHORIZED = 422040;
 const NOT_FOUND = 404050;
 const RATE_LIMITED = 429030;
 const INVALID_PAGE = 400050;
+const NOT_SERVED = 403014;
+const NON_CANONICAL = 400080;
 const BASE = '/api/identity-devices';
 
 const dayOf = (offsetDays: number): string =>
@@ -64,7 +71,16 @@ const dayOf = (offsetDays: number): string =>
 const wire = (pair: KeyPair): string =>
   new IdentityId(pair.toPrimitives().publicKey).valueOf();
 
+let addressCounter = 0;
+const nextAddress = (): string => {
+  addressCounter += 1;
+
+  return `10.${Math.floor(addressCounter / 62_500)}.${Math.floor(addressCounter / 250) % 250}.${(addressCounter % 250) + 1}`;
+};
+
 describe('Device sealing routes', () => {
+  let clientAddress: string;
+  let heldIdentityIds: Set<string>;
   let server: Server;
   let baseUrl: string;
   let registry: OrbitDBReplicatedStateRegistry;
@@ -76,6 +92,15 @@ describe('Device sealing routes', () => {
   let authorization: DeviceAuthorization;
   let transitions: DeviceAuthorizationTransition[];
   let authorizationRepository: MockProxy<DeviceAuthorizationRepository>;
+  let heldReader: KeyPair;
+
+  const heldReaderOf = async (): Promise<KeyPair> => {
+    const reader = await KeyPair.generate();
+
+    heldIdentityIds.add(wire(reader));
+
+    return reader;
+  };
 
   const enrollment = (
     previousRevision: number,
@@ -116,6 +141,7 @@ describe('Device sealing routes', () => {
     });
 
     return {
+      'x-forwarded-for': clientAddress,
       'x-identity-id': wire(signer),
       'x-signature': signer.sign(content).valueOf(),
       'x-timestamp': String(timestamp),
@@ -139,6 +165,7 @@ describe('Device sealing routes', () => {
       body: JSON.stringify(body),
       headers: {
         'content-type': 'application/json',
+        'x-forwarded-for': clientAddress,
         ...(options.headers === false
           ? {}
           : signed('PUT', target, options.signedBody ?? body, options.signer)),
@@ -171,17 +198,34 @@ describe('Device sealing routes', () => {
     };
   };
 
-  const getSigned = (target: string, signer?: KeyPair) =>
+  const getSigned = (
+    target: string,
+    signer?: KeyPair,
+    address: string = clientAddress,
+  ) =>
     fetch(`${baseUrl}${target}`, {
-      headers: signed('GET', target, {}, signer),
+      headers: {
+        ...signed('GET', target, {}, signer),
+        'x-forwarded-for': address,
+      },
     });
+
+  const getPublic = (target: string, address: string = clientAddress) =>
+    fetch(`${baseUrl}${target}`, { headers: { 'x-forwarded-for': address } });
+
+  beforeEach(() => {
+    clientAddress = nextAddress();
+  });
 
   beforeAll(async () => {
     owner = await KeyPair.generate();
     phone = await KeyPair.generate();
     stranger = await KeyPair.generate();
     identityPair = await KeyPair.generate();
+    heldIdentityIds = new Set();
     identityId = new IdentityId(identityPair.toPrimitives().publicKey);
+    heldIdentityIds.add(identityId.valueOf());
+    heldReader = await heldReaderOf();
 
     const genesis = DeviceAuthorization.genesis(
       identityId,
@@ -233,6 +277,10 @@ describe('Device sealing routes', () => {
       },
     );
 
+    const identities = mock<IdentityRepository>();
+    identities.holds.mockImplementation(async (id) =>
+      heldIdentityIds.has(id.valueOf()),
+    );
     const blockPolicy = mock<NodeBlockPolicy>();
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
     const services = new Map<unknown, unknown>([
@@ -240,7 +288,7 @@ describe('Device sealing routes', () => {
         SignedHttpRequestAuthenticator,
         new SignedHttpRequestAuthenticator(
           blockPolicy,
-          mock<IdentityRepository>(),
+          identities,
           mock<NodeRepository>(),
         ),
       ],
@@ -266,6 +314,16 @@ describe('Device sealing routes', () => {
         new DeviceAuthorizationTransitionReadRateLimiter(),
       ],
       [DeviceSealingViewRateLimiter, new DeviceSealingViewRateLimiter()],
+      [
+        DeviceSealingViewClientRateLimiter,
+        new DeviceSealingViewClientRateLimiter(),
+      ],
+      [
+        DeviceAuthorizationTransitionClientRateLimiter,
+        new DeviceAuthorizationTransitionClientRateLimiter(),
+      ],
+      [DeviceSealingViewCache, new DeviceSealingViewCache()],
+      [DeviceSealingRecordRateLimiter, new DeviceSealingRecordRateLimiter()],
     ]);
     jest
       .spyOn(Route.prototype, 'get')
@@ -281,6 +339,7 @@ describe('Device sealing routes', () => {
       defaultErrorHandler: false,
       routePrefix: '/api',
     });
+    app.set('trust proxy', true);
     app.use(
       new HttpErrorHandler({
         handlers: [handleDomainError, handleCustomHttpError],
@@ -410,7 +469,7 @@ describe('Device sealing routes', () => {
           utcDay: dayOf(-1),
         }),
       );
-      const response = await fetch(`${baseUrl}${viewPath()}`);
+      const response = await getPublic(viewPath());
       const view = (await response.json()) as {
         devices: {
           deviceCredential: string;
@@ -454,26 +513,90 @@ describe('Device sealing routes', () => {
     });
 
     it('answers 404 for an identity this node does not hold', async () => {
-      const response = await fetch(`${baseUrl}${viewPath(wire(stranger))}`);
+      const response = await getPublic(viewPath(wire(stranger)));
       const payload = (await response.json()) as { code: number };
 
       expect(response.status).toBe(404);
       expect(payload.code).toBe(NOT_FOUND);
     });
 
-    it('rate-limits the public read per identity with 429030', async () => {
+    it('rate-limits each client address with 429030', async () => {
       const target = viewPath();
       let last = 200;
 
       for (let attempt = 0; attempt <= 61; attempt += 1) {
-        last = (await fetch(`${baseUrl}${target}`)).status;
+        last = (await getPublic(target)).status;
       }
 
       expect(last).toBe(429);
-      const limited = await fetch(`${baseUrl}${target}`);
+      const limited = await getPublic(target);
       expect(((await limited.json()) as { code: number }).code).toBe(
         RATE_LIMITED,
       );
+    });
+
+    it('keeps serving other addresses while one address floods the read', async () => {
+      const target = viewPath();
+      const flooder = nextAddress();
+
+      for (let attempt = 0; attempt <= 70; attempt += 1) {
+        await getPublic(target, flooder);
+      }
+
+      expect((await getPublic(target, flooder)).status).toBe(429);
+      expect((await getPublic(target, nextAddress())).status).toBe(200);
+    });
+
+    it('lets one address exhaust neither the per-target nor the node budget', () => {
+      expect(DeviceSealingViewClientRateLimiter.ADDRESS_LIMIT).toBeLessThan(
+        DeviceSealingViewRateLimiter.IDENTITY_LIMIT,
+      );
+      expect(DeviceSealingViewRateLimiter.IDENTITY_LIMIT).toBeLessThan(
+        DeviceSealingViewRateLimiter.NODE_LIMIT,
+      );
+    });
+
+    it('serves a repeated read from a short cache without asking the authorization again', async () => {
+      const target = viewPath();
+
+      await getPublic(target);
+      authorizationRepository.require.mockClear();
+      const repeated = await getPublic(target, nextAddress());
+
+      expect(repeated.status).toBe(200);
+      expect(authorizationRepository.require).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for an unknown identity without caching the miss', async () => {
+      const target = viewPath(wire(stranger));
+
+      await getPublic(target);
+
+      expect((await getPublic(target, nextAddress())).status).toBe(404);
+    });
+
+    it('refuses a non-canonical identity id with 400080 before any budget is spent', async () => {
+      const consume = jest.spyOn(
+        DeviceSealingViewRateLimiter.prototype,
+        'consume',
+      );
+      const alias = IdentityIdMother.aliasPrefix(identityId).valueOf();
+      const response = await getPublic(viewPath(alias));
+
+      expect(response.status).toBe(400);
+      expect(((await response.json()) as { code: number }).code).toBe(
+        NON_CANONICAL,
+      );
+      expect(consume).not.toHaveBeenCalled();
+      consume.mockRestore();
+    });
+
+    it('answers 409 with the error class name for a malformed identity id', async () => {
+      const response = await getPublic(viewPath('not-a-key'));
+      const payload = (await response.json()) as { code: unknown };
+
+      expect(response.status).toBe(409);
+      expect(typeof payload.code).toBe('string');
     });
   });
 
@@ -484,9 +607,9 @@ describe('Device sealing routes', () => {
       expect(response.status).toBe(401);
     });
 
-    it('serves the signed transitions to a signed caller of another identity', async () => {
+    it('serves the transitions to a signed caller this node serves', async () => {
       const target = transitionsPath();
-      const response = await getSigned(target, stranger);
+      const response = await getSigned(target, heldReader);
       const log = (await response.json()) as Record<string, unknown>;
 
       expect(response.status).toBe(200);
@@ -506,12 +629,12 @@ describe('Device sealing routes', () => {
 
     it('pages by revision with cursor and limit', async () => {
       const first = (await (
-        await getSigned(transitionsPath('?limit=2'), stranger)
+        await getSigned(transitionsPath('?limit=2'), heldReader)
       ).json()) as { nextCursor: string | null; transitions: unknown[] };
       const second = (await (
         await getSigned(
           transitionsPath(`?cursor=${first.nextCursor}&limit=2`),
-          stranger,
+          heldReader,
         )
       ).json()) as { nextCursor: string | null; transitions: unknown[] };
 
@@ -530,7 +653,7 @@ describe('Device sealing routes', () => {
       ['?cursor=-1'],
       ['?after=1'],
     ])('answers 400050 for the query %s', async (query) => {
-      const response = await getSigned(transitionsPath(query), stranger);
+      const response = await getSigned(transitionsPath(query), heldReader);
 
       expect(response.status).toBe(400);
       expect(((await response.json()) as { code: number }).code).toBe(
@@ -538,23 +661,87 @@ describe('Device sealing routes', () => {
       );
     });
 
-    it('rate-limits each signed caller with 429030', async () => {
-      const reader = await KeyPair.generate();
+    it.each([
+      ['a throwaway key', () => KeyPair.generate()],
+      ['an identity of another node', async () => stranger],
+    ])(
+      'answers 403014 to a signed caller that is %s and reads nothing',
+      async (_label, build) => {
+        authorizationRepository.requireTransitionLog.mockClear();
+        const response = await getSigned(transitionsPath(), await build());
+
+        expect(response.status).toBe(403);
+        expect(((await response.json()) as { code: number }).code).toBe(
+          NOT_SERVED,
+        );
+        expect(
+          authorizationRepository.requireTransitionLog,
+        ).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps answering 401 to an anonymous read before the served check', async () => {
+      expect(
+        (await getPublic(transitionsPath())).status,
+      ).toBe(401);
+    });
+
+    it('rate-limits each served requester with 429030 across addresses', async () => {
+      const reader = await heldReaderOf();
       let last = 200;
 
       for (let attempt = 0; attempt <= 61; attempt += 1) {
-        last = (await getSigned(transitionsPath(), reader)).status;
+        last = (await getSigned(transitionsPath(), reader, nextAddress()))
+          .status;
       }
 
       expect(last).toBe(429);
       expect(
         (
-          (await (await getSigned(transitionsPath(), reader)).json()) as {
-            code: number;
-          }
+          (await (
+            await getSigned(transitionsPath(), reader, nextAddress())
+          ).json()) as { code: number }
         ).code,
       ).toBe(RATE_LIMITED);
-      expect((await getSigned(transitionsPath(), stranger)).status).toBe(200);
+      expect((await getSigned(transitionsPath(), heldReader)).status).toBe(200);
+    });
+
+    it('rate-limits each client address so one address cannot starve another', async () => {
+      const flooder = nextAddress();
+      const reader = await heldReaderOf();
+      const other = await heldReaderOf();
+      let last = 200;
+
+      for (let attempt = 0; attempt <= 61; attempt += 1) {
+        last = (await getSigned(transitionsPath(), reader, flooder)).status;
+      }
+
+      expect(last).toBe(429);
+      expect(
+        (await getSigned(transitionsPath(), other, nextAddress())).status,
+      ).toBe(200);
+    });
+  });
+
+  describe('sealing record publication budget', () => {
+    it('rate-limits one identity with 429030 once its publication budget is spent', async () => {
+      const statuses: number[] = [];
+
+      for (
+        let attempt = 0;
+        attempt <= DeviceSealingRecordRateLimiter.IDENTITY_LIMIT + 1 &&
+        !statuses.includes(429);
+        attempt += 1
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        const response = await putRecord(
+          recordBody({ sealingPublicKey: sealingPublicKeyOf(7) }),
+        );
+
+        statuses.push(response.status);
+      }
+
+      expect(statuses.at(-1)).toBe(429);
     });
   });
 });
