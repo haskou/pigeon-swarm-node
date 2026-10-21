@@ -158,6 +158,18 @@ export default class EmbeddedLocalDatabase {
     EmbeddedLocalDatabase.databases.delete(this.databasePath);
   }
 
+  /** Closes every open handle so LevelDB flushes its logs before the process exits. */
+  public static async closeAll(): Promise<void> {
+    const databases = [...EmbeddedLocalDatabase.databases.values()];
+
+    EmbeddedLocalDatabase.databases.clear();
+    await Promise.all(
+      databases
+        .filter((database) => database.status !== 'closed')
+        .map((database) => database.close()),
+    );
+  }
+
   public async delete(namespace: string, id: string): Promise<void> {
     await this.ensureOpen();
     await this.database.del(this.key(namespace, id));

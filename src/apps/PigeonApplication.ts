@@ -83,12 +83,14 @@ import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure
 import NetworkPrivacyDirectory from '../contexts/shared/domain/networks/NetworkPrivacyDirectory';
 import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
 import IPFSNetworkPrivacyDirectory from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory';
+import IPFSNetworkRegistry from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import {
   pigeonEnvironmentSchema,
   validatePigeonEnvironment,
 } from '../shared/infrastructure/environment/PigeonEnvironment';
 import InitializerTimedOutError from '../shared/infrastructure/errors/InitializerTimedOutError';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
+import EmbeddedLocalDatabase from '../shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { createPigeonHttpErrorHandler } from '../shared/infrastructure/express/PigeonHttpErrorHandler';
 import { PublicStaticContent } from '../shared/infrastructure/express/PublicStaticContent';
 import { parseTrustProxySetting } from '../shared/infrastructure/express/TrustProxySetting';
@@ -409,6 +411,13 @@ export default class PigeonApplication {
           ? next()
           : idempotency.handle(event, next, context),
     });
+
+    // Kernel shutdown runs hooks in reverse: registered last, the networks
+    // (OrbitDB stores, Helia) stop first, then the local database closes.
+    this.kernel.registerShutdownHook(() => EmbeddedLocalDatabase.closeAll());
+    this.kernel.registerShutdownHook(() =>
+      this.kernel.di.getService<IPFSNetworkRegistry>(IPFSNetworkRegistry).stopAll(),
+    );
   }
 
   public configureWebSocketEventHub(): void {

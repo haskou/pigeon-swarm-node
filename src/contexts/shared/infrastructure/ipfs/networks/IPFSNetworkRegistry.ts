@@ -471,6 +471,15 @@ export default class IPFSNetworkRegistry {
     await this.enqueueMutation(() => this.removeNetworkNow(id));
   }
 
+  /** Stops every network through the removal path, so OrbitDB stores close before the local database. */
+  public async stopAll(): Promise<void> {
+    await this.enqueueMutation(async () => {
+      for (const id of this.getAll().map((network) => network.getId())) {
+        await this.removeNetworkNow(id);
+      }
+    });
+  }
+
   public async deleteNetwork(id: string): Promise<void> {
     await this.enqueueMutation(async () => {
       await this.removeNetworkNow(id);
