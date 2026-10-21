@@ -348,6 +348,65 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
     ).toEqual([YESTERDAY, TODAY]);
   });
 
+  it('prunes the records of days before yesterday and keeps today and yesterday', async () => {
+    const old = sealingRecordOf({
+      identityId: fixture.identityId,
+      signer: fixture.owner,
+      utcDay: '2026-04-30',
+    });
+    const current = [TODAY, YESTERDAY].map((utcDay) =>
+      sealingRecordOf({
+        identityId: fixture.identityId,
+        signer: fixture.owner,
+        utcDay,
+      }),
+    );
+    registry.cacheHeadLocally(old.key(), old.toPrimitives());
+    for (const record of current) await repository.publish(record);
+
+    await repository.pruneExpired(NOW);
+
+    expect(registry.findCachedHead(old.key())).toBeUndefined();
+    for (const record of current) {
+      expect(registry.findCachedHead(record.key())).toEqual(
+        record.toPrimitives(),
+      );
+    }
+  });
+
+  it('prunes a record published today once two days have passed', async () => {
+    const record = sealingRecordOf({
+      identityId: fixture.identityId,
+      signer: fixture.owner,
+    });
+    await repository.publish(record);
+
+    await repository.pruneExpired(new Date('2026-05-04T00:00:00.000Z'));
+
+    expect(registry.findCachedHead(record.key())).toBeUndefined();
+  });
+
+  it('prunes a head dated on a future day, which the merger never admits', async () => {
+    const key = headKeyOf(fixture.identityId, 'device', '2026-05-03');
+    registry.cacheHeadLocally(key, { junk: true });
+
+    await repository.pruneExpired(NOW);
+
+    expect(registry.findCachedHead(key)).toBeUndefined();
+  });
+
+  it('prunes only under the sealing prefix', async () => {
+    const forgetSpy = jest.spyOn(registry, 'forgetCachedHeads');
+
+    await repository.pruneExpired(NOW);
+
+    expect(forgetSpy).toHaveBeenCalledWith(
+      DEVICE_SEALING_RECORD_HEAD_PREFIX,
+      expect.any(Function),
+    );
+    expect(registry.findCachedHead(authorizationKey)).toBeDefined();
+  });
+
   it('keeps the sealing head namespace disjoint from the other head prefixes', () => {
     for (const prefix of OTHER_HEAD_PREFIXES) {
       expect(DEVICE_SEALING_RECORD_HEAD_PREFIX.startsWith(prefix)).toBe(false);

@@ -40,6 +40,18 @@ class InMemoryOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHeadCache {
     }
   }
 
+  public async deleteMatching(
+    matches: (key: string) => boolean,
+  ): Promise<void> {
+    for (let index = this.entries.length - 1; index >= 0; index -= 1) {
+      const key = this.entries[index].key;
+
+      if (key !== undefined && matches(key)) {
+        this.entries.splice(index, 1);
+      }
+    }
+  }
+
   public async findByNetworkId(
     networkId: string,
   ): Promise<OrbitDBReplicatedHeadCacheEntry[]> {
@@ -4709,6 +4721,71 @@ describe('OrbitDBReplicatedStateRegistry', () => {
     expect(listener).toHaveBeenCalledTimes(17);
     expect(setImmediateSpy).toHaveBeenCalled();
     setImmediateSpy.mockRestore();
+  });
+});
+
+describe('OrbitDBReplicatedStateRegistry forgetting cached heads', () => {
+  async function persistedKeysOf(
+    headCache: InMemoryOrbitDBReplicatedHeadCache,
+  ): Promise<string[]> {
+    return (await headCache.findByNetworkId('network-1'))
+      .map((entry) => entry.key)
+      .sort();
+  }
+
+  it('forgets the named heads under the prefix in memory and on disk, and nothing else', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const { stores } = createStores();
+    await registry.register('network-1', stores);
+    await registry.putHead('sealing:old', { value: 1 }, ['network-1']);
+    await registry.putHead('sealing:new', { value: 2 }, ['network-1']);
+    await registry.putHead('other:old', { value: 3 }, ['network-1']);
+    registry.cacheHeadLocally('sealing:projected-old', { value: 4 });
+
+    await registry.forgetCachedHeads('sealing:', (key) => key.endsWith('old'));
+
+    expect(registry.findCachedHead('sealing:old')).toBeUndefined();
+    expect(registry.findCachedHead('sealing:projected-old')).toBeUndefined();
+    expect(registry.findCachedHead('sealing:new')).toEqual({ value: 2 });
+    expect(registry.findCachedHead('other:old')).toEqual({ value: 3 });
+    expect(registry.findCachedHeadsByPrefix('sealing:')).toEqual([
+      { value: 2 },
+    ]);
+    await expect(persistedKeysOf(headCache)).resolves.toEqual([
+      'other:old',
+      'sealing:new',
+    ]);
+    registry.clear();
+  });
+
+  it('forgets a persisted head that its merger refused at restore', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const { stores } = createStores();
+    await headCache.save('network-1', 'sealing:old', { value: 1 });
+    registry.registerHeadRecordMerger('sealing:', () => undefined);
+    await registry.register('network-1', stores);
+
+    await registry.forgetCachedHeads('sealing:', () => true);
+
+    await expect(persistedKeysOf(headCache)).resolves.toEqual([]);
+    registry.clear();
+  });
+
+  it('never asks about a key outside the prefix', async () => {
+    const headCache = new InMemoryOrbitDBReplicatedHeadCache();
+    const registry = OrbitDBReplicatedStateRegistry.withHeadCache(headCache);
+    const { stores } = createStores();
+    const isForgotten = jest.fn(() => true);
+    await registry.register('network-1', stores);
+    await registry.putHead('other:old', { value: 3 }, ['network-1']);
+
+    await registry.forgetCachedHeads('sealing:', isForgotten);
+
+    expect(isForgotten).not.toHaveBeenCalled();
+    await expect(persistedKeysOf(headCache)).resolves.toEqual(['other:old']);
+    registry.clear();
   });
 });
 
