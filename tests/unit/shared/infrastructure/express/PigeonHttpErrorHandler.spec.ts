@@ -140,6 +140,32 @@ describe('createPigeonHttpErrorHandler', () => {
     expect(logger.error).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ['500 stamped by http-errors', 500, true],
+    ['404 stamped by http-errors and not exposable', 404, false],
+  ])(
+    'answers a file system error with status %s with the generic body',
+    (_label, status, expose) => {
+      const error = Object.assign(filesystemError(), {
+        expose,
+        status,
+        statusCode: status,
+      });
+
+      const response = respondTo(error, logger);
+
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({
+        code: 'InternalServerError',
+        httpStatus: 500,
+        message: 'Internal server error.',
+      });
+      expect(logger.error).toHaveBeenCalledWith(
+        'Unhandled error: name=Error errno=-13',
+      );
+    },
+  );
+
   it('does not log an error that carries an HTTP status', () => {
     process.env.NODE_ENV = 'production';
 
