@@ -1,3 +1,4 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PublicKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
@@ -39,10 +40,6 @@ export class DeviceCredential extends PublicKey {
    * collation would let nodes with different ICU data disagree.
    */
   public compareTo(other: DeviceCredential): number {
-    if (this.valueOf() === other.valueOf()) {
-      return 0;
-    }
-
-    return this.isLessThan(other) ? -1 : 1;
+    return compareCodeUnits(this.valueOf(), other.valueOf());
   }
 }
