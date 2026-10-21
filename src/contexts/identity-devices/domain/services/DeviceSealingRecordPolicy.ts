@@ -4,6 +4,20 @@ import { DeviceSealingRecord } from '@app/contexts/identity-devices/domain/Devic
 const ONE_DAY_MS = 86_400_000;
 
 export default class DeviceSealingRecordPolicy {
+  private isAuthorized(
+    record: DeviceSealingRecord,
+    authorizationOf: () => DeviceAuthorization | undefined,
+  ): boolean {
+    const authorization = authorizationOf();
+
+    return (
+      authorization !== undefined &&
+      record.getIdentityId().valueOf() ===
+        authorization.getIdentityId().valueOf() &&
+      authorization.isAuthorized(record.getDeviceCredential())
+    );
+  }
+
   /**
    * Ingress: a record is admitted only when it is for a current day, carries a
    * valid signature and is authorized. The authorization is a provider, asked
@@ -33,20 +47,6 @@ export default class DeviceSealingRecordPolicy {
     return (
       this.isCurrentDay(record.getUtcDay(), now) &&
       this.isAuthorized(record, authorizationOf)
-    );
-  }
-
-  private isAuthorized(
-    record: DeviceSealingRecord,
-    authorizationOf: () => DeviceAuthorization | undefined,
-  ): boolean {
-    const authorization = authorizationOf();
-
-    return (
-      authorization !== undefined &&
-      record.getIdentityId().valueOf() ===
-        authorization.getIdentityId().valueOf() &&
-      authorization.isAuthorized(record.getDeviceCredential())
     );
   }
 

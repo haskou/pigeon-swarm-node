@@ -41,7 +41,39 @@ export class GetDeviceSealingViewRoute extends Route {
     DeviceSealingViewCache,
   );
 
-  private readonly identities = this.get<IdentityRepository>(IdentityRepository);
+  private readonly identities =
+    this.get<IdentityRepository>(IdentityRepository);
+
+  /**
+   * One lookup per held identity: the per-target budget is charged before the
+   * authorization is resolved, and a miss for an identity this node does not
+   * hold has already been refused by `find`.
+   */
+  private async load(target: IdentityId): Promise<DeviceSealingViewResource> {
+    this.rateLimiter.consume(target);
+
+    try {
+      const view = await this.finder.find(
+        new DeviceSealingViewFindMessage(target),
+      );
+      const resource = new DeviceSealingViewViewModel(
+        target,
+        view,
+      ).toResource();
+      this.cache.store(target, resource);
+
+      return resource;
+    } catch (error) {
+      if (error instanceof DeviceAuthorizationNotFoundError) {
+        this.unknownRateLimiter.consume();
+        this.cache.storeMissing(target);
+
+        throw new DeviceSealingViewNotFoundError();
+      }
+
+      throw error;
+    }
+  }
 
   /**
    * Public: a sender needs it before it holds any credential of the node.
@@ -84,36 +116,5 @@ export class GetDeviceSealingViewRoute extends Route {
     const resource = await this.cache.coalesce(target, () => this.load(target));
 
     return response.status(HttpRouteStatusEnum.OK).send(resource);
-  }
-
-  /**
-   * One lookup per held identity: the per-target budget is charged before the
-   * authorization is resolved, and a miss for an identity this node does not
-   * hold has already been refused above.
-   */
-  private async load(target: IdentityId): Promise<DeviceSealingViewResource> {
-    this.rateLimiter.consume(target);
-
-    try {
-      const view = await this.finder.find(
-        new DeviceSealingViewFindMessage(target),
-      );
-      const resource = new DeviceSealingViewViewModel(
-        target,
-        view,
-      ).toResource();
-      this.cache.store(target, resource);
-
-      return resource;
-    } catch (error) {
-      if (error instanceof DeviceAuthorizationNotFoundError) {
-        this.unknownRateLimiter.consume();
-        this.cache.storeMissing(target);
-
-        throw new DeviceSealingViewNotFoundError();
-      }
-
-      throw error;
-    }
   }
 }
