@@ -34,8 +34,15 @@ export class DeviceCredential extends PublicKey {
     return this.valueOf() < other.valueOf();
   }
 
-  /** Locale order: deterministic sort and pick among credentials. */
+  /**
+   * Code-unit order: deterministic sort and pick among credentials. Locale
+   * collation would let nodes with different ICU data disagree.
+   */
   public compareTo(other: DeviceCredential): number {
-    return this.valueOf().localeCompare(other.valueOf());
+    if (this.valueOf() === other.valueOf()) {
+      return 0;
+    }
+
+    return this.isLessThan(other) ? -1 : 1;
   }
 }
