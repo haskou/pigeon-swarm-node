@@ -74,12 +74,12 @@ stays behind `/devices`.
 ### Authentication
 
 A caller this node serves. The normal signed HTTP headers (`X-Identity-Id`,
-`X-Timestamp`, `X-Signature`), fresh, signed by an identity the node holds or
+`X-Timestamp`, `X-Signature`), fresh, signed by an identity in the replicated index the node holds or
 whose node it owns; the signer does not have to be the path identity, and no
 device or recovery proof header is read. Any self-generated key can sign, so a
 signer the node does not serve gets `403` (`403014`) and nothing is read; an
 anonymous request gets the generic `401`. The read is rate limited per client
-address (60 per minute), per served requester keyed on its canonical id (60
+address (60 per minute, IPv6 per /64; behind a reverse proxy `API_TRUST_PROXY` is required, or every client shares one bucket), per served requester keyed on its canonical id (60
 per minute) and per node (3000 per minute), code `429030`.
 
 This is the only authorization change of #698 stage 2: `GET
@@ -100,8 +100,13 @@ history of any identity the node holds: authorization times, compromise marks
 and compromised credentials, pairing ids and expirations, operation ids,
 epochs and the credentials of added, removed and recovered devices. This is an
 explicit design position: a sender must replay the log to verify the sealing
-view of a recipient it has never met. The scope is the users of one node, not
-anyone who can sign; security review must assess it. The entries carry no
+view of a recipient it has never met. The scope is NOT "the users of one
+node": `holds()` reads the replicated identity index, so any identity
+published on the network counts, and where registration is `open` (or `codes`
+with a code) one cheap registration is enough. The registration mode is the
+control. Relationship-scoped reads (the caller shares a community or
+conversation with the identity) are the stronger design and are tracked as a
+follow-up issue; security review must assess it. The entries carry no
 `sealedSecrets` and no head revision beyond what they state.
 
 ## Client verification algorithm

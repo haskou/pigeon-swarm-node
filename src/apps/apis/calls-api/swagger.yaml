@@ -476,7 +476,7 @@ components:
           format: uuid
         createdAt:
           type: integer
-          description: Sender clock in epoch milliseconds. Refused if more than 5000 ms ahead of the node clock.
+          description: Sender clock in epoch milliseconds. Refused if more than 5000 ms ahead of the node clock, so keep node clocks in sync (NTP).
         expiresAt:
           type: integer
           description: Must equal createdAt + 20000 and be later than the node clock.

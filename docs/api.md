@@ -650,7 +650,7 @@ credential of at most 128 characters), `createdAt`, `expiresAt` and `signature`.
 `callId`, the `networkId` and the sender against the call, refuses a reused
 `signalId`, and applies the clock rules: `expiresAt` must equal `createdAt` plus
 20000 ms and be later than the node clock, and `createdAt` must be no more than
-5000 ms ahead of the node clock. The node does not verify `signature`; the
+5000 ms ahead of the node clock. The node does not verify `signature`; node clocks should be kept in sync (NTP), since `createdAt` may be at most 5000 ms ahead of the node clock; the
 recipient UI verifies it over `pigeon:call-signal:v1` and a newline, followed by
 RFC 8785 canonical JSON of every field except `signature`. The node does not
 bind `senderDeviceCredential` or `recipientDeviceCredential` to an identity;
@@ -6730,7 +6730,8 @@ self-generated key can sign, so a signed request alone proves nothing; a signer
 this node does not serve returns `403` (`403014`) and nothing is read. The
 signer may be any served identity, not the path identity, and no device or
 recovery proof header is read. An anonymous request returns `401`, and so does
-a request that is not signed correctly or is blocked (`403012`). This is the
+a request that is not signed correctly or is blocked (`403012`). A served
+identity is one in the replicated identity index (see the waiver below). This is the
 only read whose authorization #698 stage 2 widened;
 `GET /identity-devices/{identityId}` and `/devices` stay owner-only.
 
@@ -6739,9 +6740,14 @@ history of any identity the node holds: authorization times,
 `compromisedSince` and `compromisedCredentials`, pairing ids and expirations,
 operation ids, epochs, and the credentials of every added, removed or
 recovered device. A sender needs it to replay the log and verify a recipient's
-sealing view. The scope is the identities of this node, which on a private
-network are its own users; it is not a secret from them. It is flagged for
-security review.
+sealing view. "Served" is not "a user of this node": `holds()` reads the
+replicated identity index, so any identity published anywhere on the network
+counts, and on a node whose registration mode is `open` (or `codes`, with a
+code) anyone can register one cheaply and then read every history. The
+registration mode (open, codes, closed) is therefore the real access control
+of this read. A stronger design, relationship-scoped reads (the caller must
+share a community or conversation with the identity), is tracked as a
+follow-up issue. It is flagged for security review.
 
 The response is `{ concurrentRecoveries, identityId, nextCursor, recoveries,
 transitions }`. Every entry is a stored transition in exactly the primitives
@@ -6804,9 +6810,12 @@ The response is `{ identityId, revision, devices: [{ deviceCredential,
 sealingKeys: [{ utcDay, sealingPublicKey }] }] }` for the devices authorized
 at the head and UTC days D and D-1 only; it carries no labels, timestamps or
 `compromisedSince`. A sender verifies it by replaying the transitions above.
-An identity the node does not know returns `404` (`404050`); a path that is not
-the canonical encoding of a usable key returns `400` (`400080`) before any
-budget is spent, and one that is not an identity id at all returns `409` with
+An identity the node does not know returns `404` (`404050`) and is remembered
+as unknown for five seconds; an unknown id spends only the per-address budget
+and a small node-wide unknown-id budget (300 per minute, then `429030`), is never
+tracked per target and so cannot evict the budget of a known identity; a path that is not
+the canonical encoding of a usable key returns `400` (`400080`) after the
+per-address budget but before the cache and the per-target and node budgets, and one that is not an identity id at all returns `409` with
 the error class name as `code`.
 
 This read is public: anyone who can reach the node learns the device
@@ -6817,8 +6826,11 @@ budget (3000 per minute), so one address can neither silence an identity nor
 the node; excess returns `429` (`429030`). A served view is cached for five
 seconds, a cache hit spends neither the target nor the node budget, and a view
 can therefore trail the head by that time on top of the replication delay. The
-client address is the one Express derives (`API_TRUST_PROXY`), is kept in
-memory only and is never logged. Sealed call signals reach every socket of the
+client address is the one Express derives (`API_TRUST_PROXY`, IPv6 per /64,
+IPv4-mapped as IPv4), is kept in memory only and is never logged.
+`API_TRUST_PROXY` defaults to `false`: behind a reverse proxy every client then
+shares the proxy address and one 60 per minute bucket on this read and on
+transitions, so the setting is required behind a proxy. Sealed call signals reach every socket of the
 recipient identity, so the size of its device set is visible there too. The
 node does not bind a device credential to an identity: the UI verifies that
 through the transition log.

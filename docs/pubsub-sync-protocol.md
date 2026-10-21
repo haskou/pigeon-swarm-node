@@ -1152,8 +1152,10 @@ refuses a different key for the same triple. The public `GET
 D-1 only. Senders verify it against the signed transitions read from `GET
 /identity-devices/{identityId}/transitions`, which every identity the node
 serves may read (a signer it does not serve gets `403014`): the full signed
-history of an identity is therefore disclosed to the users of the node
-(flagged for security review). The public view discloses the device
+history of an identity is therefore disclosed to every identity in the
+replicated index the node holds, which is any published identity, not only the
+users of the node; the registration mode is the control (flagged for security
+review). The public view discloses the device
 credentials and the device count to anyone who reaches the node; reads are
 limited per client address, then per target and per node, and a view is cached
 for five seconds. Pruning of old records is not reported: the records are
