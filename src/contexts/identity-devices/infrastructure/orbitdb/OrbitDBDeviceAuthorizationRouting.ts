@@ -9,6 +9,7 @@ import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/Devic
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { assert } from '@haskou/value-objects';
 
 interface GenesisIdentity {
@@ -55,7 +56,10 @@ export default class OrbitDBDeviceAuthorizationRouting {
     private readonly networkRegistry: IPFSNetworkRegistry,
   ) {}
 
-  /** Only a verified "identity not found" reads as no candidates. */
+  /**
+   * Only a verified "identity not found" reads as no candidates; any other
+   * retrieval failure is not ready, never absence or an unexpected error.
+   */
   private async findFreshCandidates(
     identityId: IdentityId,
   ): Promise<IdentityCandidate[]> {
@@ -68,7 +72,36 @@ export default class OrbitDBDeviceAuthorizationRouting {
         return [];
       }
 
-      throw error;
+      throw error instanceof ReplicatedStateNotReadyError
+        ? error
+        : new ReplicatedStateNotReadyError();
+    }
+  }
+
+  /**
+   * The previous identity a chain links to, or undefined when the repository
+   * verified that it does not know it. A failed read, or one that vanished
+   * between the check and the read, is not ready.
+   */
+  private async findPreviousIdentity(
+    externalIdentifier: IdentityExternalIdentifier,
+  ): Promise<Identity | undefined> {
+    try {
+      if (
+        !(await this.identityRepository.hasByExternalIdentifier(
+          externalIdentifier,
+        ))
+      ) {
+        return undefined;
+      }
+
+      return await this.identityRepository.requireByExternalIdentifier(
+        externalIdentifier,
+      );
+    } catch (error) {
+      throw error instanceof ReplicatedStateNotReadyError
+        ? error
+        : new ReplicatedStateNotReadyError();
     }
   }
 
@@ -147,20 +180,11 @@ export default class OrbitDBDeviceAuthorizationRouting {
       identityId,
       candidate.getIdentity(),
       async (externalIdentifier) => {
-        if (
-          !(await this.identityRepository.hasByExternalIdentifier(
-            externalIdentifier,
-          ))
-        ) {
-          return undefined;
+        const previous = await this.findPreviousIdentity(externalIdentifier);
+
+        if (previous) {
+          root = { externalIdentifier, identity: previous };
         }
-
-        const previous =
-          await this.identityRepository.requireByExternalIdentifier(
-            externalIdentifier,
-          );
-
-        root = { externalIdentifier, identity: previous };
 
         return previous;
       },
@@ -287,9 +311,10 @@ export default class OrbitDBDeviceAuthorizationRouting {
    * wins, then the lowest external identifier. When the repository does not
    * know the identity at all, only a genesis verified earlier or provisioned by
    * the local publisher (after its own chain validation) is returned; an
-   * identity whose candidates all fail validation yields no genesis. A
-   * retrieval failure of the identity repository (not ready) is never read as
-   * absence: it propagates, so no caller falls back to a missing genesis.
+   * identity whose candidates all fail validation yields no genesis. Any
+   * retrieval failure of the identity repository, including one while
+   * following the chain, rejects as `ReplicatedStateNotReadyError`: it is
+   * never read as absence, so no caller falls back to a missing genesis.
    */
   public async resolveTrustedGenesis(
     identityId: IdentityId,
