@@ -2756,6 +2756,9 @@ services:
   shared/infrastructure/errors/InvalidMessageBusAdapterError:
     class: /shared/infrastructure/errors/InvalidMessageBusAdapterError
     arguments: []
+  shared/infrastructure/errors/MemoryMessageBusAdapterClosedError:
+    class: /shared/infrastructure/errors/MemoryMessageBusAdapterClosedError
+    arguments: []
   shared/infrastructure/errors/scheduler/CannotInstantiateScheduledProcessError:
     class: >-
       /shared/infrastructure/errors/scheduler/CannotInstantiateScheduledProcessError

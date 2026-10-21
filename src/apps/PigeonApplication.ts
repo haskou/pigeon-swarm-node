@@ -99,6 +99,7 @@ import { DomainEventConsumer } from '../shared/infrastructure/messageBus/DomainE
 import { DomainEventPublisher } from '../shared/infrastructure/messageBus/DomainEventPublisher';
 import { LocalDomainEventPublisher } from '../shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import LocalProcessedDomainEventIdempotencyStore from '../shared/infrastructure/messageBus/LocalProcessedDomainEventIdempotencyStore';
+import MemoryMessageBusAdapter from '../shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import MessageBus from '../shared/infrastructure/messageBus/MessageBus';
 import WebSocketClientMessageHandler from '../shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { webSocketEventHub } from '../shared/infrastructure/websocket/WebSocketEventHub';
@@ -409,6 +410,14 @@ export default class PigeonApplication {
           ? next()
           : idempotency.handle(event, next, context),
     });
+
+    // The kernel runs shutdown hooks after consumers and schedulers. The
+    // container shares this instance with the MessageBus every consumer uses.
+    const memoryMessageBusAdapter =
+      this.kernel.di.getService<MemoryMessageBusAdapter>(
+        MemoryMessageBusAdapter,
+      );
+    this.kernel.registerShutdownHook(() => memoryMessageBusAdapter.close());
   }
 
   public configureWebSocketEventHub(): void {

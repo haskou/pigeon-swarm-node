@@ -1,4 +1,5 @@
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
+import MemoryMessageBusAdapterClosedError from '@app/shared/infrastructure/errors/MemoryMessageBusAdapterClosedError';
 import { errorClassName } from '@app/shared/infrastructure/logs/ErrorClassName';
 import Kernel from '@haskou/ddd-kernel';
 import { Constructor } from '@haskou/ddd-kernel/domain';
@@ -21,6 +22,10 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
   public static memoryMessages: Record<string, MemoryMessage[]> = {};
 
   public static errorMemoryMessages: Record<string, string[]> = {};
+
+  private readonly pollers = new Set<NodeJS.Timeout>();
+
+  private closed = false;
 
   private getQueueNameFromDomainEvent(
     domainEvent: DomainEvent,
@@ -120,14 +125,19 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
     }
   }
 
-  public async consume(
+  /** Refuses a consumer once closed, so a stopped node starts no new timer. */
+  public consume(
     queueName: string,
     bindingKey: string,
     DomainEventInstance: Constructor<DomainEvent>,
     exchange: string,
     handler: (event: DomainEvent) => Promise<void>,
   ): Promise<void> {
-    await Promise.resolve(
+    if (this.closed) {
+      return Promise.reject(new MemoryMessageBusAdapterClosedError());
+    }
+
+    this.pollers.add(
       setInterval(
         () =>
           void this.handleQueuedMessage(
@@ -140,6 +150,19 @@ export default class MemoryMessageBusAdapter implements MessageBusAdapter {
         50,
       ),
     );
+
+    return Promise.resolve();
+  }
+
+  /** Stops every consumer timer: no queued message is delivered after this returns. */
+  public close(): void {
+    this.closed = true;
+
+    for (const poller of this.pollers) {
+      clearInterval(poller);
+    }
+
+    this.pollers.clear();
   }
 
   public async publish(

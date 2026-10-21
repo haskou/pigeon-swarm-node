@@ -505,6 +505,11 @@ Use `TRANSPORT_DSN=libp2p-gossipsub://` to publish and subscribe through the
 standalone libp2p/gossipsub runtime. This runtime is separate from IPFS content
 storage.
 
+The `in-memory` transport polls each consumer queue with a timer. Node
+shutdown stops every one of these timers after the consumers and schedulers
+stop, so no queued event reaches a handler on a stopped node. A consumer
+subscribed after shutdown is refused.
+
 ## Application log privacy
 
 HTTP access logs record the request method and response status alongside the logger timestamp and severity. They exclude URLs, query parameters, headers, cookies, request bodies and response bodies. Private identifiers and bearer capabilities must not be added to access-log messages.
