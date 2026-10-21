@@ -66,7 +66,9 @@ import { PostIdentityRoute } from '@app/apps/apis/identities-api/routes/PostIden
 import { PutIdentityRoute } from '@app/apps/apis/identities-api/routes/PutIdentityRoute';
 import { DeviceSealedSecretRoute } from '@app/apps/apis/identity-devices-api/routes/DeviceSealedSecretRoute';
 import { GetDeviceAuthorizationRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceAuthorizationRoute';
+import { GetDeviceSealingViewRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceSealingViewRoute';
 import { PostDeviceAuthorizationTransitionRoute } from '@app/apps/apis/identity-devices-api/routes/PostDeviceAuthorizationTransitionRoute';
+import { PutDeviceSealingRecordRoute } from '@app/apps/apis/identity-devices-api/routes/PutDeviceSealingRecordRoute';
 import { DeleteContentReplicationRoute } from '@app/apps/apis/ipfs-api/routes/DeleteContentReplicationRoute';
 import { GetContentReplicationStatusRoute } from '@app/apps/apis/ipfs-api/routes/GetContentReplicationStatusRoute';
 import { GetIPFSContentRoute } from '@app/apps/apis/ipfs-api/routes/GetIPFSContentRoute';
@@ -176,6 +178,8 @@ export const applicationRoutes: ApplicationServiceClass<Route>[] = [
   GetDeviceAuthorizationRoute,
   PostDeviceAuthorizationTransitionRoute,
   DeviceSealedSecretRoute,
+  GetDeviceSealingViewRoute,
+  PutDeviceSealingRecordRoute,
   GetKeychainRoute,
   PostKeychainRoute,
   PostLinkPreviewRoute,

@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import DiagnosticsTraceInitializer from '@app/apps/initializers/diagnostics/DiagnosticsTraceInitializer';
 import PigeonApplication from '@app/apps/PigeonApplication';
 import { DEVICE_SEALING_RECORD_HEAD_PREFIX } from '@app/contexts/identity-devices/domain/DeviceSealingRecord';
+import { DeviceSealingRecordRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceSealingRecordRepository';
 import OrbitDBDeviceSealingRecordRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository';
 import NodeLoader from '@app/contexts/nodes/application/load/NodeLoader';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
@@ -230,7 +231,7 @@ describe('PigeonApplication local node state', () => {
     jest.spyOn(Kernel.prototype, 'di', 'get').mockReturnValue({
       getService: (ClassDefinition: unknown) => {
         if (ClassDefinition === NodeLoader) return { loadNode };
-        if (ClassDefinition === OrbitDBDeviceSealingRecordRepository)
+        if (ClassDefinition === DeviceSealingRecordRepository)
           return new OrbitDBDeviceSealingRecordRepository(
             registry,
             mock<IPFSNetworkRegistry>(),

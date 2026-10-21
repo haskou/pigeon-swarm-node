@@ -342,7 +342,8 @@ spec against the route handlers and the OpenAPI documents:
   `draft`, a message `pin` and `thread`, a sticker pack `saved` mark, a
   sticker `favorite` mark, a sticker `usage` mark, the sticker `library`, the
   node block-list `publication`, `/client-contract`, `/node/readiness`,
-  `/ipfs/replication-status` and `/push/vapid-public-key`. The namespaces
+  `/ipfs/replication-status`, `/push/vapid-public-key` and an identity's
+  `/identity-devices/{identityId}/sealing-view`. The namespaces
   `/ipfs`, `/push`, `/realtime` and
   `/private-authorization` are singletons too.
 - **`me`.** `me` stands for the authenticated identity only as the item of a
