@@ -843,8 +843,8 @@ retried every 60 seconds, so the answer lasts as long as the rescan fails.
 
 A call is never reported missing, and a list never leaves a call out, because
 the node could not read it. A call whose participant or end records the node
-holds without its start answers `503020` for up to 60 seconds after the first
-such record arrived, then `CallNotFoundError` if the start never came. A call
+holds without its start answers `503020` until the start is projected: those
+records are admitted only after their start, so the start exists. A call
 whose stored start the node cannot rebuild answers `503020` by id, and every
 list that would contain it answers `503020` too; the node never marks such a
 call missed. A list or call whose community, conversation or private-community

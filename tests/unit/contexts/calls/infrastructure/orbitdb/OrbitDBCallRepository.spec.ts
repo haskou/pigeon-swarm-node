@@ -273,7 +273,7 @@ describe('OrbitDBCallRepository', () => {
       expect(found.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
     });
 
-    it('answers the call as missing once the bounded wait for its start is over', async () => {
+    it('keeps answering the call as not ready however long its start takes, never as missing', async () => {
       const start = conversationStart();
       const joined = signCallParticipant({
         at: now() + 1,
@@ -284,11 +284,13 @@ describe('OrbitDBCallRepository', () => {
       const callId = new CallId(start.callId);
 
       await replicate(joined.payload, joined.proof);
-      await jest.advanceTimersByTimeAsync(OrbitDBCallProjection.START_AWAIT_MS);
+      await jest.advanceTimersByTimeAsync(24 * 60 * 60 * 1_000);
 
-      await expect(repository.hasById(callId)).resolves.toBe(false);
+      await expect(repository.hasById(callId)).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
       await expect(repository.requireById(callId)).rejects.toBeInstanceOf(
-        CallNotFoundError,
+        ReplicatedStateNotReadyError,
       );
     });
   });
