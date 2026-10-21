@@ -6,6 +6,7 @@ import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/doma
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
+import { DeviceAuthorizationGenesisConflictError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationGenesisConflictError';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
@@ -346,6 +347,18 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     return this.lock.run(authorization.getIdentityId(), async () => {
+      const trustedGenesis = await this.routing.resolveTrustedGenesis(
+        authorization.getIdentityId(),
+      );
+
+      assert(
+        !trustedGenesis ||
+          this.genesisMatcher.sameAuthorizationGenesis(
+            trustedGenesis.toPrimitives(),
+            authorization.toPrimitives(),
+          ),
+        new DeviceAuthorizationGenesisConflictError(),
+      );
       this.routing.remember(
         authorization,
         identityVersion,
