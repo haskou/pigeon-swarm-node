@@ -1,3 +1,4 @@
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 
@@ -8,6 +9,8 @@ import { LocalPushSubscriptionDocument } from './documents/LocalPushSubscription
 
 export default class LocalPushSubscriptionRepository extends PushSubscriptionRepository {
   private static readonly NAMESPACE = 'push_subscriptions';
+  private static readonly UNREADABLE_MESSAGE =
+    'A stored push subscription cannot be read. It was kept unchanged, so the subscriptions are not reported partially. Retry later.';
 
   constructor(private readonly database: EmbeddedLocalDatabase) {
     super();
@@ -55,36 +58,20 @@ export default class LocalPushSubscriptionRepository extends PushSubscriptionRep
     );
   }
 
-  private async removeInvalidDocument(
-    document: Record<string, unknown>,
-  ): Promise<void> {
-    if (typeof document._id === 'string') {
-      await this.database.delete(
-        LocalPushSubscriptionRepository.NAMESPACE,
-        document._id,
+  private hydrate(document: Record<string, unknown>): PushSubscription {
+    if (!this.isDocument(document)) {
+      throw new ReplicatedStateNotReadyError(
+        LocalPushSubscriptionRepository.UNREADABLE_MESSAGE,
       );
     }
-  }
 
-  private async hydrateValidDocuments(
-    documents: Array<Record<string, unknown>>,
-  ): Promise<PushSubscription[]> {
-    const subscriptions: PushSubscription[] = [];
-
-    for (const document of documents) {
-      if (!this.isDocument(document)) {
-        await this.removeInvalidDocument(document);
-        continue;
-      }
-
-      try {
-        subscriptions.push(this.toDomain(document));
-      } catch {
-        await this.removeInvalidDocument(document);
-      }
+    try {
+      return this.toDomain(document);
+    } catch {
+      throw new ReplicatedStateNotReadyError(
+        LocalPushSubscriptionRepository.UNREADABLE_MESSAGE,
+      );
     }
-
-    return subscriptions;
   }
 
   public async delete(
@@ -121,7 +108,7 @@ export default class LocalPushSubscriptionRepository extends PushSubscriptionRep
       (document) => document.identityId === identityId.valueOf(),
     );
 
-    return this.hydrateValidDocuments(documents);
+    return documents.map((document) => this.hydrate(document));
   }
 
   public async save(subscription: PushSubscription): Promise<void> {
