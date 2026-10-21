@@ -7,6 +7,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationGenesisConflictError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationGenesisConflictError';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
@@ -50,7 +51,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     return { genesis, identityId, owner, recovery };
   }
 
-  function repositoryFixture() {
+  function repositoryFixture(onPrivateNetwork = true) {
     const registry = mock<OrbitDBReplicatedStateRegistry>();
     const identityRepository = mock<IdentityRepository>();
     identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
@@ -62,7 +63,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     privateNetwork.getId.mockReturnValue(
       '550e8400-e29b-41d4-a716-446655440000',
     );
-    privateNetwork.isPrivate.mockReturnValue(true);
+    privateNetwork.isPrivate.mockReturnValue(onPrivateNetwork);
     networkRegistry.getAll.mockReturnValue([privateNetwork]);
 
     registry.registerHeadRecordMerger.mockImplementation(
@@ -4247,6 +4248,124 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(
         (await repository.require(identityId)).getIdentityId().valueOf(),
       ).toBe(genesis.getIdentityId().valueOf());
+    });
+  });
+
+  describe('never replacing the genesis of an identity it already has', () => {
+    const forkExternalIdentifier = new IdentityExternalIdentifier('bafy-fork');
+
+    async function enrolled(onPrivateNetwork: boolean) {
+      const setup = await fixture();
+      const phone = await KeyPair.generate();
+      const repositorySetup = repositoryFixture(onPrivateNetwork);
+      repositorySetup.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+        [
+          new IdentityCandidate(
+            genesisExternalIdentifier,
+            identityOf(setup.genesis),
+          ),
+        ],
+      );
+      await provisionAuthorization(repositorySetup.repository, setup.genesis);
+      await repositorySetup.repository.compareAndApply(
+        enrollment(
+          setup.identityId,
+          setup.owner,
+          phone,
+          '00000000-0000-4000-8000-000000000071',
+          '10000000-0000-4000-8000-000000000071',
+        ),
+      );
+
+      return { ...setup, ...repositorySetup, phone };
+    }
+
+    async function forkOf(genesis: DeviceAuthorization) {
+      const device = await KeyPair.generate();
+      const recovery = await KeyPair.generate();
+
+      return DeviceAuthorization.genesis(
+        genesis.getIdentityId(),
+        genesis.getNetworkIds(),
+        DeviceCredential.fromString(device.toPrimitives().publicKey),
+        RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
+      );
+    }
+
+    function credentialsOf(authorization: DeviceAuthorization): string[] {
+      return authorization
+        .getCredentials()
+        .map((credential) => credential.valueOf());
+    }
+
+    it.each([
+      ['a private', true],
+      ['only a public', false],
+    ])(
+      'refuses a second, different version-1 genesis on %s network and keeps the enrolled devices',
+      async (_network, onPrivateNetwork) => {
+        const { database, genesis, identityId, phone, registry, repository } =
+          await enrolled(onPrivateNetwork);
+        registry.putHead.mockClear();
+        database.save.mockClear();
+
+        await expect(
+          provisionAuthorization(
+            repository,
+            await forkOf(genesis),
+            1,
+            forkExternalIdentifier,
+          ),
+        ).rejects.toThrow(DeviceAuthorizationGenesisConflictError);
+
+        const kept = await repository.require(identityId);
+        expect(kept.getRevision().valueOf()).toBe(1);
+        expect(credentialsOf(kept)).toContain(phone.toPrimitives().publicKey);
+        expect(registry.putHead).not.toHaveBeenCalled();
+        expect(database.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses a different genesis known only from its own earlier provision', async () => {
+      const { genesis, identityId } = await fixture();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+
+      await expect(
+        provisionAuthorization(
+          repository,
+          await forkOf(genesis),
+          1,
+          forkExternalIdentifier,
+        ),
+      ).rejects.toThrow(DeviceAuthorizationGenesisConflictError);
+      expect((await repository.require(identityId)).toPrimitives()).toEqual(
+        genesis.toPrimitives(),
+      );
+    });
+
+    it('keeps the enrolled devices when an update provisions the same genesis with more networks', async () => {
+      const { genesis, identityId, phone, repository } = await enrolled(true);
+      const update = DeviceAuthorization.genesis(
+        identityId,
+        [
+          ...genesis.getNetworkIds(),
+          new NetworkId('550e8400-e29b-41d4-a716-446655440001'),
+        ],
+        genesis.getCredentials()[0],
+        genesis.getRecoveryAuthority(),
+      );
+
+      await provisionAuthorization(
+        repository,
+        update,
+        2,
+        new IdentityExternalIdentifier('bafy-second'),
+      );
+
+      const kept = await repository.require(identityId);
+      expect(kept.getRevision().valueOf()).toBe(1);
+      expect(credentialsOf(kept)).toContain(phone.toPrimitives().publicKey);
     });
   });
 });
