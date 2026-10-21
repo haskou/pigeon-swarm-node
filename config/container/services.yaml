@@ -2623,6 +2623,9 @@ services:
   contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer:
     class: /contexts/shared/infrastructure/ipfs/helia/IPFSContentRacer
     arguments: []
+  contexts/shared/infrastructure/ipfs/helia/IPFSVerifiedAbsence:
+    class: /contexts/shared/infrastructure/ipfs/helia/IPFSVerifiedAbsence
+    arguments: []
   contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory:
     class: /contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory
     arguments:

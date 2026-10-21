@@ -9,6 +9,7 @@ import { PubSubEvent } from '@app/shared/infrastructure/pubsub/libp2p/PubSubEven
 import Kernel from '@haskou/ddd-kernel';
 import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
 
+import ReplicatedStateNotReadyError from '../../orbitdb/ReplicatedStateNotReadyError';
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
 import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
@@ -28,6 +29,7 @@ import IPFSCidCodec from './IPFSCidCodec';
 import { IPFSConnection } from './IPFSConnection';
 import { IPFSId } from './IPFSId';
 import { IPFSOptions } from './IPFSOptions';
+import IPFSVerifiedAbsence from './IPFSVerifiedAbsence';
 import { ContentRetrievalOptions } from './types/ContentRetrievalOptions';
 import { ContentRetrievalProgressEvent } from './types/ContentRetrievalProgressEvent';
 import { ParsedHeliaIPFSOptions } from './types/ParsedHeliaIPFSOptions';
@@ -48,6 +50,12 @@ function peerIdFromConnectionEvent(event: Event): string {
 }
 
 export abstract class HeliaIPFS implements IPFSConnection {
+  private static readonly RECORD_UNVERIFIED_MESSAGE =
+    'The IPFS record could not be verified as present or absent. Retry shortly.';
+
+  private static readonly CONTENT_UNVERIFIED_MESSAGE =
+    'The IPFS content could not be verified as present or absent. Retry shortly.';
+
   private static readonly automaticProviderPublicationWindowMs = 5 * 60_000;
   private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
   private static readonly routingPublicationRetryDelayMs = 30_000;
@@ -334,8 +342,14 @@ export abstract class HeliaIPFS implements IPFSConnection {
       });
 
       return decoder.decode(value);
-    } catch {
-      return undefined;
+    } catch (error: unknown) {
+      if (IPFSVerifiedAbsence.isVerified(error)) {
+        return undefined;
+      }
+
+      throw new ReplicatedStateNotReadyError(
+        HeliaIPFS.RECORD_UNVERIFIED_MESSAGE,
+      );
     }
   }
 
@@ -1091,8 +1105,14 @@ export abstract class HeliaIPFS implements IPFSConnection {
           Parameters<HeliaInstance['blockstore']['get']>[1]
         >,
       );
-    } catch {
-      throw new IPFSBlockNotFoundPublicError(cid.valueOf());
+    } catch (error: unknown) {
+      if (IPFSVerifiedAbsence.isVerified(error)) {
+        throw new IPFSBlockNotFoundPublicError(cid.valueOf());
+      }
+
+      throw new ReplicatedStateNotReadyError(
+        HeliaIPFS.CONTENT_UNVERIFIED_MESSAGE,
+      );
     }
   }
 
@@ -1250,22 +1270,29 @@ export abstract class HeliaIPFS implements IPFSConnection {
       return undefined;
     }
 
-    const decoder = new TextDecoder();
-
-    if (this.hasPeers()) {
-      try {
-        const value = await this.heliaCore.routing.get(
-          new TextEncoder().encode(key),
-          { signal },
-        );
-
-        return decoder.decode(value);
-      } catch {
-        // Fallback to local datastore.
-      }
+    if (!this.hasPeers()) {
+      // Nobody to ask: the record may exist on the network, so this is not absence.
+      throw new ReplicatedStateNotReadyError(
+        HeliaIPFS.RECORD_UNVERIFIED_MESSAGE,
+      );
     }
 
-    return undefined;
+    try {
+      const value = await this.heliaCore.routing.get(
+        new TextEncoder().encode(key),
+        { signal },
+      );
+
+      return new TextDecoder().decode(value);
+    } catch (error: unknown) {
+      if (IPFSVerifiedAbsence.isVerified(error)) {
+        return undefined;
+      }
+
+      throw new ReplicatedStateNotReadyError(
+        HeliaIPFS.RECORD_UNVERIFIED_MESSAGE,
+      );
+    }
   }
 
   public async publishIPNSRecord(

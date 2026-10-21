@@ -399,12 +399,14 @@ describe('PublicIPFS', () => {
       expect(mockHeliaNode.blockstore.get).toHaveBeenCalled();
     });
 
-    it('should throw IPFSBlockNotFoundPublicError when block cannot be fetched', async () => {
+    it('should throw IPFSBlockNotFoundPublicError when the block is verified missing', async () => {
       const connection = await PublicIPFS.create({ storageLocation: 'memory' });
       const cid = new IPFSId('bafymockcid');
 
       mockHeliaNode.blockstore.get.mockRejectedValue(
-        new Error('block not available'),
+        Object.assign(new Error('block not available'), {
+          name: 'NotFoundError',
+        }),
       );
 
       await expect(connection.stat(cid, false)).rejects.toThrow(
