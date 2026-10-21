@@ -27,7 +27,7 @@ permissions:
 jobs:
   changes:
     name: Detect changes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       heavy: ${{ steps.classify.outputs.heavy }}
@@ -45,7 +45,7 @@ jobs:
     name: Real transport scripts
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --max-old-space-size=4096
@@ -124,7 +124,7 @@ jobs:
     name: Backend credentials against coturn
     needs: changes
     if: always() && needs.changes.outputs.heavy != 'false'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     env:
       NODE_OPTIONS: --max-old-space-size=4096
