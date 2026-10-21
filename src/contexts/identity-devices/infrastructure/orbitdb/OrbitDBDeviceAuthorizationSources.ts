@@ -1,6 +1,7 @@
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { isDeepStrictEqual } from 'node:util';
 
 import { OrbitDBDeviceAuthorizationDocument } from './documents/OrbitDBDeviceAuthorizationDocument';
@@ -45,15 +46,17 @@ export default class OrbitDBDeviceAuthorizationSources {
     }
 
     return [...uniqueRecords.values()].sort((left, right) => {
-      const operationOrder = left.transition.operationId.localeCompare(
+      const operationOrder = compareCodeUnits(
+        left.transition.operationId,
         right.transition.operationId,
       );
 
       return (
         operationOrder ||
-        this.canonicalizer
-          .serialize(left)
-          .localeCompare(this.canonicalizer.serialize(right))
+        compareCodeUnits(
+          this.canonicalizer.serialize(left),
+          this.canonicalizer.serialize(right),
+        )
       );
     });
   }
@@ -174,9 +177,10 @@ export default class OrbitDBDeviceAuthorizationSources {
     );
 
     return retained.sort((left, right) =>
-      this.canonicalizer
-        .serialize(left)
-        .localeCompare(this.canonicalizer.serialize(right)),
+      compareCodeUnits(
+        this.canonicalizer.serialize(left),
+        this.canonicalizer.serialize(right),
+      ),
     );
   }
 

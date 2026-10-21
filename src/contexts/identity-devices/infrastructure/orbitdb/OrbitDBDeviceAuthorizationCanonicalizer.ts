@@ -1,3 +1,5 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
+
 export default class OrbitDBDeviceAuthorizationCanonicalizer {
   public normalize(value: unknown): unknown {
     if (Array.isArray(value)) {
@@ -10,7 +12,7 @@ export default class OrbitDBDeviceAuthorizationCanonicalizer {
 
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .sort(([left], [right]) => compareCodeUnits(left, right))
         .map(([key, item]) => [key, this.normalize(item)]),
     );
   }
