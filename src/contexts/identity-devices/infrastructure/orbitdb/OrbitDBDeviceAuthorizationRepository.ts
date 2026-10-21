@@ -228,6 +228,26 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return document !== candidate ? this.save(document) : document;
   }
 
+  /**
+   * The genesis this node already holds for the identity: verified earlier,
+   * provisioned here, or in its stored document. It never asks the network: a
+   * new identity has no version list there yet and could never publish.
+   */
+  private heldGenesis(
+    identityId: IdentityId,
+    stored: Record<string, unknown> | undefined,
+  ): OrbitDBDeviceAuthorizationDocument['genesis'] | undefined {
+    const known = this.routing.trustedGenesis(identityId.valueOf());
+
+    if (known) {
+      return known.toPrimitives();
+    }
+
+    return stored && this.validator.isDocument(stored)
+      ? stored.genesis
+      : undefined;
+  }
+
   public compareAndApply(
     transition: DeviceAuthorizationTransition,
   ): Promise<DeviceAuthorization> {
@@ -346,14 +366,16 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     return this.lock.run(authorization.getIdentityId(), async () => {
-      const trustedGenesis = await this.routing.resolveTrustedGenesis(
+      const existing = await this.readHead(authorization.getIdentityId());
+      const trustedGenesis = this.heldGenesis(
         authorization.getIdentityId(),
+        existing,
       );
 
       assert(
         !trustedGenesis ||
           this.genesisMatcher.sameAuthorizationGenesis(
-            trustedGenesis.toPrimitives(),
+            trustedGenesis,
             authorization.toPrimitives(),
           ),
         new DeviceAuthorizationGenesisConflictError(),
@@ -363,20 +385,16 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         identityVersion,
         identityExternalIdentifier,
       );
-      const existing = await this.readHead(authorization.getIdentityId());
 
-      if (existing) {
-        if (
-          !this.validator.isDocument(existing) ||
-          !this.genesisMatcher.sameAuthorizationGenesis(
-            existing.genesis,
-            authorization.toPrimitives(),
-          )
-        ) {
-          await this.save(this.factory.toDocument(authorization, []));
-        } else {
-          await this.save(existing);
-        }
+      if (
+        existing &&
+        this.validator.isDocument(existing) &&
+        this.genesisMatcher.sameAuthorizationGenesis(
+          existing.genesis,
+          authorization.toPrimitives(),
+        )
+      ) {
+        await this.save(existing);
 
         return;
       }

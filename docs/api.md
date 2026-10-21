@@ -3095,7 +3095,10 @@ credential, its commitment and the recovery authority) differs from the one
 this node already holds for the `id`, including a second validly signed
 version 1, is refused with `409` code `DeviceAuthorizationGenesisConflictError`
 before anything is stored, so the identity's enrolled and revoked devices stay
-as they are. Updates keep the genesis and may change the networks.
+as they are. Updates keep the genesis and may change the networks. The check
+reads only what this node holds (its stored document and the genesis it
+verified or provisioned), never the network, so a new identity publishes on a
+node with no peers.
 
 The signature covers this canonical property order:
 
