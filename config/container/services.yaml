@@ -88,6 +88,9 @@ services:
     class: /apps/apis/identity-devices-api/DeviceSealingViewRateLimiter
     arguments: []
     parent: apps/apis/identity-devices-api/DeviceAuthorizationRateLimiter
+  apps/apis/identity-devices-api/DeviceSealingViewUnknownRateLimiter:
+    class: /apps/apis/identity-devices-api/DeviceSealingViewUnknownRateLimiter
+    arguments: []
   apps/apis/link-previews-api/services/LinkPreviewCacheRepository:
     class: /apps/apis/link-previews-api/services/LinkPreviewCacheRepository
     arguments:

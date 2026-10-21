@@ -11,6 +11,7 @@ import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 import DeviceSealingViewCache from '../DeviceSealingViewCache';
 import DeviceSealingViewClientRateLimiter from '../DeviceSealingViewClientRateLimiter';
 import DeviceSealingViewRateLimiter from '../DeviceSealingViewRateLimiter';
+import DeviceSealingViewUnknownRateLimiter from '../DeviceSealingViewUnknownRateLimiter';
 import { DeviceSealingViewNotFoundError } from '../errors/DeviceSealingViewNotFoundError';
 import { DeviceSealingViewViewModel } from '../view-model/DeviceSealingViewViewModel';
 
@@ -29,15 +30,21 @@ export class GetDeviceSealingViewRoute extends Route {
       DeviceSealingViewClientRateLimiter,
     );
 
+  private readonly unknownRateLimiter =
+    this.get<DeviceSealingViewUnknownRateLimiter>(
+      DeviceSealingViewUnknownRateLimiter,
+    );
+
   private readonly cache = this.get<DeviceSealingViewCache>(
     DeviceSealingViewCache,
   );
 
   /**
    * Public: a sender needs it before it holds any credential of the node.
-   * Spent in order: the client address, a few seconds of cache, then the
-   * per-target and node budgets, so one address can neither silence a target
-   * nor the node.
+   * Spent in order: the client address (IPv6 per /64), the id check, a few
+   * seconds of cache (hits and misses), then the lookup. A known target spends
+   * its per-target and node budgets; an unknown id spends only the small
+   * unknown-id budget and is never tracked per target.
    */
   @Get('/:identityId/sealing-view')
   public async find(
@@ -58,12 +65,15 @@ export class GetDeviceSealingViewRoute extends Route {
       return response.status(HttpRouteStatusEnum.OK).send(cached);
     }
 
-    this.rateLimiter.consume(target);
+    if (this.cache.isMissing(target)) {
+      throw new DeviceSealingViewNotFoundError();
+    }
 
     try {
       const view = await this.finder.find(
         new DeviceSealingViewFindMessage(target),
       );
+      this.rateLimiter.consume(target);
       const resource = new DeviceSealingViewViewModel(
         target,
         view,
@@ -73,6 +83,9 @@ export class GetDeviceSealingViewRoute extends Route {
       return response.status(HttpRouteStatusEnum.OK).send(resource);
     } catch (error) {
       if (error instanceof DeviceAuthorizationNotFoundError) {
+        this.unknownRateLimiter.consume();
+        this.cache.storeMissing(target);
+
         throw new DeviceSealingViewNotFoundError();
       }
 

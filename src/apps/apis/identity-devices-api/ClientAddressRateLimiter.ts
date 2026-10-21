@@ -1,3 +1,5 @@
+import clientRateKey from '@app/shared/infrastructure/express/clientRateKey';
+
 import { DeviceAuthorizationTransitionRateLimitExceededError } from './errors/DeviceAuthorizationTransitionRateLimitExceededError';
 
 type Window = { count: number; resetAt: number };
@@ -9,7 +11,7 @@ export interface ClientAddressRateLimits {
 }
 
 /**
- * A fixed window per client address, in front of the per-identity and node
+ * A fixed window per client address (`clientRateKey`: IPv6 per /64), in front of the per-identity and node
  * budgets: one address cannot spend what other addresses are allowed. The table
  * is in memory only and bounded: a full table evicts the oldest address, so a
  * flood of addresses weakens the limit for the evicted ones but never refuses
@@ -42,7 +44,9 @@ export abstract class ClientAddressRateLimiter {
   }
 
   public consume(address: string | undefined, now = Date.now()): void {
-    const key = address || ClientAddressRateLimiter.UNKNOWN_ADDRESS;
+    const key = address
+      ? clientRateKey(address)
+      : ClientAddressRateLimiter.UNKNOWN_ADDRESS;
     const current = this.addresses.get(key);
     const window =
       current && current.resetAt > now

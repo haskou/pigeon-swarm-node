@@ -51,6 +51,8 @@ const identityAttributeKeys = [
 ];
 
 const MAX_CLIENTS_PER_IDENTITY = 16;
+/** The sender retries at most this many times. */
+const MAX_CALL_SIGNAL_ATTEMPT = 5;
 const MAX_RELAYED_CALL_SIGNALS = 10_000;
 
 type RelayedCallSignal = CallSignalAttributes & {
@@ -706,7 +708,12 @@ export class WebSocketEventHub {
   ): RelayedCallSignal | undefined {
     const { attempt, sentAt } = event.attributes;
 
-    if (!Number.isSafeInteger(attempt) || !Number.isSafeInteger(sentAt)) {
+    if (
+      !Number.isSafeInteger(attempt) ||
+      (attempt as number) < 1 ||
+      (attempt as number) > MAX_CALL_SIGNAL_ATTEMPT ||
+      !Number.isSafeInteger(sentAt)
+    ) {
       return undefined;
     }
 

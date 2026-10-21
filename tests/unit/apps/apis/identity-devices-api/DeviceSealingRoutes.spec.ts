@@ -324,6 +324,10 @@ describe('Device sealing routes', () => {
         new DeviceAuthorizationTransitionClientRateLimiter(),
       ],
       [DeviceSealingViewCache, new DeviceSealingViewCache()],
+      [
+        DeviceSealingViewUnknownRateLimiter,
+        new DeviceSealingViewUnknownRateLimiter(),
+      ],
       [DeviceSealingRecordRateLimiter, new DeviceSealingRecordRateLimiter()],
     ]);
     jest
@@ -490,7 +494,9 @@ describe('Device sealing routes', () => {
       expect(view.revision).toBe(authorization.getRevision().valueOf());
       expect(
         view.devices.map(({ deviceCredential }) => deviceCredential),
-      ).toEqual([wire(owner), wire(phone)].sort());
+      ).toEqual(
+        [wire(owner), wire(phone)].sort((a, b) => a.localeCompare(b)),
+      );
       view.devices.forEach((device) => {
         expect(Object.keys(device).sort()).toEqual([
           'deviceCredential',
