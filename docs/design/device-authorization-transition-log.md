@@ -95,7 +95,7 @@ always included). `recoveries`, `concurrentRecoveries` and `transitions` hold on
 the log is exhausted. `cursor` (default `0`) and `limit` (default 50, maximum 100) are part of the signed request target, so a relay cannot change them.
 Any other query key, including the retired `after`, returns `400` (`400050`).
 
-Disclosure waiver: every identity this node serves learns the full signed
+Disclosure by design: every identity this node serves learns the full signed
 history of any identity the node holds: authorization times, compromise marks
 and compromised credentials, pairing ids and expirations, operation ids,
 epochs and the credentials of added, removed and recovered devices. This is an
@@ -104,10 +104,10 @@ view of a recipient it has never met. The scope is NOT "the users of one
 node": `holds()` reads the replicated identity index, so any identity
 published on the network counts, and where registration is `open` (or `codes`
 with a code) one cheap registration is enough. The registration mode is the
-control. Relationship-scoped reads (the caller shares a community or
-conversation with the identity) are the stronger design and are tracked as a
-follow-up issue; security review must assess it. The entries carry no
-`sealedSecrets` and no head revision beyond what they state.
+control. The history is not narrowed to shared communities or conversations:
+any served caller can read it, because a first-contact sender replays it to
+verify a sealing view. The entries carry no `sealedSecrets` and no head
+revision beyond what they state.
 
 ## Client verification algorithm
 
@@ -207,7 +207,7 @@ In every case a wipe needs a signature from a key that had the power to remove
   count and order of device additions and removals). Entries carry no secrets
   or network ids. A signer the node does not serve is refused (`403014`). The
   anonymous sealing view separately discloses device credentials and the device
-  count. Both are flagged for security review.
+  count. Both are disclosed by design, as described under Disclosure.
 - A stolen authorized device key can sign a genuine revocation of `C` and make
   it wipe. That is within the power the key already has: it could revoke `C`
   on every node.

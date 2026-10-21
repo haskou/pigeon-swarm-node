@@ -114,10 +114,10 @@ paths:
         A served caller reads the full signed history of any identity the node
         holds: authorization times, compromisedSince and compromisedCredentials,
         pairing ids and expirations, operation ids, epochs, and the credentials
-        of every added, removed or recovered device. It is an explicit design
-        position that lets a sender replay the log and verify the sealing view
-        it was served; relationship-scoped reads are a tracked follow-up; it is flagged for
-        security review.
+        of every added, removed or recovered device. It is readable by any served
+        caller by design, because verifying a sealing view needs the replay from
+        genesis; the read is not narrowed to shared communities or conversations.
+        The registration mode is the access control of this read.
 
         Every entry is the stored signed transition, byte-for-byte the
         primitives POST /identity-devices/{identityId}/transitions accepted,

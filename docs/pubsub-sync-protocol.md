@@ -1163,9 +1163,10 @@ D-1 only. Senders verify it against the signed transitions read from `GET
 serves may read (a signer it does not serve gets `403014`): the full signed
 history of an identity is therefore disclosed to every identity in the
 replicated index the node holds, which is any published identity, not only the
-users of the node; the registration mode is the control (flagged for security
-review). The public view discloses the device
-credentials and the device count to anyone who reaches the node; reads are
+users of the node; the registration mode is the access control, by design: the
+history is not narrowed to shared communities or conversations. The public view
+discloses the device credentials and the device count to anyone who reaches the
+node; reads are
 limited per client address, then per target and per node, and a view is cached
 for five seconds. Pruning of old records is not reported: the records are
 tracked as a follow-up issue.

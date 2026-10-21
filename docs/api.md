@@ -6756,23 +6756,25 @@ this node does not serve returns `403` (`403014`) and nothing is read. The
 signer may be any served identity, not the path identity, and no device or
 recovery proof header is read. An anonymous request returns `401`, and so does
 a request that is not signed correctly or is blocked (`403012`). A served
-identity is one in the replicated identity index (see the waiver below). This is the
+identity is one in the replicated identity index (see Disclosure by design
+below). This is the
 only read whose authorization #698 stage 2 widened;
 `GET /identity-devices/{identityId}` and `/devices` stay owner-only.
 
-Disclosure waiver: every identity this node serves can read the full signed
-history of any identity the node holds: authorization times,
+Disclosure by design: every identity this node serves can read the full signed
+history of any identity the node holds, and this read is not narrowed to shared
+communities or conversations. The history holds authorization times,
 `compromisedSince` and `compromisedCredentials`, pairing ids and expirations,
-operation ids, epochs, and the credentials of every added, removed or
-recovered device. A sender needs it to replay the log and verify a recipient's
-sealing view. "Served" is not "a user of this node": `holds()` reads the
-replicated identity index, so any identity published anywhere on the network
-counts, and on a node whose registration mode is `open` (or `codes`, with a
-code) anyone can register one cheaply and then read every history. The
-registration mode (open, codes, closed) is therefore the real access control
-of this read. A stronger design, relationship-scoped reads (the caller must
-share a community or conversation with the identity), is tracked as a
-follow-up issue. It is flagged for security review.
+operation ids, epochs, and the credentials of every added, removed or recovered
+device. It is readable by any served caller because verifying a sealing view
+needs the replay from genesis: a first-contact sender cannot check a view
+without the log. "Served" means the identity is in the replicated identity
+index, so an identity published anywhere on the network counts. On a node whose
+registration mode is `open` (or `codes`, with a code) anyone can register an
+identity and then read these histories, so the registration mode (open, codes,
+closed) is the access control of this read. The log exposes public device
+credentials and when they were authorized, removed or marked compromised; it
+never serves sealed secrets.
 
 The response is `{ concurrentRecoveries, identityId, nextCursor, recoveries,
 transitions }`. Every entry is a stored transition in exactly the primitives
