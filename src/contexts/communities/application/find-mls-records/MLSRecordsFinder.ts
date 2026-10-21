@@ -1,3 +1,5 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
+
 import { MLSGroupAccess } from '../../domain/MLSGroupAccess';
 import { MLSRecord } from '../../domain/MLSRecord';
 import CommunityRepository from '../../domain/repositories/CommunityRepository';
@@ -32,7 +34,7 @@ export default class MLSRecordsFinder {
         (left, right) =>
           (left.epoch ?? 0) - (right.epoch ?? 0) ||
           left.createdAt.valueOf() - right.createdAt.valueOf() ||
-          left.id.valueOf().localeCompare(right.id.valueOf()),
+          compareCodeUnits(left.id.valueOf(), right.id.valueOf()),
       );
   }
 }
