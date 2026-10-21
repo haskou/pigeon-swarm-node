@@ -5972,6 +5972,14 @@ projection confirms that the authenticated identity is a member and can view
 the requested channel. Protected settings stay in the node-local database and
 are limited to 256 scopes per identity and 4,096 scopes per node.
 
+A protected setting stored on the node that the node cannot read (it no longer
+parses, or the domain rejects it) is kept unchanged and never read as "no
+setting": `GET /notification-settings`, this upsert and the push delivery
+check for that scope answer `503` with code `503020`
+(`ReplicatedStateNotReadyError`) instead of listing fewer settings, falling
+back to defaults or replacing it. Resetting the scope with `DELETE
+/notification-settings/scopes` removes it explicitly.
+
 ### Reset scope notification settings
 
 ```http
@@ -6161,6 +6169,14 @@ Response:
 
 Backend also removes stale subscriptions automatically when the push provider
 returns `404` or `410`.
+
+A stored subscription the node cannot read (it no longer parses, or the
+domain rejects it, for example an endpoint host outside the supported list) is
+kept unchanged and never skipped or removed: `POST /push/test` answers `503`
+with code `503020` (`ReplicatedStateNotReadyError`) instead of testing fewer
+subscriptions, and push delivery to that identity fails rather than reaching
+only some of its subscriptions. Registering the same endpoint again with
+`PUT /push/subscriptions` replaces it.
 
 Push delivery failures are logged as one JSON line with `message`, `endpointHost`,
 `statusCode`, `error` and `shouldDeleteSubscription`. The full endpoint URL,
