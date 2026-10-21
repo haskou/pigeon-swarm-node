@@ -207,7 +207,8 @@ In every case a wipe needs a signature from a key that had the power to remove
   count and order of device additions and removals). Entries carry no secrets
   or network ids. A signer the node does not serve is refused (`403014`). The
   anonymous sealing view separately discloses device credentials and the device
-  count. Both are disclosed by design, as described under Disclosure.
+  count. The served-caller history is disclosed by design (see Disclosure); the
+  anonymous view is flagged for security review.
 - A stolen authorized device key can sign a genuine revocation of `C` and make
   it wipe. That is within the power the key already has: it could revoke `C`
   on every node.

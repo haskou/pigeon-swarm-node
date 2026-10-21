@@ -6757,8 +6757,7 @@ signer may be any served identity, not the path identity, and no device or
 recovery proof header is read. An anonymous request returns `401`, and so does
 a request that is not signed correctly or is blocked (`403012`). A served
 identity is one in the replicated identity index (see Disclosure by design
-below). This is the
-only read whose authorization #698 stage 2 widened;
+below). This is the only read whose authorization #698 stage 2 widened;
 `GET /identity-devices/{identityId}` and `/devices` stay owner-only.
 
 Disclosure by design: every identity this node serves can read the full signed
