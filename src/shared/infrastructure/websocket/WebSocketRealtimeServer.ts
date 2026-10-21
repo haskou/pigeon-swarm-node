@@ -9,6 +9,8 @@ import { WebSocketOriginPolicy } from './WebSocketOriginPolicy';
 import { WebSocketTicketAuthenticator } from './WebSocketTicketAuthenticator';
 
 const MAX_CLIENT_FRAME_BYTES = 16 * 1024;
+const GOING_AWAY_CLOSE_CODE = 1001;
+const CLOSE_HANDSHAKE_TIMEOUT_MS = 1_000;
 
 export class WebSocketRealtimeServer {
   private readonly admissionLimiter = new WebSocketAdmissionLimiter();
@@ -19,6 +21,8 @@ export class WebSocketRealtimeServer {
     maxPayload: MAX_CLIENT_FRAME_BYTES,
     noServer: true,
   });
+
+  private closing = false;
 
   private handleUpgrade(
     request: IncomingMessage,
@@ -76,7 +80,42 @@ export class WebSocketRealtimeServer {
 
   public attach(httpServer: HttpServer, ticketPath: string): void {
     httpServer.on('upgrade', (request, socket, head) => {
+      if (this.closing) {
+        socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n');
+        socket.destroy();
+
+        return;
+      }
+
       this.handleUpgrade(request, socket, head, ticketPath);
     });
+  }
+
+  /**
+   * Refuses new upgrades and closes every open realtime socket as going away.
+   * A client that does not answer the close handshake within a second is cut,
+   * so shutdown stays inside its time budget.
+   */
+  public async close(): Promise<void> {
+    this.closing = true;
+    const clients = [...this.server.clients];
+
+    await Promise.all(
+      clients.map((client) => {
+        const { promise, resolve } = Promise.withResolvers<void>();
+        const timeout = setTimeout(
+          () => client.terminate(),
+          CLOSE_HANDSHAKE_TIMEOUT_MS,
+        );
+
+        client.once('close', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+        client.close(GOING_AWAY_CLOSE_CODE, 'Server shutting down');
+
+        return promise;
+      }),
+    );
   }
 }
