@@ -437,6 +437,27 @@ describe('PrivateAuthorizationScope', () => {
     ).toEqual(['a', 'z']);
   });
 
+  it('returns retryable pending operations in code-unit operation-id order, independent of locale', () => {
+    const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
+
+    for (const id of ['a_AA', 'aAAA', 'BBBB']) {
+      scope.acceptProposal(
+        operation({
+          digest: `digest-${id}`,
+          id,
+          previousOperationIds: ['dependency'],
+        }),
+      );
+    }
+    scope.acceptProposal(
+      operation({ digest: 'dependency-digest', id: 'dependency' }),
+    );
+
+    expect(
+      scope.retryable().map((pending) => pending.toPrimitives().id),
+    ).toEqual(['BBBB', 'aAAA', 'a_AA']);
+  });
+
   it('promotes an identical pending operation once its predecessors are accepted', () => {
     const scope = PrivateAuthorizationScope.pin(genesis(), 'genesis-hash');
     const dependent = operation({
