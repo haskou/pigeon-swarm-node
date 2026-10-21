@@ -192,6 +192,8 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       const s = await scenario();
       const marker = `probe-${randomUUID()}`;
       const signalId = randomUUID();
+      // Nothing is on the wire before the sender publishes.
+      expect(s.fabric.carried).toHaveLength(0);
 
       await s.sender.adapter.publish([
         new CallSignalSentEvent(
@@ -212,9 +214,9 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
         (await registeredText(s.recipient, signalId))?.includes(marker) ??
           false,
       ).toBe(false);
-      // The sender controls its own publication; no receiving node relays it.
+      // The sender's publication is the only frame (frames are encrypted on a
+      // private network, so they are counted, not read): no receiver relays it.
       expect(s.fabric.carried).toHaveLength(1);
-      expect(s.fabric.carried[0]).toContain(signalId);
     });
 
     it('E1/E2: the real send path never puts a plaintext payload on the wire', async () => {
