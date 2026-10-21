@@ -49,66 +49,27 @@ describe('IPFS', () => {
   });
 
   describe('stat', () => {
-    it('should return true when CID exists in any network', async () => {
-      const cid = new IPFSId('bafyexists');
+    it('should check every network locally until one holds the CID', async () => {
+      const cid = new IPFSId('bafy-local');
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
 
-      racer.raceStat.mockResolvedValue(undefined);
+      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
+      firstNetwork.stat.mockRejectedValue(
+        new IPFSContentNotFoundError('bafy-local'),
+      );
+      secondNetwork.stat.mockResolvedValue(undefined);
 
       const exists = await ipfs.stat(cid);
 
       expect(exists).toBe(true);
-      expect(racer.raceStat).toHaveBeenCalledWith([mockNetwork], cid);
-    });
-
-    it('should return false when CID does not exist', async () => {
-      const cid = new IPFSId('bafymissing');
-
-      racer.raceStat.mockRejectedValue(new IPFSContentNotFoundError('cid'));
-
-      const exists = await ipfs.stat(cid);
-
-      expect(exists).toBe(false);
+      expect(registry.initialize).toHaveBeenCalled();
+      expect(firstNetwork.stat).toHaveBeenCalledWith(cid);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid);
     });
 
     it('should check only provided network ids when networkIds are provided', async () => {
-      const cid = new IPFSId('bafy-network');
-      const firstNetwork = mock<IPFSNetwork>();
-      const secondNetwork = mock<IPFSNetwork>();
-
-      firstNetwork.getId.mockReturnValue('network-1');
-      secondNetwork.getId.mockReturnValue('network-2');
-      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
-      racer.raceStat.mockResolvedValue(undefined);
-
-      const exists = await ipfs.stat(cid, false, ['network-2']);
-
-      expect(exists).toBe(true);
-      expect(registry.initialize).toHaveBeenCalled();
-      expect(racer.raceStat).toHaveBeenCalledWith([secondNetwork], cid);
-    });
-
-    it('should check sequentially when offlineOnly is enabled', async () => {
-      const cid = new IPFSId('bafy-offline');
-      const firstNetwork = mock<IPFSNetwork>();
-      const secondNetwork = mock<IPFSNetwork>();
-
-      registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
-      firstNetwork.stat.mockRejectedValue(
-        new IPFSContentNotFoundError('bafy-offline'),
-      );
-      secondNetwork.stat.mockResolvedValue(undefined);
-
-      const exists = await ipfs.stat(cid, true);
-
-      expect(exists).toBe(true);
-      expect(registry.initialize).toHaveBeenCalled();
-      expect(firstNetwork.stat).toHaveBeenCalledWith(cid, true);
-      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
-      expect(racer.raceStat).not.toHaveBeenCalled();
-    });
-
-    it('should check sequentially when offlineOnly is enabled with networkIds', async () => {
-      const cid = new IPFSId('bafy-offline-filtered');
+      const cid = new IPFSId('bafy-local-filtered');
       const firstNetwork = mock<IPFSNetwork>();
       const secondNetwork = mock<IPFSNetwork>();
 
@@ -117,90 +78,88 @@ describe('IPFS', () => {
       registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
       secondNetwork.stat.mockResolvedValue(undefined);
 
-      const exists = await ipfs.stat(cid, true, ['network-2']);
+      const exists = await ipfs.stat(cid, ['network-2']);
 
       expect(exists).toBe(true);
-      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid);
       expect(firstNetwork.stat).not.toHaveBeenCalled();
-      expect(racer.raceStat).not.toHaveBeenCalled();
     });
 
-    it('should try the next network when an offline check fails with a transport error', async () => {
-      const cid = new IPFSId('bafy-offline-transport');
+    it('should try the next network when a local check fails with another error', async () => {
+      const cid = new IPFSId('bafy-local-failure');
       const firstNetwork = mock<IPFSNetwork>();
       const secondNetwork = mock<IPFSNetwork>();
 
       registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
-      firstNetwork.stat.mockRejectedValue(new Error('transport failed'));
+      firstNetwork.stat.mockRejectedValue(new Error('blockstore failed'));
       secondNetwork.stat.mockResolvedValue(undefined);
 
-      await expect(ipfs.stat(cid, true)).resolves.toBe(true);
-      expect(secondNetwork.stat).toHaveBeenCalledWith(cid, true);
+      await expect(ipfs.stat(cid)).resolves.toBe(true);
+      expect(secondNetwork.stat).toHaveBeenCalledWith(cid);
     });
 
-    it('should throw ReplicatedStateNotReadyError when offline checks fail without a not found answer', async () => {
-      const cid = new IPFSId('bafy-offline-unavailable');
+    it('should throw ReplicatedStateNotReadyError when local checks fail without a not found answer', async () => {
+      const cid = new IPFSId('bafy-local-unavailable');
       const firstNetwork = mock<IPFSNetwork>();
       const secondNetwork = mock<IPFSNetwork>();
 
       registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
-      firstNetwork.stat.mockRejectedValue(new Error('transport failed'));
-      secondNetwork.stat.mockRejectedValue(new Error('transport failed'));
+      firstNetwork.stat.mockRejectedValue(new Error('blockstore failed'));
+      secondNetwork.stat.mockRejectedValue(new Error('blockstore failed'));
 
-      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+      await expect(ipfs.stat(cid)).rejects.toThrow(
         ReplicatedStateNotReadyError,
       );
-      expect(racer.raceStat).not.toHaveBeenCalled();
     });
 
-    it('should return false when offline checks answer not found on every network', async () => {
-      const cid = new IPFSId('bafy-offline-missing');
+    it('should return false when local checks answer not found on every network', async () => {
+      const cid = new IPFSId('bafy-local-missing');
       const firstNetwork = mock<IPFSNetwork>();
       const secondNetwork = mock<IPFSNetwork>();
 
       registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
       firstNetwork.stat.mockRejectedValue(
-        new IPFSContentNotFoundError('bafy-offline-missing'),
+        new IPFSContentNotFoundError('bafy-local-missing'),
       );
       secondNetwork.stat.mockRejectedValue(
-        new IPFSContentNotFoundError('bafy-offline-missing'),
+        new IPFSContentNotFoundError('bafy-local-missing'),
       );
 
-      await expect(ipfs.stat(cid, true)).resolves.toBe(false);
+      await expect(ipfs.stat(cid)).resolves.toBe(false);
     });
 
-    it('should throw ReplicatedStateNotReadyError when offline checks answer not found on one network and fail on another', async () => {
-      const cid = new IPFSId('bafy-offline-mixed');
+    it('should throw ReplicatedStateNotReadyError when local checks answer not found on one network and fail on another', async () => {
+      const cid = new IPFSId('bafy-local-mixed');
       const firstNetwork = mock<IPFSNetwork>();
       const secondNetwork = mock<IPFSNetwork>();
 
       registry.getAll.mockReturnValue([firstNetwork, secondNetwork]);
       firstNetwork.stat.mockRejectedValue(
-        new IPFSContentNotFoundError('bafy-offline-mixed'),
+        new IPFSContentNotFoundError('bafy-local-mixed'),
       );
-      secondNetwork.stat.mockRejectedValue(new Error('transport failed'));
+      secondNetwork.stat.mockRejectedValue(new Error('blockstore failed'));
 
-      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+      await expect(ipfs.stat(cid)).rejects.toThrow(
         ReplicatedStateNotReadyError,
       );
     });
 
-    it('should throw ReplicatedStateNotReadyError when offline checks have no networks to ask', async () => {
-      const cid = new IPFSId('bafy-offline-empty');
+    it('should throw ReplicatedStateNotReadyError when there are no networks to ask', async () => {
+      const cid = new IPFSId('bafy-local-empty');
 
       registry.getAll.mockReturnValue([]);
 
-      await expect(ipfs.stat(cid, true)).rejects.toThrow(
+      await expect(ipfs.stat(cid)).rejects.toThrow(
         ReplicatedStateNotReadyError,
       );
     });
 
     it('should throw when provided network ids do not match any network', async () => {
-      const cid = new IPFSId('bafy-offline');
+      const cid = new IPFSId('bafy-local');
 
       mockNetwork.getId.mockReturnValue('existing-network');
 
-      await expect(ipfs.stat(cid, false, ['missing-network'])).rejects.toThrow(
+      await expect(ipfs.stat(cid, ['missing-network'])).rejects.toThrow(
         IPFSNetworksNotFoundByIdsError,
       );
     });
