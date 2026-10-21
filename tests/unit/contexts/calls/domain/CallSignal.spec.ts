@@ -121,9 +121,9 @@ describe('CallSignal', () => {
   });
 
   it('refuses an empty sealed entry list', () => {
-    expect(() => CallSignal.fromPrimitives(wire({ sealedEntries: [] }))).toThrow(
-      InvalidCallSignalError,
-    );
+    expect(() =>
+      CallSignal.fromPrimitives(wire({ sealedEntries: [] })),
+    ).toThrow(InvalidCallSignalError);
   });
 
   it('refuses a sealed entry without an envelope', () => {
@@ -142,7 +142,9 @@ describe('CallSignal', () => {
     expect(() =>
       CallSignal.fromPrimitives(
         wire({
-          sealedEntries: [{ envelope: 'sealed', recipientDeviceCredential: '' }],
+          sealedEntries: [
+            { envelope: 'sealed', recipientDeviceCredential: '' },
+          ],
         }),
       ),
     ).toThrow(InvalidCallSignalError);
@@ -277,7 +279,11 @@ describe('CallSignal', () => {
     ],
     [
       'the sender device credential',
-      { senderDeviceCredential: 'c'.repeat(CallSignal.MAX_CREDENTIAL_LENGTH + 1) },
+      {
+        senderDeviceCredential: 'c'.repeat(
+          CallSignal.MAX_CREDENTIAL_LENGTH + 1,
+        ),
+      },
     ],
     [
       'the signature',
@@ -290,8 +296,8 @@ describe('CallSignal', () => {
   });
 
   it('returns sealed entries holding exactly the two sealed fields', () => {
-    const [entry] = CallSignal.fromPrimitives(wire()).toPrimitives()
-      .sealedEntries;
+    const [entry] =
+      CallSignal.fromPrimitives(wire()).toPrimitives().sealedEntries;
 
     expect(Object.keys(entry).sort()).toEqual([
       'envelope',

@@ -608,7 +608,10 @@ describe('Device sealing routes', () => {
       const find = jest
         .spyOn(DeviceSealingViewCache.prototype, 'find')
         .mockReturnValue(undefined);
-      const consume = jest.spyOn(DeviceSealingViewRateLimiter.prototype, 'consume');
+      const consume = jest.spyOn(
+        DeviceSealingViewRateLimiter.prototype,
+        'consume',
+      );
       authorizationRepository.require.mockClear();
 
       expect((await getPublic(viewPath())).status).toBe(200);

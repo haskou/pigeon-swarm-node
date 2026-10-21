@@ -41,10 +41,7 @@ describe('Call signal consumers', () => {
   it('registers received signal deliveries', async () => {
     const eventConsumer = mock<DomainEventConsumer>();
     const registrar = mock<CallSignalDeliveryRegistrar>();
-    const consumer = new RegisterCallSignalWhenSent(
-      eventConsumer,
-      registrar,
-    );
+    const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
     const event = new CallSignalSentEvent(
       '550e8400-e29b-41d4-a716-446655440000',
       signalAttributes,
@@ -60,12 +57,15 @@ describe('Call signal consumers', () => {
     const registrar = mock<CallSignalDeliveryRegistrar>();
     const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
     const expiredAt = Date.now() - 60_000;
-    const event = new CallSignalSentEvent('550e8400-e29b-41d4-a716-446655440000', {
-      ...signalAttributes,
-      createdAt: expiredAt,
-      expiresAt: expiredAt + 20_000,
-      sentAt: expiredAt,
-    });
+    const event = new CallSignalSentEvent(
+      '550e8400-e29b-41d4-a716-446655440000',
+      {
+        ...signalAttributes,
+        createdAt: expiredAt,
+        expiresAt: expiredAt + 20_000,
+        sentAt: expiredAt,
+      },
+    );
 
     await expect(consumer.handler(event)).resolves.toBeUndefined();
     expect(registrar.register).not.toHaveBeenCalled();
@@ -83,10 +83,7 @@ describe('Call signal consumers', () => {
     async (_case, override) => {
       const eventConsumer = mock<DomainEventConsumer>();
       const registrar = mock<CallSignalDeliveryRegistrar>();
-      const consumer = new RegisterCallSignalWhenSent(
-        eventConsumer,
-        registrar,
-      );
+      const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
       const event = new CallSignalSentEvent(
         '550e8400-e29b-41d4-a716-446655440000',
         { ...signalAttributes, ...override },
@@ -117,10 +114,7 @@ describe('Call signal consumers', () => {
     async (_case, override) => {
       const eventConsumer = mock<DomainEventConsumer>();
       const registrar = mock<CallSignalDeliveryRegistrar>();
-      const consumer = new RegisterCallSignalWhenSent(
-        eventConsumer,
-        registrar,
-      );
+      const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
       const event = new CallSignalSentEvent(
         '550e8400-e29b-41d4-a716-446655440000',
         { ...signalAttributes, ...override } as never,
