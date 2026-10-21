@@ -236,6 +236,10 @@ jobs:
         run: yarn test:integration:orbitdb-heads-framing
         timeout-minutes: 4
 
+      - name: Filesystem datastore record absence
+        run: yarn test:integration:fs-datastore-record-absence
+        timeout-minutes: 4
+
       - name: Mailbox realtime hint
         run: yarn test:e2e:real-transport:mailbox-realtime
         timeout-minutes: 4
