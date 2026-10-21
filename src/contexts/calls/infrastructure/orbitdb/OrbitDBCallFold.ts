@@ -3,6 +3,7 @@ import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallNonce } from '@app/contexts/calls/domain/value-objects/CallNonce';
 import { CallSessionEpoch } from '@app/contexts/calls/domain/value-objects/CallSessionEpoch';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { Timestamp } from '@haskou/value-objects';
@@ -33,7 +34,7 @@ export class OrbitDBCallFold {
     ].sort(
       (left, right) =>
         (left.at as number) - (right.at as number) ||
-        (left.id as string).localeCompare(right.id as string),
+        compareCodeUnits(left.id as string, right.id as string),
     );
 
     for (const event of events) {
