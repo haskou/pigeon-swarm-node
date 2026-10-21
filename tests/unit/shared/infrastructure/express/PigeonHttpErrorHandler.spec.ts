@@ -1,3 +1,4 @@
+import { CallSignalMismatchError } from '@app/contexts/calls/domain/errors/CallSignalMismatchError';
 import { createPigeonHttpErrorHandler } from '@app/shared/infrastructure/express/PigeonHttpErrorHandler';
 import { Log } from '@app/shared/infrastructure/logs/Log';
 import { HttpError } from 'routing-controllers';
@@ -100,16 +101,44 @@ describe('createPigeonHttpErrorHandler', () => {
     expect(logger.error).toHaveBeenCalledWith('Unhandled error: name=Error');
   });
 
-  it('keeps the 500 response body of an unhandled error unchanged', () => {
-    process.env.NODE_ENV = 'production';
+  it.each(['production', 'test', 'local', ''])(
+    'answers an unhandled error with a fixed generic body when NODE_ENV is %p',
+    (environment) => {
+      process.env.NODE_ENV = environment;
 
-    const response = respondTo(filesystemError(), logger);
+      const response = respondTo(filesystemError(), logger);
 
-    expect(response.status).toBe(500);
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({
+        code: 'InternalServerError',
+        httpStatus: 500,
+        message: 'Internal server error.',
+      });
+      expect(JSON.stringify(response.body)).not.toContain(SECRET_PATH);
+    },
+  );
+
+  it('does not reveal the class name of a custom unhandled error', () => {
+    class SecretSubsystemFailure extends Error {}
+
+    const response = respondTo(new SecretSubsystemFailure('boom'), logger);
+
     expect(response.body).toEqual({
-      code: 'Error',
-      message: `EACCES: permission denied, open '${SECRET_PATH}'`,
+      code: 'InternalServerError',
+      httpStatus: 500,
+      message: 'Internal server error.',
     });
+  });
+
+  it('keeps the documented message of a domain error', () => {
+    const response = respondTo(new CallSignalMismatchError(), logger);
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      code: 'CallSignalMismatchError',
+      message: 'Call signal does not match the request or the call.',
+    });
+    expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('does not log an error that carries an HTTP status', () => {
