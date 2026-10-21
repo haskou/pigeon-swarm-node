@@ -2,8 +2,8 @@ import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notificati
 import { NotificationScopeSettings } from '@app/contexts/notification-settings/domain/NotificationScopeSettings';
 import { NotificationSettingsStorageQuota } from '@app/contexts/notification-settings/domain/NotificationSettingsStorageQuota';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
-import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Integer } from '@haskou/value-objects';
 
@@ -11,6 +11,7 @@ export default class LocalNotificationScopeSettingsRepository {
   private static readonly NAMESPACE = 'private_notification_scope_settings';
   private static readonly UNREADABLE_MESSAGE =
     'Stored notification settings cannot be read. They were kept unchanged, so they are not reported missing. Retry later.';
+
   private static readonly queues = new WeakMap<
     EmbeddedLocalDatabase,
     Promise<void>
