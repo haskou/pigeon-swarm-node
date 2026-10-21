@@ -4199,6 +4199,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       const { database, registry, repository, transition } =
         await provisioned();
       registry.findHead.mockResolvedValue(undefined);
+      registry.rehydrateHead.mockResolvedValue(true);
       registry.findPersistedHead.mockRejectedValue(
         new ReplicatedStateNotReadyError(),
       );
@@ -4241,6 +4242,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       registry.findHead
         .mockResolvedValueOnce(undefined)
         .mockResolvedValueOnce(undefined);
+      registry.rehydrateHead.mockResolvedValue(true);
       registry.findPersistedHead.mockResolvedValue(undefined);
 
       const applied = await repository.compareAndApply(transition);
@@ -4249,6 +4251,17 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(
         (await repository.require(identityId)).getIdentityId().valueOf(),
       ).toBe(genesis.getIdentityId().valueOf());
+    });
+
+    it('does not read the store again when no network stores the head', async () => {
+      const { identityId, registry, repository } = await provisioned();
+      registry.findHead.mockResolvedValue(undefined);
+      registry.rehydrateHead.mockResolvedValue(false);
+
+      await repository.has(identityId);
+
+      expect(registry.rehydrateHead).toHaveBeenCalled();
+      expect(registry.findPersistedHead).not.toHaveBeenCalled();
     });
   });
 });
