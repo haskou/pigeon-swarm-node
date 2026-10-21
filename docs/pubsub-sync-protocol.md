@@ -1166,8 +1166,9 @@ replicated index the node holds, which is any published identity, not only the
 users of the node; the registration mode is the access control, by design: the
 history is not narrowed to shared communities or conversations. The public view
 discloses the device credentials and the device count to anyone who reaches the
-node (flagged for security review); reads are
-limited per client address, then per target and per node, and a view is cached
+node. That anonymous disclosure is flagged for security review, not by design.
+Reads are limited per client address, then per target and per node, and a view
+is cached
 for five seconds. Pruning of old records is not reported: the records are
 tracked as a follow-up issue.
 

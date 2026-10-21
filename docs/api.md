@@ -176,9 +176,10 @@ Implemented:
 - no identity-signed `GET`, `HEAD` or `OPTIONS` request takes a slot, and
   neither does the transitions read of a key that was never authorized (see
   _Identity device authorization_). Replaying either inside the window only
-  returns again what that key may read, at most the public recovery lineage.
-  The guard is kept for state changes and for device and recovery proofs, which
-  take a slot on every method
+  returns again what that key may read; for the transitions read of a served
+  caller that is the full signed history, disclosed by design. The guard is
+  kept for state changes and for device and recovery proofs, which take a slot
+  on every method
 - `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
   (PEM armour and whitespace are ignored). An alias encoding of the signing key,
   such as another DER prefix byte or base64 padding bits that decode to the
@@ -6734,10 +6735,12 @@ GET /identity-devices/{percent-encoded identityId}/devices
 It has exactly the authentication of the checkpoint read: the stable identity
 signing key must match the requested identity and exactly one complete device
 or recovery proof is required, so no other participant can read this
-inventory. Other routes disclose parts of it by design: the anonymous
-`sealing-view` below serves the device credentials and the device count of any
-identity this node holds, and the transitions read serves the history of the
-device set to any identity this node serves. The response is `{ credentials, epoch, identityId, revision }`, where
+inventory. Other routes disclose parts of it: the transitions read serves the
+history of the device set by design to any identity this node serves, and the
+anonymous `sealing-view` below serves the device credentials and the device
+count of any identity this node holds. The anonymous view is flagged for
+security review, not by design. The response is `{ credentials, epoch,
+identityId, revision }`, where
 `credentials` holds the normalized public credentials authorized at the
 current head. It carries no labels, commitments, revoked credentials or
 revocation history; a client keeps its own device names. Failures are the same

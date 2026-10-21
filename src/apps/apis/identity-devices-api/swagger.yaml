@@ -319,7 +319,8 @@ paths:
         GET /identity-devices/{identityId}/transitions.
 
         Anyone who reaches the node learns the device credentials and the device
-        count of any identity it holds. Rate limited per client address (60 per
+        count of any identity it holds. This anonymous disclosure is flagged for
+        security review, not by design. Rate limited per client address (60 per
         minute; IPv6 per /64), then per known target identity (300 per minute)
         and per node (3000 per minute), code 429030, so one address can neither
         silence an identity nor the node. A served view is cached for five
