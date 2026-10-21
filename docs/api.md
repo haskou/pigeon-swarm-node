@@ -2573,16 +2573,43 @@ times out, the answer is the same `503`, even when another network reported the
 CID absent: one network's absence does not prove the content is absent
 everywhere. Retry.
 
-Identity and keychain record lookups follow the same rule. The Helia adapter
-reports a record as absent only when the local datastore or every DHT router
-answered not-found. The filesystem datastore answers not-found only when the
-record file does not exist; any other local read failure (I/O error,
-permission, abort) is a datastore error. A datastore error, a DHT timeout or
-abort, a router that failed while another answered not-found, or having no connected peers while the
-DHT is enabled is a retrieval failure: the lookup answers `503` with code
-`503020`, never "no record", so an unreachable DHT cannot make an existing
-identity or keychain read as missing. Block `stat` over the public network
-likewise reports a missing block only on a definitive not-found answer.
+Identity and keychain record lookups follow the same rule. The node asks every
+network it has configured, all at once, and reports a record as absent only
+when each network answered within the lookup timeout that it holds none:
+
+- A not-found answer from the node's local datastore is definitive. The
+  filesystem datastore answers not-found only when the record file does not
+  exist; any other local read failure (I/O error, permission, abort) is a
+  datastore error.
+- On a network whose DHT is disabled (a private network), that local answer is
+  the whole answer.
+- On a network whose DHT is enabled (the public network), the node asks its
+  peers. A DHT not-found only means that the query of every router finished
+  without finding a value, not that the network verified the record is absent.
+  A connected node treats that answer as absence, so peers able to eclipse the
+  node's DHT view can make an existing record read as missing.
+- A datastore error, a DHT timeout or abort, a router that failed while another
+  answered not-found, and having no connected peers while the DHT is enabled are
+  retrieval failures. The lookup answers `503` with code `503020`, never "no
+  record", so an unreachable DHT cannot make an existing identity or keychain
+  read as missing.
+
+The lookup times out after 2500 ms (`IPFS_CONTENT_TIMEOUT_MS`, capped at 5000
+ms) and then answers `503` with code `503020`. A DHT query that has to walk the
+public network to prove a record absent often outlasts that timeout, so a
+genuinely absent record on the public network often answers `503020` rather
+than `404` or `409`. A node that has a public network with no connected peers
+answers `503020` for every record it does not hold locally, whatever its other
+networks answer. An unknown id with no peers and no local record therefore
+answers `503`, not `404` or `409`.
+
+The `message` of such a `503020` says why. `IPFS records are not reachable on
+every network yet. Retry shortly.` means the node is ready but the record lookup
+could not be verified. `Replicated state is not ready yet. Retry after the node
+finishes opening and synchronizing replicated state.` means the node has not
+finished startup or opened its replicated state; keychain lookups also use it
+when they cannot verify a keychain's ownership. The message is a diagnostic:
+both answers mean "retry", and a client must branch only on the code.
 
 ### Register content replication
 
@@ -2994,7 +3021,10 @@ read, the lookup answers HTTP 503 with code `503020`
 identity is not reported missing, so retry. A 409 means the node is ready (see
 Node readiness) and every network it asked answered that it does not know the
 identity. If any network fails to answer, the lookup answers 503 with code
-`503020` instead, even when another network reported the identity absent.
+`503020` instead, even when another network reported the identity absent. What
+counts as a network's answer, the lookup timeout, why a public network without
+peers answers 503, and how the `message` tells an unverified lookup from a node
+that is not ready are described under `### Get public IPFS content`.
 
 ### Publish identity
 
@@ -3304,7 +3334,9 @@ Errors:
   its routing record, replicated keychain document or local index entry cannot be
   read or mapped. The keychain is not reported missing, so retry. A record or
   document that stays unreadable keeps this answer at 503 rather than 409 until it
-  is repaired or removed.
+  is repaired or removed. What counts as a verified absence, the lookup timeout
+  and which `message` each of these `503020` answers carries are described under
+  `### Get public IPFS content`.
 
 ## Conversation HTTP API
 
