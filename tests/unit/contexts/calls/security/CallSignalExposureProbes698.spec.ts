@@ -197,9 +197,8 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
         (await registeredText(s.recipient, signalId))?.includes(marker) ??
           false,
       ).toBe(false);
-      expect(
-        s.fabric.carried.some((payload) => payload.includes(marker)),
-      ).toBe(false);
+      // The sender controls its own publication; no receiving node relays it.
+      expect(s.fabric.carried).toHaveLength(1);
     });
 
     it.each([
