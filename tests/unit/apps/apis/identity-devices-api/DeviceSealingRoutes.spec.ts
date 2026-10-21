@@ -2,7 +2,7 @@ import DeviceAuthorizationTransitionClientRateLimiter from '@app/apps/apis/ident
 import DeviceAuthorizationTransitionReadRateLimiter from '@app/apps/apis/identity-devices-api/DeviceAuthorizationTransitionReadRateLimiter';
 import DeviceSealingRecordRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingRecordRateLimiter';
 import DeviceSealingViewCache from '@app/apps/apis/identity-devices-api/DeviceSealingViewCache';
-import DeviceSealingViewClientRateLimiter from '@app/apis/identity-devices-api/DeviceSealingViewClientRateLimiter';
+import DeviceSealingViewClientRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewClientRateLimiter';
 import DeviceSealingViewRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewRateLimiter';
 import { GetDeviceAuthorizationRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceAuthorizationRoute';
 import { GetDeviceSealingViewRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceSealingViewRoute';
@@ -278,8 +278,8 @@ describe('Device sealing routes', () => {
     );
 
     const identities = mock<IdentityRepository>();
-    identities.holds.mockImplementation(async (id) =>
-      heldIdentityIds.has(id.valueOf()),
+    identities.holds.mockImplementation((id) =>
+      Promise.resolve(heldIdentityIds.has(id.valueOf())),
     );
     const blockPolicy = mock<NodeBlockPolicy>();
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
@@ -663,7 +663,7 @@ describe('Device sealing routes', () => {
 
     it.each([
       ['a throwaway key', () => KeyPair.generate()],
-      ['an identity of another node', async () => stranger],
+      ['an identity of another node', () => Promise.resolve(stranger)],
     ])(
       'answers 403014 to a signed caller that is %s and reads nothing',
       async (_label, build) => {
@@ -681,9 +681,7 @@ describe('Device sealing routes', () => {
     );
 
     it('keeps answering 401 to an anonymous read before the served check', async () => {
-      expect(
-        (await getPublic(transitionsPath())).status,
-      ).toBe(401);
+      expect((await getPublic(transitionsPath())).status).toBe(401);
     });
 
     it('rate-limits each served requester with 429030 across addresses', async () => {

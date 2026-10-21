@@ -89,7 +89,7 @@ describe('DeviceSealingRecordPolicy', () => {
           signer: fixture.owner,
           utcDay: '2026-02-28',
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         justAfterMidnight,
       ),
     ).toBe(true);
@@ -100,7 +100,7 @@ describe('DeviceSealingRecordPolicy', () => {
           signer: fixture.owner,
           utcDay: '2026-02-27',
         }),
-        fixture.authorization,
+        () => fixture.authorization,
         justAfterMidnight,
       ),
     ).toBe(false);
@@ -113,7 +113,7 @@ describe('DeviceSealingRecordPolicy', () => {
           identityId: fixture.identityId,
           signer: fixture.owner,
         }),
-        undefined,
+        () => undefined,
         NOW,
       ),
     ).toBe(false);

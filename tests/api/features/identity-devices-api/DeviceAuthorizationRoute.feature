@@ -226,7 +226,7 @@ Feature: Device authorization route
     When I GET the current device transition log
     Then response code is equal to 401
 
-  Scenario: Serve the signed transitions to a signed caller of another identity
+  Scenario: Refuse the transitions to a signed caller this node does not serve
     Given I am an anonymous user
     And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
     And I set a client-signed identity body with name "log isolated" and handle "transition-isolated"
@@ -234,8 +234,8 @@ Feature: Device authorization route
     Then response code is equal to 200
     Given another identity signs the current device transition log request
     When I GET the current device transition log
-    Then response code is equal to 200
-    And response serves the signed device authorization transitions after revision 0
+    Then response code is equal to 403
+    And response body should contain "403014"
 
   Scenario: Refuse a transition posted to another identity
     Given I am an anonymous user
