@@ -1150,10 +1150,14 @@ signature verifies; the merger keeps one key per (identity, device, day) and
 refuses a different key for the same triple. The public `GET
 /identity-devices/{identityId}/sealing-view` serves the keys for UTC days D and
 D-1 only. Senders verify it against the signed transitions read from `GET
-/identity-devices/{identityId}/transitions`, which any signed identity may
-read: the add and remove history of an identity is therefore disclosed to every
-signed identity of the node (private-network scope, flagged for security
-review). Pruning of old records is not reported.
+/identity-devices/{identityId}/transitions`, which every identity the node
+serves may read (a signer it does not serve gets `403014`): the full signed
+history of an identity is therefore disclosed to the users of the node
+(flagged for security review). The public view discloses the device
+credentials and the device count to anyone who reaches the node; reads are
+limited per client address, then per target and per node, and a view is cached
+for five seconds. Pruning of old records is not reported: the records are
+tracked as a follow-up issue.
 
 ## Live call projection boundary
 

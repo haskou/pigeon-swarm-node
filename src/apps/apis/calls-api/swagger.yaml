@@ -491,6 +491,7 @@ components:
         sealedEntries:
           type: array
           minItems: 1
+          maxItems: 128
           items:
             type: object
             additionalProperties: false
@@ -500,10 +501,13 @@ components:
             properties:
               envelope:
                 type: string
+                maxLength: 32768
               recipientDeviceCredential:
                 type: string
+                maxLength: 128
         senderDeviceCredential:
           type: string
+          maxLength: 128
         senderIdentityId:
           type: string
         signalId:
@@ -514,6 +518,7 @@ components:
           enum: [offer, answer, ice_candidate]
         signature:
           type: string
+          maxLength: 256
     CallSignalDeliveryResource:
       type: object
       required:

@@ -644,14 +644,23 @@ object and has no `payload` field. It carries `signalId`, `callId`, `networkId`,
 `senderIdentityId`, `senderDeviceCredential`, `recipientIdentityId`,
 `signalType` (`offer`, `answer` or `ice_candidate`), `scopeType`
 (`conversation` or `community_channel`; `group_capability` is refused),
-`sealedEntries` (one or more `{envelope, recipientDeviceCredential}` objects),
-`createdAt`, `expiresAt` and `signature`. The node checks presence, the path
+`sealedEntries` (1 to 128 `{envelope, recipientDeviceCredential}` objects with
+exactly those two keys, unique credentials, an envelope of at most 32768 and a
+credential of at most 128 characters), `createdAt`, `expiresAt` and `signature`. The node checks presence, the path
 `callId`, the `networkId` and the sender against the call, refuses a reused
 `signalId`, and applies the clock rules: `expiresAt` must equal `createdAt` plus
 20000 ms and be later than the node clock, and `createdAt` must be no more than
 5000 ms ahead of the node clock. The node does not verify `signature`; the
 recipient UI verifies it over `pigeon:call-signal:v1` and a newline, followed by
-RFC 8785 canonical JSON of every field except `signature`.
+RFC 8785 canonical JSON of every field except `signature`. The node does not
+bind `senderDeviceCredential` or `recipientDeviceCredential` to an identity;
+the UI verifies that through the transition log. A repeated `signalId` with a
+higher attempt never replaces the stored sealed content. The WebSocket relay
+delivers a signal only when `recipientIdentityId` is one canonical string,
+rebuilds it through the domain (an expired, far-future or malformed signal is
+dropped), and relays the same `signalId` and attempt once; each sealed entry
+reaches every socket of the recipient identity, so the size of its device set is
+visible there.
 
 Ephemeral typing indicators:
 
@@ -6699,8 +6708,11 @@ GET /identity-devices/{percent-encoded identityId}/devices
 
 It has exactly the authentication of the checkpoint read: the stable identity
 signing key must match the requested identity and exactly one complete device
-or recovery proof is required, so no other participant can read the inventory.
-The response is `{ credentials, epoch, identityId, revision }`, where
+or recovery proof is required, so no other participant can read this
+inventory. Other routes disclose parts of it by design: the anonymous
+`sealing-view` below serves the device credentials and the device count of any
+identity this node holds, and the transitions read serves the history of the
+device set to any identity this node serves. The response is `{ credentials, epoch, identityId, revision }`, where
 `credentials` holds the normalized public credentials authorized at the
 current head. It carries no labels, commitments, revoked credentials or
 revocation history; a client keeps its own device names. Failures are the same
@@ -6712,25 +6724,34 @@ Read a page of the signed transitions of an identity with:
 GET /identity-devices/{percent-encoded identityId}/transitions?cursor=<revision>&limit=<n>
 ```
 
-Any signed caller may read it: the signer may be any identity, not the path
-identity, and no device or recovery proof header is read. An anonymous request
-returns `401`. This is the only read whose authorization #698 stage 2 widened;
+The caller must be an identity this node serves: it holds the identity, or the
+identity owns the node (the same test as for state-changing requests). Any
+self-generated key can sign, so a signed request alone proves nothing; a signer
+this node does not serve returns `403` (`403014`) and nothing is read. The
+signer may be any served identity, not the path identity, and no device or
+recovery proof header is read. An anonymous request returns `401`, and so does
+a request that is not signed correctly or is blocked (`403012`). This is the
+only read whose authorization #698 stage 2 widened;
 `GET /identity-devices/{identityId}` and `/devices` stay owner-only.
 
-Transition-history disclosure waiver: any signed identity on a node can learn
-the add and remove history (the count and order of enrollments, revocations and
-recoveries) of any identity it asks about. This is an explicit design position
-so that a sender can replay the log and verify a recipient's sealing view. It
-is scoped to private networks and is flagged for security review.
+Disclosure waiver: every identity this node serves can read the full signed
+history of any identity the node holds: authorization times,
+`compromisedSince` and `compromisedCredentials`, pairing ids and expirations,
+operation ids, epochs, and the credentials of every added, removed or
+recovered device. A sender needs it to replay the log and verify a recipient's
+sealing view. The scope is the identities of this node, which on a private
+network are its own users; it is not a secret from them. It is flagged for
+security review.
 
 The response is `{ concurrentRecoveries, identityId, nextCursor, recoveries,
 transitions }`. Every entry is a stored transition in exactly the primitives
 `POST /identity-devices/{identityId}/transitions` accepted, including
 `proofOfPossession` and `signature`; the node never re-signs or rewrites one,
 never serves `sealedSecrets`, and serves only records its replay accepted.
-`recoveries` and `concurrentRecoveries` are served on every page;
-`transitions` holds whole revision groups ascending after `cursor`, at most
-`limit` entries (the first group is always served). `nextCursor` is the
+`recoveries`, `concurrentRecoveries` and `transitions` all hold whole
+revision groups ascending after `cursor`: an entry at or below `cursor` is not
+served again, and each entry counts toward `limit` (the first group is always
+served, even when it alone exceeds `limit`). `nextCursor` is the
 revision to send as `cursor` next, or `null` once the log is exhausted. No head
 revision, epoch, network id or device list is returned; the client replays
 what it verifies from the genesis.
@@ -6739,8 +6760,9 @@ what it verifies from the genesis.
 leading zeros and `limit` an integer from 1 to 100 (default 50); any other
 value, or any other query key such as the retired `after`, returns `400`
 (`400050`). Both are part of the signed request target. The read is rate
-limited per signing identity (60 per minute) and per node (600 per minute):
-excess returns `429` (`429030`). A client deciding whether it was removed pages
+limited per client address (60 per minute, in front of everything else, `429`
+`429030`), per served requester (60 per minute, keyed on its canonical id) and
+per node (3000 per minute); an address cannot exhaust the other two. A client deciding whether it was removed pages
 from `0`, verifies every entry with the shared replay rules and wipes only on
 positive signed evidence: a recovery in its own epoch targeting another
 credential, or a replayed revision group above its verified revision that
@@ -6766,8 +6788,11 @@ device's signature over the record. `201` means the record was admitted and
 `sealingPublicKey` is already admitted for the same identity, device and day.
 `422` (`422040`) means it was not admitted: the credential is not authorized at
 the head, the day is not today or yesterday in UTC, the signature is invalid
-or a field is malformed. A body over 8 KB returns `413`. No route-specific rate
-limit applies beyond the signed-request replay guard.
+or a field is malformed. A body over 8 KB returns `413`. The signature
+verification is bounded by a per-identity limit of 30 publications per minute
+and a node limit of 600 per minute: excess returns `429` (`429030`). A path
+identity that is not a valid identity id returns `409` with the error class
+name as `code`.
 
 Read the sealing keys a sender seals to with the public, unauthenticated:
 
@@ -6779,9 +6804,24 @@ The response is `{ identityId, revision, devices: [{ deviceCredential,
 sealingKeys: [{ utcDay, sealingPublicKey }] }] }` for the devices authorized
 at the head and UTC days D and D-1 only; it carries no labels, timestamps or
 `compromisedSince`. A sender verifies it by replaying the transitions above.
-An identity the node does not know returns `404` (`404050`); the read is rate
-limited per target identity (60 per minute) and per node (600 per minute),
-excess returns `429` (`429030`).
+An identity the node does not know returns `404` (`404050`); a path that is not
+the canonical encoding of a usable key returns `400` (`400080`) before any
+budget is spent, and one that is not an identity id at all returns `409` with
+the error class name as `code`.
+
+This read is public: anyone who can reach the node learns the device
+credentials and the device count of any identity the node holds, plus the
+sealing keys of today and yesterday. It is rate limited per client address
+(60 per minute) in front of a per-target budget (300 per minute) and a node
+budget (3000 per minute), so one address can neither silence an identity nor
+the node; excess returns `429` (`429030`). A served view is cached for five
+seconds, a cache hit spends neither the target nor the node budget, and a view
+can therefore trail the head by that time on top of the replication delay. The
+client address is the one Express derives (`API_TRUST_PROXY`), is kept in
+memory only and is never logged. Sealed call signals reach every socket of the
+recipient identity, so the size of its device set is visible there too. The
+node does not bind a device credential to an identity: the UI verifies that
+through the transition log.
 
 Submit an enrollment, revocation or recovery operation to:
 

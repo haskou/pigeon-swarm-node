@@ -73,12 +73,14 @@ stays behind `/devices`.
 
 ### Authentication
 
-Any signed caller. The normal signed HTTP headers (`X-Identity-Id`,
-`X-Timestamp`, `X-Signature`), fresh, signed by any identity; the signer does
-not have to be the path identity, and no device or recovery proof header is
-read. An anonymous request gets the generic `401`. The read is rate limited
-per signing identity (60 per minute) and per node (600 per minute), code
-`429030`.
+A caller this node serves. The normal signed HTTP headers (`X-Identity-Id`,
+`X-Timestamp`, `X-Signature`), fresh, signed by an identity the node holds or
+whose node it owns; the signer does not have to be the path identity, and no
+device or recovery proof header is read. Any self-generated key can sign, so a
+signer the node does not serve gets `403` (`403014`) and nothing is read; an
+anonymous request gets the generic `401`. The read is rate limited per client
+address (60 per minute), per served requester keyed on its canonical id (60
+per minute) and per node (3000 per minute), code `429030`.
 
 This is the only authorization change of #698 stage 2: `GET
 /identity-devices/{identityId}` and `/devices` stay owner-only with a device or
@@ -88,18 +90,19 @@ recovery proof.
 
 The node serves `log.disclose().page(cursor, limit)`: the whole log, paged by
 whole revision groups ascending (at most `limit` transitions, the first group
-always included). `recoveries` and `concurrentRecoveries` are served on every
-page. `nextCursor` is the revision of the last served group, or `null` when
+always included). `recoveries`, `concurrentRecoveries` and `transitions` hold only entries above
+`cursor`, and every entry counts toward `limit`. `nextCursor` is the revision of the last served group, or `null` when
 the log is exhausted. `cursor` (default `0`) and `limit` (default 50, maximum 100) are part of the signed request target, so a relay cannot change them.
 Any other query key, including the retired `after`, returns `400` (`400050`).
 
-Transition-history disclosure waiver: any signed identity on a node learns the
-add and remove history (the count and order of enrollments, revocations and
-recoveries) of any identity it asks about. This is an explicit design
-position: a sender must replay the log to verify the sealing view of a
-recipient it has never met. Scope is private networks only; security review
-must assess it. The entries carry no `sealedSecrets` and no head revision
-beyond what they state.
+Disclosure waiver: every identity this node serves learns the full signed
+history of any identity the node holds: authorization times, compromise marks
+and compromised credentials, pairing ids and expirations, operation ids,
+epochs and the credentials of added, removed and recovered devices. This is an
+explicit design position: a sender must replay the log to verify the sealing
+view of a recipient it has never met. The scope is the users of one node, not
+anyone who can sign; security review must assess it. The entries carry no
+`sealedSecrets` and no head revision beyond what they state.
 
 ## Client verification algorithm
 
@@ -194,10 +197,12 @@ In every case a wipe needs a signature from a key that had the power to remove
 
 ## Residuals
 
-- Any signed identity learns the whole transition history of any identity
-  (target credentials, operation ids, revisions, carried caps, the count and
-  order of device additions and removals). Entries carry no secrets or network
-  ids. This waiver is private-network only and is flagged for security review.
+- Every identity the node serves learns the whole transition history of any
+  identity (target credentials, operation ids, revisions, carried caps, the
+  count and order of device additions and removals). Entries carry no secrets
+  or network ids. A signer the node does not serve is refused (`403014`). The
+  anonymous sealing view separately discloses device credentials and the device
+  count. Both are flagged for security review.
 - A stolen authorized device key can sign a genuine revocation of `C` and make
   it wipe. That is within the power the key already has: it could revoke `C`
   on every node.
@@ -224,5 +229,6 @@ In every case a wipe needs a signature from a key that had the power to remove
   of the shared vectors, signatures verified.
 - `DeviceAuthorizationRoute.feature`: a signed identity reads
   the log, `cursor` and `limit`
-  page, an invalid `cursor`, `limit` or `after` returns `400050`, any signed identity reads and
-  an anonymous request returns `401`.
+  page, an invalid `cursor`, `limit` or `after` returns `400050`, a served identity reads, a signed
+  identity the node does not serve returns `403014` and an anonymous request
+  returns `401`.
