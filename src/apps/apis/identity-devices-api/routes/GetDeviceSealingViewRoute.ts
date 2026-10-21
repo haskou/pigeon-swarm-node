@@ -1,4 +1,5 @@
 import { NonCanonicalIdentityIdError } from '@app/apps/apis/shared/errors/NonCanonicalIdentityIdError';
+import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import DeviceSealingViewFinder from '@app/contexts/identity-devices/application/find/DeviceSealingViewFinder';
 import { DeviceSealingViewFindMessage } from '@app/contexts/identity-devices/application/find/messages/DeviceSealingViewFindMessage';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
@@ -13,6 +14,7 @@ import DeviceSealingViewClientRateLimiter from '../DeviceSealingViewClientRateLi
 import DeviceSealingViewRateLimiter from '../DeviceSealingViewRateLimiter';
 import DeviceSealingViewUnknownRateLimiter from '../DeviceSealingViewUnknownRateLimiter';
 import { DeviceSealingViewNotFoundError } from '../errors/DeviceSealingViewNotFoundError';
+import { DeviceSealingViewResource } from '../resources/DeviceSealingViewResource';
 import { DeviceSealingViewViewModel } from '../view-model/DeviceSealingViewViewModel';
 
 @JsonController('/identity-devices')
@@ -39,12 +41,15 @@ export class GetDeviceSealingViewRoute extends Route {
     DeviceSealingViewCache,
   );
 
+  private readonly identities = this.get<IdentityRepository>(IdentityRepository);
+
   /**
    * Public: a sender needs it before it holds any credential of the node.
    * Spent in order: the client address (IPv6 per /64), the id check, a few
-   * seconds of cache (hits and misses), then the lookup. A known target spends
-   * its per-target and node budgets; an unknown id spends only the small
-   * unknown-id budget and is never tracked per target.
+   * seconds of cache (hits and misses), the held check, then the per-target
+   * budget and the lookup. Concurrent misses for one identity share one lookup.
+   * An unknown id spends only the small unknown-id budget and is never tracked
+   * per target.
    */
   @Get('/:identityId/sealing-view')
   public async find(
@@ -69,18 +74,37 @@ export class GetDeviceSealingViewRoute extends Route {
       throw new DeviceSealingViewNotFoundError();
     }
 
+    if (!(await this.identities.holds(target))) {
+      this.unknownRateLimiter.consume();
+      this.cache.storeMissing(target);
+
+      throw new DeviceSealingViewNotFoundError();
+    }
+
+    const resource = await this.cache.coalesce(target, () => this.load(target));
+
+    return response.status(HttpRouteStatusEnum.OK).send(resource);
+  }
+
+  /**
+   * One lookup per held identity: the per-target budget is charged before the
+   * authorization is resolved, and a miss for an identity this node does not
+   * hold has already been refused above.
+   */
+  private async load(target: IdentityId): Promise<DeviceSealingViewResource> {
+    this.rateLimiter.consume(target);
+
     try {
       const view = await this.finder.find(
         new DeviceSealingViewFindMessage(target),
       );
-      this.rateLimiter.consume(target);
       const resource = new DeviceSealingViewViewModel(
         target,
         view,
       ).toResource();
       this.cache.store(target, resource);
 
-      return response.status(HttpRouteStatusEnum.OK).send(resource);
+      return resource;
     } catch (error) {
       if (error instanceof DeviceAuthorizationNotFoundError) {
         this.unknownRateLimiter.consume();

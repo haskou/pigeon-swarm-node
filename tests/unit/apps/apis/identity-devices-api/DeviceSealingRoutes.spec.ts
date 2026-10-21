@@ -285,6 +285,7 @@ describe('Device sealing routes', () => {
     const blockPolicy = mock<NodeBlockPolicy>();
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
     const services = new Map<unknown, unknown>([
+      [IdentityRepository, identities],
       [
         SignedHttpRequestAuthenticator,
         new SignedHttpRequestAuthenticator(
@@ -624,6 +625,19 @@ describe('Device sealing routes', () => {
         .spyOn(DeviceSealingViewCache.prototype, 'find')
         .mockReturnValue(undefined);
       authorizationRepository.require.mockClear();
+      const originalFind = DeviceSealingViewFinder.prototype.find;
+      const slowFind = jest
+        .spyOn(DeviceSealingViewFinder.prototype, 'find')
+        .mockImplementation(async function (
+          this: DeviceSealingViewFinder,
+          message,
+        ) {
+          const { promise, resolve } = Promise.withResolvers<void>();
+          setTimeout(resolve, 50);
+          await promise;
+
+          return originalFind.call(this, message);
+        });
 
       const responses = await Promise.all([
         getPublic(viewPath(), nextAddress()),
@@ -637,6 +651,7 @@ describe('Device sealing routes', () => {
       expect(authorizationRepository.require).toHaveBeenCalledTimes(1);
 
       find.mockRestore();
+      slowFind.mockRestore();
     });
 
     it('counts every address of one IPv6 /64 as one client', async () => {
