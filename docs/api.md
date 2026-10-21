@@ -3077,6 +3077,13 @@ is idempotent, so the same signed body can be sent again and names the same
 identity without creating anything new. The admission path (proof of work and
 registration control above) is unchanged by this rule.
 
+An identity's genesis is never replaced. A body whose genesis (initial device
+credential, its commitment and the recovery authority) differs from the one
+this node already holds for the `id`, including a second validly signed
+version 1, is refused with `409` code `DeviceAuthorizationGenesisConflictError`
+before anything is stored, so the identity's enrolled and revoked devices stay
+as they are. Updates keep the genesis and may change the networks.
+
 The signature covers this canonical property order:
 
 ```json
