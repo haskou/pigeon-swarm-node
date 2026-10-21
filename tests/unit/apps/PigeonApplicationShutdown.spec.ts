@@ -1,7 +1,10 @@
 import 'reflect-metadata';
 import PigeonApplication from '@app/apps/PigeonApplication';
+import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import MemoryMessageBusAdapterClosedError from '@app/shared/infrastructure/errors/MemoryMessageBusAdapterClosedError';
+import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 
@@ -62,5 +65,42 @@ describe('PigeonApplication shutdown', () => {
       ),
     ).rejects.toThrow(MemoryMessageBusAdapterClosedError);
     expect(handler).not.toHaveBeenCalled();
+  }, 60_000);
+});
+
+describe('PigeonApplication shutdown hooks', () => {
+  const originalTransportDsn = process.env.TRANSPORT_DSN;
+
+  beforeEach(() => {
+    process.env.TRANSPORT_DSN = 'in-memory://';
+  });
+
+  afterEach(() => {
+    process.env.TRANSPORT_DSN = originalTransportDsn;
+    jest.restoreAllMocks();
+  });
+
+  it('stops the bus timers, then the networks, then the local databases, once for concurrent shutdowns', async () => {
+    const application = new PigeonApplication();
+    const closed: string[] = [];
+
+    await application.dependencyInjection({ containerBuild: false });
+    jest
+      .spyOn(MemoryMessageBusAdapter.prototype, 'close')
+      .mockImplementation(async () => {
+        closed.push('message bus');
+      });
+    jest
+      .spyOn(IPFSNetworkRegistry.prototype, 'stopAll')
+      .mockImplementation(async () => {
+        closed.push('networks');
+      });
+    jest.spyOn(EmbeddedLocalDatabase, 'closeAll').mockImplementation(async () => {
+      closed.push('local databases');
+    });
+
+    await Promise.all([application.shutdown(), application.shutdown()]);
+
+    expect(closed).toEqual(['message bus', 'networks', 'local databases']);
   }, 60_000);
 });

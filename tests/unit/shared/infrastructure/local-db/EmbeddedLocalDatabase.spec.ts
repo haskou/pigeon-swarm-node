@@ -197,6 +197,26 @@ describe('EmbeddedLocalDatabase', () => {
     await expect(withinASecond(later)).resolves.toBe('queued');
   });
 
+  it('should close every open handle on closeAll, releasing the lock with the writes on disk', async () => {
+    await firstDatabase.save('nodes', 'node-1', { name: 'Node 1' });
+
+    await EmbeddedLocalDatabase.closeAll();
+
+    const otherProcess = new Level<string, Record<string, unknown>>(
+      databasePath,
+      { valueEncoding: 'json' },
+    );
+    await expect(otherProcess.open()).resolves.toBeUndefined();
+    await otherProcess.close();
+
+    const reopened = new EmbeddedLocalDatabase();
+    await expect(reopened.findOne('nodes', 'node-1')).resolves.toEqual({
+      _id: 'node-1',
+      name: 'Node 1',
+    });
+    await reopened.close();
+  });
+
   describe('when another process holds the database', () => {
     let lockedPath: string;
     let runningNode: Level<string, Record<string, unknown>>;

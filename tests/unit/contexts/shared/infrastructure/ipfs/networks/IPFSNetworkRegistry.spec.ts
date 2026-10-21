@@ -743,6 +743,54 @@ describe('IPFSNetworkRegistry', () => {
       );
     });
   });
+
+  describe('stopAll', () => {
+    it('should stop every network and keep its storage', async () => {
+      process.env.IPFS_STORAGE_PATH = '/tmp/pigeon-swarm-ipfs';
+      const registry = createRegistry();
+      const firstNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+      const removeStorage = fs.rm as jest.MockedFunction<typeof fs.rm>;
+
+      firstNetwork.getId.mockReturnValue('network-1');
+      firstNetwork.stop.mockResolvedValue(undefined);
+      secondNetwork.getId.mockReturnValue('network-2');
+      secondNetwork.stop.mockResolvedValue(undefined);
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockResolvedValueOnce(firstNetwork)
+        .mockResolvedValueOnce(secondNetwork);
+
+      await registry.register(
+        new IPFSNetworkConfig('network-1', 'private_1', new PrivateKey(validPem)),
+      );
+      await registry.register(
+        new IPFSNetworkConfig('network-2', 'private_2', new PrivateKey(validPem)),
+      );
+
+      await registry.stopAll();
+
+      expect(firstNetwork.stop).toHaveBeenCalledTimes(1);
+      expect(secondNetwork.stop).toHaveBeenCalledTimes(1);
+      expect(registry.getAll()).toEqual([]);
+      expect(removeStorage).not.toHaveBeenCalled();
+    });
+  });
 });
 
 function deferred<T>(): {
