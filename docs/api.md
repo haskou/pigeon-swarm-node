@@ -1852,6 +1852,10 @@ Implemented:
 - reject a second public network with `409`
 - persist the network in the local embedded database
 - synchronize the runtime IPFS network registry after saving
+- answer with the node's networks; private network `key` values and the
+  `privateNetwork` flag go only to the signed node owner, so an unsigned
+  addition to an unowned node receives neither, as an anonymous
+  `GET /node/networks` does
 
 ### Delete local node network
 
@@ -1872,6 +1876,8 @@ Implemented:
   conversations, communities and their channel messages/reactions/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
+- answer with the remaining networks, private network `key` values included
+  only while the signer still owns the node
 
 ### Put local node owner
 
