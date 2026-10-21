@@ -614,13 +614,15 @@ describe('Device sealing routes', () => {
       );
       authorizationRepository.require.mockClear();
 
-      expect((await getPublic(viewPath())).status).toBe(200);
-      expect(consume.mock.invocationCallOrder[0]).toBeLessThan(
-        authorizationRepository.require.mock.invocationCallOrder[0],
-      );
-
-      find.mockRestore();
-      consume.mockRestore();
+      try {
+        expect((await getPublic(viewPath())).status).toBe(200);
+        expect(consume.mock.invocationCallOrder[0]).toBeLessThan(
+          authorizationRepository.require.mock.invocationCallOrder[0],
+        );
+      } finally {
+        find.mockRestore();
+        consume.mockRestore();
+      }
     });
 
     it('coalesces concurrent misses for one identity into one authorization lookup', async () => {
@@ -642,19 +644,21 @@ describe('Device sealing routes', () => {
           return originalFind.call(this, message);
         });
 
-      const responses = await Promise.all([
-        getPublic(viewPath(), nextAddress()),
-        getPublic(viewPath(), nextAddress()),
-        getPublic(viewPath(), nextAddress()),
-      ]);
+      try {
+        const responses = await Promise.all([
+          getPublic(viewPath(), nextAddress()),
+          getPublic(viewPath(), nextAddress()),
+          getPublic(viewPath(), nextAddress()),
+        ]);
 
-      expect(responses.map((response) => response.status)).toEqual([
-        200, 200, 200,
-      ]);
-      expect(authorizationRepository.require).toHaveBeenCalledTimes(1);
-
-      find.mockRestore();
-      slowFind.mockRestore();
+        expect(responses.map((response) => response.status)).toEqual([
+          200, 200, 200,
+        ]);
+        expect(authorizationRepository.require).toHaveBeenCalledTimes(1);
+      } finally {
+        find.mockRestore();
+        slowFind.mockRestore();
+      }
     });
 
     it('counts every address of one IPv6 /64 as one client', async () => {
@@ -719,14 +723,18 @@ describe('Device sealing routes', () => {
         'consume',
       );
       const alias = IdentityIdMother.aliasPrefix(identityId).valueOf();
-      const response = await getPublic(viewPath(alias));
 
-      expect(response.status).toBe(400);
-      expect(((await response.json()) as { code: number }).code).toBe(
-        NON_CANONICAL,
-      );
-      expect(consume).not.toHaveBeenCalled();
-      consume.mockRestore();
+      try {
+        const response = await getPublic(viewPath(alias));
+
+        expect(response.status).toBe(400);
+        expect(((await response.json()) as { code: number }).code).toBe(
+          NON_CANONICAL,
+        );
+        expect(consume).not.toHaveBeenCalled();
+      } finally {
+        consume.mockRestore();
+      }
     });
 
     it('answers 409 with the error class name for a malformed identity id', async () => {
