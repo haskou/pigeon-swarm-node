@@ -36,6 +36,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+
 import { teardownAndExit } from './RealTransportTeardown';
 
 interface Replica {
@@ -100,7 +101,9 @@ async function open(replica: Replica): Promise<void> {
   replica.repository = new OrbitDBDeviceAuthorizationRepository(
     replica.registry,
     new DeviceAuthorizationPolicy(),
-    {} as IdentityRepository,
+    {
+      findFreshCandidateReferencesById: () => Promise.resolve([]),
+    } as unknown as IdentityRepository,
     {
       getAll: () => [
         {

@@ -1,3 +1,4 @@
+import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
@@ -53,6 +54,23 @@ export default class OrbitDBDeviceAuthorizationRouting {
     private readonly identityRepository: IdentityRepository,
     private readonly networkRegistry: IPFSNetworkRegistry,
   ) {}
+
+  /** Only a verified "identity not found" reads as no candidates. */
+  private async findFreshCandidates(
+    identityId: IdentityId,
+  ): Promise<IdentityCandidate[]> {
+    try {
+      return await this.identityRepository.findFreshCandidateReferencesById(
+        identityId,
+      );
+    } catch (error) {
+      if (error instanceof IdentityNotFoundError) {
+        return [];
+      }
+
+      throw error;
+    }
+  }
 
   private shouldReplaceRoutingNetworks(
     identityId: string,
@@ -276,10 +294,7 @@ export default class OrbitDBDeviceAuthorizationRouting {
   public async resolveTrustedGenesis(
     identityId: IdentityId,
   ): Promise<DeviceAuthorization | undefined> {
-    const candidates =
-      await this.identityRepository.findFreshCandidateReferencesById(
-        identityId,
-      );
+    const candidates = await this.findFreshCandidates(identityId);
 
     if (candidates.length === 0) {
       return this.trustedGenesis(identityId.valueOf());

@@ -7,9 +7,6 @@ import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceCompromisedCredential } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionState';
-import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
-import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
-import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
 import { DeviceAuthorizationOperationId } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationOperationId';
@@ -18,6 +15,9 @@ import { PairingAuthorization } from '@app/contexts/identity-devices/domain/valu
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
+import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
+import PublicMutationVerifier from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
+import DeviceAuthorizationPublicMutationAuthorization from '@app/contexts/public-mutations/infrastructure/DeviceAuthorizationPublicMutationAuthorization';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import {
@@ -41,6 +41,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+
 import { teardownAndExit } from './RealTransportTeardown';
 
 interface Replica {
@@ -105,7 +106,9 @@ async function open(replica: Replica): Promise<void> {
   replica.repository = new OrbitDBDeviceAuthorizationRepository(
     replica.registry,
     new DeviceAuthorizationPolicy(),
-    {} as IdentityRepository,
+    {
+      findFreshCandidateReferencesById: () => Promise.resolve([]),
+    } as unknown as IdentityRepository,
     {
       getAll: () => [
         {
