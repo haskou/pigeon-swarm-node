@@ -53,6 +53,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   function repositoryFixture() {
     const registry = mock<OrbitDBReplicatedStateRegistry>();
     const identityRepository = mock<IdentityRepository>();
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
     const networkRegistry = mock<IPFSNetworkRegistry>();
     const privateNetwork = mock<IPFSNetwork>();
     let head: Record<string, unknown> | undefined;

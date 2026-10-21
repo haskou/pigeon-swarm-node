@@ -13,6 +13,7 @@ import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/ser
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Timestamp, assert } from '@haskou/value-objects';
 
@@ -122,27 +123,51 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     return `${OrbitDBDeviceAuthorizationRepository.HEAD_PREFIX}${identityId.valueOf()}`;
   }
 
+  /**
+   * The stored head of the identity. Absence is returned only after the
+   * replicated store settled the key and the local copy was read completely;
+   * any retrieval failure or unreadable copy rejects as not ready, so a caller
+   * never saves a genesis-only document over history it could not read.
+   */
   private async readHead(
     identityId: IdentityId,
   ): Promise<Record<string, unknown> | undefined> {
     const key = this.headKey(identityId);
-    let replicated = await this.registry.findHead(key);
 
-    if (!replicated) {
-      await this.registry.rehydrateHead(key);
-      replicated = await this.registry.findHead(key);
+    try {
+      let replicated = await this.registry.findHead(key);
+
+      if (!replicated) {
+        await this.registry.rehydrateHead(key);
+        replicated =
+          (await this.registry.findHead(key)) ??
+          (await this.registry.findPersistedHead(key));
+      }
+
+      if (replicated) {
+        return replicated;
+      }
+
+      const local = await this.database.findOne(
+        OrbitDBDeviceAuthorizationRepository.LOCAL_NAMESPACE,
+        identityId.valueOf(),
+      );
+
+      if (local === undefined) {
+        return undefined;
+      }
+
+      assert(
+        this.shape.isRecord(local.document),
+        new ReplicatedStateNotReadyError(),
+      );
+
+      return local.document;
+    } catch (error) {
+      throw error instanceof ReplicatedStateNotReadyError
+        ? error
+        : new ReplicatedStateNotReadyError();
     }
-
-    if (replicated) {
-      return replicated;
-    }
-
-    const local = await this.database.findOne(
-      OrbitDBDeviceAuthorizationRepository.LOCAL_NAMESPACE,
-      identityId.valueOf(),
-    );
-
-    return this.shape.isRecord(local?.document) ? local.document : undefined;
   }
 
   private async save(

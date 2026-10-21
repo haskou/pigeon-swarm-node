@@ -6654,6 +6654,16 @@ public recovery authority and authorization revision zero. Passwords, password
 KDF parameters, protected device roots, recovery secrets and encrypted private
 keys are client-local data and are rejected by the identity API.
 
+Every endpoint of this section fails closed: when the node cannot read the
+identity's genesis or the authorization head (the identity repository or the
+replicated store is not ready, or the local copy is unreadable) it answers
+HTTP 503 code `503020` (`ReplicatedStateNotReadyError`, retriable) and applies
+nothing. A missing authorization, an empty history or the absence of compromise
+caps is reported only after a complete read of a settled store; a transition is
+never applied on top of a genesis-only document written over a head that could
+not be read. The same `503020` answers a device sealing record whose identity's
+authorization head is not readable yet, instead of refusing it as unauthorised.
+
 Read the current checkpoint with:
 
 ```http

@@ -550,6 +550,15 @@ unverifiable. The recovery carries the compromise caps in effect as
 Threat model, rejected alternatives, the restart behaviour and the open residuals
 of carried caps are in `docs/design/causal-device-authorization.md`.
 
+Fail closed (#742): an authorization that cannot be read is never read as absent.
+When the identity repository cannot settle the identity's genesis (not ready), or the
+replicated store has not settled the head key, or its local copy cannot be read, every
+read of the authorization (`has`, `require*`, `findCompromisedSince`), every transition
+(`compareAndApply`, which never saves a genesis-only document over a head it could
+not read) and the admission of a device sealing record fail with `503020`
+(`ReplicatedStateNotReadyError`). "No authorization", "no head" and "no compromise
+caps" are answered only after a complete read of a settled store.
+
 Residual: community **operations** are evaluated against the state folded from
 their causal past, but the permissions of channel messages, pins, reactions,
 membership requests and polls are evaluated against the community

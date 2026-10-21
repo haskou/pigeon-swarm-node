@@ -284,8 +284,8 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
     identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
       new Error('unavailable'),
     );
-    await expect(routing.resolveTrustedGenesis(identityId)).resolves.toBe(
-      undefined,
+    await expect(routing.resolveTrustedGenesis(identityId)).rejects.toThrow(
+      'unavailable',
     );
     expect(routing.trustedGenesis(identityId.valueOf())).toBeUndefined();
   });

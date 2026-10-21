@@ -269,62 +269,60 @@ export default class OrbitDBDeviceAuthorizationRouting {
    * wins, then the lowest external identifier. When the repository does not
    * know the identity at all, only a genesis verified earlier or provisioned by
    * the local publisher (after its own chain validation) is returned; an
-   * identity whose candidates all fail validation yields no genesis.
+   * identity whose candidates all fail validation yields no genesis. A
+   * retrieval failure of the identity repository (not ready) is never read as
+   * absence: it propagates, so no caller falls back to a missing genesis.
    */
   public async resolveTrustedGenesis(
     identityId: IdentityId,
   ): Promise<DeviceAuthorization | undefined> {
-    try {
-      const candidates =
-        await this.identityRepository.findFreshCandidateReferencesById(
-          identityId,
-        );
-
-      if (candidates.length === 0) {
-        return this.trustedGenesis(identityId.valueOf());
-      }
-
-      const roots = (
-        await Promise.all(
-          candidates.map((candidate) =>
-            this.genesisIdentityOf(identityId, candidate),
-          ),
-        )
-      ).filter((root): root is GenesisIdentity => root !== undefined);
-      const genesisIdentity = roots.reduce<GenesisIdentity | undefined>(
-        (best, root) =>
-          !best || this.isEarlierGenesis(root, best) ? root : best,
-        undefined,
-      );
-
-      if (!genesisIdentity) {
-        return undefined;
-      }
-
-      const { identity } = genesisIdentity;
-      const genesis = DeviceAuthorization.genesis(
+    const candidates =
+      await this.identityRepository.findFreshCandidateReferencesById(
         identityId,
-        identity.getNetworkIds(),
-        identity.getInitialDeviceCredential(),
-        identity.getRecoveryAuthority(),
-      );
-      const [latest] = candidates;
-
-      this.verifiedGenesisByIdentity.set(identityId.valueOf(), genesis);
-      this.rememberRouting(
-        identityId.valueOf(),
-        latest
-          .getIdentity()
-          .getNetworkIds()
-          .map((networkId) => networkId.valueOf())
-          .sort(),
-        latest.getIdentity().getVersion(),
-        latest.getExternalIdentifier(),
       );
 
-      return genesis;
-    } catch {
+    if (candidates.length === 0) {
       return this.trustedGenesis(identityId.valueOf());
     }
+
+    const roots = (
+      await Promise.all(
+        candidates.map((candidate) =>
+          this.genesisIdentityOf(identityId, candidate),
+        ),
+      )
+    ).filter((root): root is GenesisIdentity => root !== undefined);
+    const genesisIdentity = roots.reduce<GenesisIdentity | undefined>(
+      (best, root) =>
+        !best || this.isEarlierGenesis(root, best) ? root : best,
+      undefined,
+    );
+
+    if (!genesisIdentity) {
+      return undefined;
+    }
+
+    const { identity } = genesisIdentity;
+    const genesis = DeviceAuthorization.genesis(
+      identityId,
+      identity.getNetworkIds(),
+      identity.getInitialDeviceCredential(),
+      identity.getRecoveryAuthority(),
+    );
+    const [latest] = candidates;
+
+    this.verifiedGenesisByIdentity.set(identityId.valueOf(), genesis);
+    this.rememberRouting(
+      identityId.valueOf(),
+      latest
+        .getIdentity()
+        .getNetworkIds()
+        .map((networkId) => networkId.valueOf())
+        .sort(),
+      latest.getIdentity().getVersion(),
+      latest.getExternalIdentifier(),
+    );
+
+    return genesis;
   }
 }
