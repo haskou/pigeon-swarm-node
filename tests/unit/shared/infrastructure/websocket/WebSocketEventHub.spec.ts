@@ -776,6 +776,26 @@ describe('WebSocketEventHub', () => {
 
       expect(recipientClient.send).toHaveBeenCalledTimes(2);
     });
+
+    it('relays attempts 1 to 5 of one signal once each and refuses every replay of them', async () => {
+      const hub = new WebSocketEventHub();
+      const senderIdentityId = await generateIdentityId();
+      const recipientIdentityId = await generateIdentityId();
+      const recipientClient = buildClient();
+      const attempts = [1, 2, 3, 4, 5];
+
+      hub.register(recipientIdentityId, recipientClient);
+      jest.clearAllMocks();
+      authorizeCallAudience(hub);
+      for (const attempt of [...attempts, ...attempts]) {
+        hub.publish([
+          signalSentEvent(senderIdentityId, recipientIdentityId, { attempt }),
+        ]);
+        await flushPromises();
+      }
+
+      expect(recipientClient.send).toHaveBeenCalledTimes(attempts.length);
+    });
   });
 
   it('sends call lease connection transitions to call participants', async () => {

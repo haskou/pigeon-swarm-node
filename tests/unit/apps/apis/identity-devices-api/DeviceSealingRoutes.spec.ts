@@ -594,6 +594,51 @@ describe('Device sealing routes', () => {
       consume.mockRestore();
     });
 
+    it('never resolves an authorization for an identity this node does not hold', async () => {
+      authorizationRepository.require.mockClear();
+
+      expect(
+        (await getPublic(viewPath(wire(await KeyPair.generate())))).status,
+      ).toBe(404);
+      expect(authorizationRepository.require).not.toHaveBeenCalled();
+    });
+
+    it('charges the per-target budget before resolving the authorization on a cache miss', async () => {
+      const find = jest
+        .spyOn(DeviceSealingViewCache.prototype, 'find')
+        .mockReturnValue(undefined);
+      const consume = jest.spyOn(DeviceSealingViewRateLimiter.prototype, 'consume');
+      authorizationRepository.require.mockClear();
+
+      expect((await getPublic(viewPath())).status).toBe(200);
+      expect(consume.mock.invocationCallOrder[0]).toBeLessThan(
+        authorizationRepository.require.mock.invocationCallOrder[0],
+      );
+
+      find.mockRestore();
+      consume.mockRestore();
+    });
+
+    it('coalesces concurrent misses for one identity into one authorization lookup', async () => {
+      const find = jest
+        .spyOn(DeviceSealingViewCache.prototype, 'find')
+        .mockReturnValue(undefined);
+      authorizationRepository.require.mockClear();
+
+      const responses = await Promise.all([
+        getPublic(viewPath(), nextAddress()),
+        getPublic(viewPath(), nextAddress()),
+        getPublic(viewPath(), nextAddress()),
+      ]);
+
+      expect(responses.map((response) => response.status)).toEqual([
+        200, 200, 200,
+      ]);
+      expect(authorizationRepository.require).toHaveBeenCalledTimes(1);
+
+      find.mockRestore();
+    });
+
     it('counts every address of one IPv6 /64 as one client', async () => {
       const target = viewPath();
 

@@ -173,6 +173,7 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       expect(
         s.fabric.carried.some((payload) => payload.includes('"sdp"')),
       ).toBe(false);
+      expect(s.fabric.carried.length).toBeGreaterThan(0);
     });
 
     it('E1/E2: never registers or relays a plaintext payload that a sender adds', async () => {
@@ -194,6 +195,9 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       expect(
         (await registeredText(s.recipient, signalId))?.includes(marker) ??
           false,
+      ).toBe(false);
+      expect(
+        s.fabric.carried.some((payload) => payload.includes(marker)),
       ).toBe(false);
     });
 

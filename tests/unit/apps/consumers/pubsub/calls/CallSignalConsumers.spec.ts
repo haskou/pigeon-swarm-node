@@ -54,6 +54,22 @@ describe('Call signal consumers', () => {
     expect(registrar.register).toHaveBeenCalledTimes(1);
   });
 
+  it('refuses a received signal that has already expired, without registering it', async () => {
+    const eventConsumer = mock<DomainEventConsumer>();
+    const registrar = mock<CallSignalDeliveryRegistrar>();
+    const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
+    const expiredAt = Date.now() - 60_000;
+    const event = new CallSignalSentEvent('550e8400-e29b-41d4-a716-446655440000', {
+      ...signalAttributes,
+      createdAt: expiredAt,
+      expiresAt: expiredAt + 20_000,
+      sentAt: expiredAt,
+    });
+
+    await expect(consumer.handler(event)).resolves.toBeUndefined();
+    expect(registrar.register).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['an empty signature', { signature: '' }],
     [

@@ -173,4 +173,40 @@ describe('CallSignalDelivery', () => {
     expect(retried.retry(new Timestamp(1_770_000_001_000))).toBe(true);
     expect(retried.supersedes(stored)).toBe(true);
   });
+
+  it('does not supersede a retry that moves the delivery to another owner', () => {
+    const stored = send();
+    const moved = CallSignalDelivery.fromPrimitives({
+      ...stored.toPrimitives(),
+      attempt: 2,
+      ownerNodeId: '6f1c2a54-8d1e-4b7a-9c3e-2a5b7d9e0f11',
+    });
+
+    expect(moved.supersedes(stored)).toBe(false);
+  });
+
+  it('does not supersede a retry that changes the participant set', () => {
+    const stored = send();
+    const primitives = stored.toPrimitives();
+    const narrowed = CallSignalDelivery.fromPrimitives({
+      ...primitives,
+      attempt: 2,
+      participantIds: primitives.participantIds.slice(0, 1),
+    });
+
+    expect(narrowed.supersedes(stored)).toBe(false);
+  });
+
+  it('does not supersede a retry whose send time moves backwards', () => {
+    const stored = send();
+    const primitives = stored.toPrimitives();
+    const rewound = CallSignalDelivery.fromPrimitives({
+      ...primitives,
+      attempt: 2,
+      nextRetryAt: primitives.nextRetryAt - 1_000,
+      sentAt: primitives.sentAt - 1_000,
+    });
+
+    expect(rewound.supersedes(stored)).toBe(false);
+  });
 });
