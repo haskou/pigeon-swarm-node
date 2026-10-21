@@ -83,6 +83,7 @@ import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure
 import NetworkPrivacyDirectory from '../contexts/shared/domain/networks/NetworkPrivacyDirectory';
 import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
 import IPFSNetworkPrivacyDirectory from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory';
+import IPFSNetworkRegistry from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import {
   pigeonEnvironmentSchema,
   validatePigeonEnvironment,
@@ -94,11 +95,13 @@ import { PublicStaticContent } from '../shared/infrastructure/express/PublicStat
 import { parseTrustProxySetting } from '../shared/infrastructure/express/TrustProxySetting';
 import { Initializer } from '../shared/infrastructure/lifecycle/Initializer';
 import { Runtime } from '../shared/infrastructure/lifecycle/Runtime';
+import EmbeddedLocalDatabase from '../shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import WinstonLogger from '../shared/infrastructure/logs/WinstonLogger';
 import { DomainEventConsumer } from '../shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEventPublisher } from '../shared/infrastructure/messageBus/DomainEventPublisher';
 import { LocalDomainEventPublisher } from '../shared/infrastructure/messageBus/LocalDomainEventPublisher';
 import LocalProcessedDomainEventIdempotencyStore from '../shared/infrastructure/messageBus/LocalProcessedDomainEventIdempotencyStore';
+import MemoryMessageBusAdapter from '../shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import MessageBus from '../shared/infrastructure/messageBus/MessageBus';
 import WebSocketClientMessageHandler from '../shared/infrastructure/websocket/WebSocketClientMessageHandler';
 import { webSocketEventHub } from '../shared/infrastructure/websocket/WebSocketEventHub';
@@ -118,6 +121,9 @@ export default class PigeonApplication {
   });
 
   private server: ExpressKernelServer | undefined;
+  // A signal can arrive while the init-failure path already shuts down: both
+  // share one kernel shutdown, so no hook runs twice.
+  private shutdownInProgress: Promise<void> | undefined;
   private readonly swaggerRegistrar = new ApiSwaggerRegistrar();
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
@@ -409,6 +415,22 @@ export default class PigeonApplication {
           ? next()
           : idempotency.handle(event, next, context),
     });
+
+    // Kernel shutdown runs hooks in reverse, after consumers and schedulers:
+    // registered last, the in-memory bus timers stop first, then the networks
+    // (OrbitDB stores, Helia) stop, then the local database closes.
+    this.kernel.registerShutdownHook(() => EmbeddedLocalDatabase.closeAll());
+    this.kernel.registerShutdownHook(() =>
+      this.kernel.di
+        .getService<IPFSNetworkRegistry>(IPFSNetworkRegistry)
+        .stopAll(),
+    );
+    // The container shares this instance with the MessageBus every consumer uses.
+    const memoryMessageBusAdapter =
+      this.kernel.di.getService<MemoryMessageBusAdapter>(
+        MemoryMessageBusAdapter,
+      );
+    this.kernel.registerShutdownHook(() => memoryMessageBusAdapter.close());
   }
 
   public configureWebSocketEventHub(): void {
@@ -544,6 +566,8 @@ export default class PigeonApplication {
   }
 
   public async shutdown(): Promise<void> {
-    await this.kernel.shutdown();
+    this.shutdownInProgress ??= this.kernel.shutdown();
+
+    await this.shutdownInProgress;
   }
 }

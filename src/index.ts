@@ -92,25 +92,57 @@ export async function init(application: PigeonApplication): Promise<void> {
   logInfo('Ready!');
 }
 
-const FAILED_INIT_SHUTDOWN_TIMEOUT_MS = 10_000;
+const SHUTDOWN_TIMEOUT_MS = 8_000;
 
-async function shutdownAfterInitFailure(
+async function shutdownWithinBudget(
   application: PigeonApplication,
-): Promise<void> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      reject(new Error(`timed out after ${FAILED_INIT_SHUTDOWN_TIMEOUT_MS}ms`));
-    }, FAILED_INIT_SHUTDOWN_TIMEOUT_MS);
-  });
+  reason: string,
+): Promise<boolean> {
+  const { promise: timeout, reject } = Promise.withResolvers<never>();
+  const timer = setTimeout(() => {
+    reject(new Error(`timed out after ${SHUTDOWN_TIMEOUT_MS}ms`));
+  }, SHUTDOWN_TIMEOUT_MS);
 
   try {
     await Promise.race([application.shutdown(), timeout]);
+
+    return true;
   } catch (error) {
-    logError('Shutdown after init failure', error);
+    logError(`Shutdown ${reason}`, error);
+
+    return false;
   } finally {
     clearTimeout(timer);
   }
+}
+
+/**
+ * Docker sends SIGKILL 10 s after SIGTERM (the `docker stop` default), so a
+ * stop gets 8 s: the kernel shutdown closes the IPFS networks, OrbitDB stores
+ * and local databases, and a stuck close never outlives the grace period.
+ * Signals that arrive while the first stop runs are ignored.
+ */
+export function installShutdownSignalHandlers(
+  application: PigeonApplication,
+  signalSource: NodeJS.EventEmitter = process,
+  exit: (code: number) => void = (code) => process.exit(code),
+): void {
+  let stopping = false;
+
+  const stop = async (signal: NodeJS.Signals): Promise<void> => {
+    if (stopping) {
+      return;
+    }
+
+    stopping = true;
+    logInfo(`Received ${signal}, shutting down`);
+    const clean = await shutdownWithinBudget(application, `on ${signal}`);
+
+    exit(clean ? 0 : 1);
+  };
+
+  signalSource.on('SIGTERM', () => void stop('SIGTERM'));
+  signalSource.on('SIGINT', () => void stop('SIGINT'));
 }
 
 async function run(): Promise<void> {
@@ -119,6 +151,7 @@ async function run(): Promise<void> {
   try {
     startTimer('Kernel');
     application = new PigeonApplication();
+    installShutdownSignalHandlers(application);
     endTimer('Kernel');
 
     await init(application);
@@ -127,7 +160,7 @@ async function run(): Promise<void> {
     logError('Application error', error);
 
     if (application) {
-      await shutdownAfterInitFailure(application);
+      await shutdownWithinBudget(application, 'after init failure');
     }
 
     process.exit(1);

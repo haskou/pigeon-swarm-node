@@ -49,6 +49,18 @@ export default class EmbeddedLocalDatabase {
     return database;
   }
 
+  /** Closes every open handle so LevelDB flushes its logs before the process exits. */
+  public static async closeAll(): Promise<void> {
+    const databases = [...EmbeddedLocalDatabase.databases.values()];
+
+    EmbeddedLocalDatabase.databases.clear();
+    await Promise.all(
+      databases
+        .filter((database) => database.status !== 'closed')
+        .map((database) => database.close()),
+    );
+  }
+
   constructor() {
     this.databasePath =
       pigeonEnvironment().PIGEON_LOCAL_DB_PATH ||
