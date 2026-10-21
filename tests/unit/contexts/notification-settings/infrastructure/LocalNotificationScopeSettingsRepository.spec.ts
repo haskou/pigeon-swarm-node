@@ -5,6 +5,7 @@ import { NotificationScopeSettingsNotFoundError } from '@app/contexts/notificati
 import { NotificationSettingsStorageCapacityExceededError } from '@app/contexts/notification-settings/domain/errors/NotificationSettingsStorageCapacityExceededError';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import LocalNotificationScopeSettingsRepository from '@app/contexts/notification-settings/infrastructure/local-db/LocalNotificationScopeSettingsRepository';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { generateKeyPairSync } from 'node:crypto';
@@ -70,6 +71,38 @@ describe('LocalNotificationScopeSettingsRepository', () => {
       repository.requireByScope(identityId, scope),
     ).rejects.toBeInstanceOf(NotificationScopeSettingsNotFoundError);
   });
+
+  it.each([
+    ['fails the stored shape', { notificationLevel: 7 }],
+    ['is rejected by the domain', { notificationLevel: 'loud' }],
+  ])(
+    'keeps a stored document that %s and answers 503020 instead of absence',
+    async (_case, corruption) => {
+      const settings = NotificationScopeSettings.create(
+        identityId,
+        scope,
+        NotificationScopeSettingsPreferences.defaults(),
+      );
+      await repository.save(settings);
+      const id = `${identityId.valueOf()}:${scope.key()}`;
+      const unreadable = { ...documents.get(id), ...corruption };
+      documents.set(id, unreadable);
+
+      for (const read of [
+        () => repository.requireByScope(identityId, scope),
+        () => repository.hasByScope(identityId, scope),
+        () => repository.findByIdentityId(identityId),
+      ]) {
+        await expect(read()).rejects.toMatchObject({
+          code: ReplicatedStateNotReadyError.CODE,
+          httpCode: 503,
+        });
+      }
+
+      expect(database.delete).not.toHaveBeenCalled();
+      expect(documents.get(id)).toEqual(unreadable);
+    },
+  );
 
   it('bounds the number of settings stored for one identity', async () => {
     for (let index = 0; index < 256; index++) {
