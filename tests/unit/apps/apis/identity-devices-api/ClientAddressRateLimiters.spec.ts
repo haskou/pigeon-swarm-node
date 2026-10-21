@@ -55,6 +55,23 @@ describe.each([
     expect(() => limiter.consume('late-comer', 1000)).not.toThrow();
   });
 
+  it('counts every address of one IPv6 /64 and an IPv4-mapped address as one client', () => {
+    const limiter = new Limiter();
+
+    for (let i = 0; i < ADDRESS_LIMIT; i++) {
+      limiter.consume(`2001:db8:1:2:${i}::1`, 1000);
+    }
+
+    expect(() => limiter.consume('2001:db8:1:2:ffff::1', 1001)).toThrow();
+    expect(() => limiter.consume('2001:db8:1:3::1', 1001)).not.toThrow();
+
+    for (let i = 0; i < ADDRESS_LIMIT; i++) {
+      limiter.consume('::ffff:10.9.9.9', 1000);
+    }
+
+    expect(() => limiter.consume('10.9.9.9', 1001)).toThrow();
+  });
+
   it('serves a request without an address from a shared bucket instead of skipping the limit', () => {
     const limiter = new Limiter();
 

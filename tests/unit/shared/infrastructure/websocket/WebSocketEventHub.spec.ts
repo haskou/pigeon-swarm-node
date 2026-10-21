@@ -745,6 +745,13 @@ describe('WebSocketEventHub', () => {
       ).toHaveLength(0);
     });
 
+    it.each([0, 6, 1.5, -1])(
+      'drops a signal whose attempt %p is outside 1 to 5',
+      async (attempt) => {
+        expect(await relay({ attempt })).toHaveLength(0);
+      },
+    );
+
     it('relays a replayed signal and attempt only once', async () => {
       expect(await relay({}, 2)).toHaveLength(1);
     });

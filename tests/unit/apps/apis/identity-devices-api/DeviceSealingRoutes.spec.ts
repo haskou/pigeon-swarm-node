@@ -3,6 +3,7 @@ import DeviceAuthorizationTransitionReadRateLimiter from '@app/apps/apis/identit
 import DeviceSealingRecordRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingRecordRateLimiter';
 import DeviceSealingViewCache from '@app/apps/apis/identity-devices-api/DeviceSealingViewCache';
 import DeviceSealingViewClientRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewClientRateLimiter';
+import DeviceSealingViewUnknownRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewUnknownRateLimiter';
 import DeviceSealingViewRateLimiter from '@app/apps/apis/identity-devices-api/DeviceSealingViewRateLimiter';
 import { GetDeviceAuthorizationRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceAuthorizationRoute';
 import { GetDeviceSealingViewRoute } from '@app/apps/apis/identity-devices-api/routes/GetDeviceSealingViewRoute';
@@ -567,12 +568,82 @@ describe('Device sealing routes', () => {
       expect(authorizationRepository.require).not.toHaveBeenCalled();
     });
 
-    it('answers 404 for an unknown identity without caching the miss', async () => {
+    it('answers 404 for an unknown identity and keeps the miss for a few seconds', async () => {
       const target = viewPath(wire(stranger));
 
-      await getPublic(target);
+      expect((await getPublic(target)).status).toBe(404);
+      authorizationRepository.require.mockClear();
 
       expect((await getPublic(target, nextAddress())).status).toBe(404);
+      expect(authorizationRepository.require).not.toHaveBeenCalled();
+    });
+
+    it('never spends the per-target budget on an unknown identity', async () => {
+      const consume = jest.spyOn(
+        DeviceSealingViewRateLimiter.prototype,
+        'consume',
+      );
+
+      await getPublic(viewPath(wire(await KeyPair.generate())));
+
+      expect(consume).not.toHaveBeenCalled();
+      consume.mockRestore();
+    });
+
+    it('counts every address of one IPv6 /64 as one client', async () => {
+      const target = viewPath();
+
+      for (let attempt = 0; attempt <= 61; attempt += 1) {
+        await getPublic(target, `2001:db8:aaaa:1::${attempt + 1}`);
+      }
+
+      expect((await getPublic(target, '2001:db8:aaaa:1:ffff::9')).status).toBe(
+        429,
+      );
+      expect((await getPublic(target, '2001:db8:aaaa:2::1')).status).toBe(200);
+    });
+
+    it('keeps a flood of random identity ids from one /64 off other clients and known targets', async () => {
+      const known = viewPath();
+
+      await getPublic(known, '2001:db8:bbbb:2::1');
+
+      for (let attempt = 0; attempt < 120; attempt += 1) {
+        await getPublic(
+          viewPath(wire(await KeyPair.generate())),
+          `2001:db8:bbbb:1::${attempt + 1}`,
+        );
+      }
+
+      expect((await getPublic(known, '2001:db8:bbbb:3::1')).status).toBe(200);
+      expect((await getPublic(known, '2001:db8:bbbb:1::ffff')).status).toBe(
+        429,
+      );
+    });
+
+    it('lets a spread flood of random ids exhaust only the unknown-id budget, never the known targets', async () => {
+      const known = viewPath();
+
+      for (
+        let attempt = 0;
+        attempt <= DeviceSealingViewUnknownRateLimiter.LIMIT;
+        attempt += 1
+      ) {
+        await getPublic(
+          viewPath(wire(await KeyPair.generate())),
+          nextAddress(),
+        );
+      }
+
+      expect(
+        (
+          await getPublic(
+            viewPath(wire(await KeyPair.generate())),
+            nextAddress(),
+          )
+        ).status,
+      ).toBe(429);
+      expect((await getPublic(known, nextAddress())).status).toBe(200);
     });
 
     it('refuses a non-canonical identity id with 400080 before any budget is spent', async () => {
