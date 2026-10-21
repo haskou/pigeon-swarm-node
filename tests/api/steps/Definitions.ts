@@ -476,6 +476,35 @@ export default class Definitions {
     return identityId ?? this.ownerIdentityId;
   }
 
+  private async callSignalBodyFor(
+    recipientIdentityId: IdentityId,
+  ): Promise<Record<string, unknown>> {
+    const deviceCredential = (
+      await this.ensureIdentityDeviceOwnerKeyPair()
+    ).toPrimitives().publicKey;
+    const createdAt = Date.now();
+
+    return {
+      callId: this.callId,
+      createdAt,
+      expiresAt: createdAt + 20_000,
+      networkId: String(this.currentNetworkId),
+      recipientIdentityId: recipientIdentityId.valueOf(),
+      scopeType: 'conversation',
+      sealedEntries: [
+        {
+          envelope: 'api-sealed-envelope',
+          recipientDeviceCredential: deviceCredential,
+        },
+      ],
+      senderDeviceCredential: deviceCredential,
+      senderIdentityId: String(this.ownerIdentityId),
+      signalId: randomUUID(),
+      signalType: 'offer',
+      signature: 'api-signature',
+    };
+  }
+
   private aliasOf(identityId: IdentityId, encoding: string): IdentityId {
     const aliasOf = new Map(IdentityIdMother.aliases()).get(encoding);
 
@@ -4586,18 +4615,14 @@ export default class Definitions {
   }
 
   @given('I set a call signal body for the other identity')
-  public iSetACallSignalBodyForTheOtherIdentity(): void {
+  public async iSetACallSignalBodyForTheOtherIdentity(): Promise<void> {
     if (!this.otherIdentityId) {
       throw new Error('Other identity must exist first.');
     }
 
-    this.body = JSON.stringify({
-      payload: {
-        sdp: 'api-offer-sdp',
-      },
-      recipientIdentityId: this.otherIdentityId.valueOf(),
-      signalType: 'offer',
-    });
+    this.body = JSON.stringify(
+      await this.callSignalBodyFor(this.otherIdentityId),
+    );
   }
 
   @given('I set a call signal body for an unrelated identity')
@@ -4607,13 +4632,9 @@ export default class Definitions {
       unrelatedKeyPair.toPrimitives().publicKey,
     );
 
-    this.body = JSON.stringify({
-      payload: {
-        sdp: 'api-offer-sdp',
-      },
-      recipientIdentityId: unrelatedIdentityId.valueOf(),
-      signalType: 'offer',
-    });
+    this.body = JSON.stringify(
+      await this.callSignalBodyFor(unrelatedIdentityId),
+    );
   }
 
   @given('I sign the current call start request')
