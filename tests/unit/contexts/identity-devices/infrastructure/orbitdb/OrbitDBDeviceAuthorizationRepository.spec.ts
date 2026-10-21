@@ -24,6 +24,7 @@ import { OrbitDBHeadRecordMerger } from '@app/contexts/shared/infrastructure/orb
 import { OrbitDBHeadRecordScope } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadRecordScope';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 import { Timestamp } from '@haskou/value-objects';
 import { mock, MockProxy } from 'jest-mock-extended';
@@ -52,6 +53,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
   function repositoryFixture() {
     const registry = mock<OrbitDBReplicatedStateRegistry>();
     const identityRepository = mock<IdentityRepository>();
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
     const networkRegistry = mock<IPFSNetworkRegistry>();
     const privateNetwork = mock<IPFSNetwork>();
     let head: Record<string, unknown> | undefined;
@@ -4131,5 +4133,120 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect.any(Object),
       ['550e8400-e29b-41d4-a716-446655440000', publishedNetworkId],
     );
+  });
+
+  describe('failing closed when its genesis or head cannot be read', () => {
+    async function provisioned() {
+      const setup = await fixture();
+      const target = await KeyPair.generate();
+      const repositorySetup = repositoryFixture();
+
+      await provisionAuthorization(repositorySetup.repository, setup.genesis);
+      repositorySetup.registry.putHead.mockClear();
+      repositorySetup.database.save.mockClear();
+
+      return {
+        ...setup,
+        ...repositorySetup,
+        transition: await enrollment(
+          setup.identityId,
+          setup.owner,
+          target,
+          '00000000-0000-4000-8000-000000000042',
+          '10000000-0000-4000-8000-000000000042',
+        ),
+      };
+    }
+
+    it('answers 503020 from every read and write when the identity repository is not ready', async () => {
+      const {
+        identityId,
+        identityRepository,
+        registry,
+        database,
+        repository,
+        transition,
+      } = await provisioned();
+      identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(repository.has(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.require(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.requireTimeline(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.requireTransitionLog(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.findCompromisedSince(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.compareAndApply(transition)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(registry.putHead).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses to write over a head the store cannot settle', async () => {
+      const { database, registry, repository, transition } =
+        await provisioned();
+      registry.findHead.mockResolvedValue(undefined);
+      registry.findPersistedHead.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(repository.compareAndApply(transition)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(registry.putHead).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+    });
+
+    it('refuses to write over a head whose rehydration failed', async () => {
+      const { database, registry, repository, transition } =
+        await provisioned();
+      registry.findHead.mockResolvedValue(undefined);
+      registry.rehydrateHead.mockRejectedValue(new Error('store unreadable'));
+
+      await expect(repository.compareAndApply(transition)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(registry.putHead).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+    });
+
+    it('answers 503020 instead of absence when the local copy is unreadable', async () => {
+      const { database, identityId, registry, repository } =
+        await provisioned();
+      registry.findHead.mockResolvedValue(undefined);
+      database.findOne.mockResolvedValue({ _id: 'x', document: 'corrupt' });
+
+      await expect(repository.require(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(registry.putHead).not.toHaveBeenCalled();
+    });
+
+    it('provisions from the genesis once the store is settled and the head is truly missing', async () => {
+      const { genesis, identityId, registry, repository, transition } =
+        await provisioned();
+      registry.findHead
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined);
+      registry.findPersistedHead.mockResolvedValue(undefined);
+
+      const applied = await repository.compareAndApply(transition);
+
+      expect(applied.getRevision().valueOf()).toBe(1);
+      expect(
+        (await repository.require(identityId)).getIdentityId().valueOf(),
+      ).toBe(genesis.getIdentityId().valueOf());
+    });
   });
 });

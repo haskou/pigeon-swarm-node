@@ -10,6 +10,7 @@ import { DeviceSealingRecordRepository } from '@app/contexts/identity-devices/do
 import DeviceSealingRecordPolicy from '@app/contexts/identity-devices/domain/services/DeviceSealingRecordPolicy';
 import IPFSNetworkRegistry from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 const DEVICE_AUTHORIZATION_HEAD_PREFIX = 'device-authorization:';
 
@@ -56,8 +57,12 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
     return record.toPrimitives();
   }
 
+  /**
+   * Absent only when the settled cache holds no head; an unsettled or
+   * unreadable head rejects as not ready, never as an unauthorised device.
+   */
   private authorizationOf(identityId: string): DeviceAuthorization | undefined {
-    const head = this.registry.findCachedHead(
+    const head = this.registry.findSettledCachedHead(
       `${DEVICE_AUTHORIZATION_HEAD_PREFIX}${identityId}`,
     );
 
@@ -69,7 +74,7 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
         head.authorization as DeviceAuthorizationPrimitives,
       );
     } catch {
-      return undefined;
+      throw new ReplicatedStateNotReadyError();
     }
   }
 

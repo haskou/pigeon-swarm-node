@@ -1,3 +1,4 @@
+import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
 import { Identity } from '@app/contexts/identities/domain/Identity';
 import { IdentityCandidate } from '@app/contexts/identities/domain/IdentityCandidate';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
@@ -257,6 +258,18 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
     }
   });
 
+  it('reads a verified identity-not-found as no genesis candidate', async () => {
+    const { identityId, identityRepository, routing } = await fixture();
+
+    identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
+      new IdentityNotFoundError(identityId.valueOf()),
+    );
+
+    await expect(routing.resolveTrustedGenesis(identityId)).resolves.toBe(
+      undefined,
+    );
+  });
+
   it('fails closed when the identity cannot be resolved or verified', async () => {
     const { identityId, identityRepository, routing } = await fixture();
     const invalid = await signedIdentity({
@@ -284,8 +297,8 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
     identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
       new Error('unavailable'),
     );
-    await expect(routing.resolveTrustedGenesis(identityId)).resolves.toBe(
-      undefined,
+    await expect(routing.resolveTrustedGenesis(identityId)).rejects.toThrow(
+      'unavailable',
     );
     expect(routing.trustedGenesis(identityId.valueOf())).toBeUndefined();
   });

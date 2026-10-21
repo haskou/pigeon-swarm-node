@@ -276,6 +276,7 @@ Feature: Device authorization route
 
   Scenario: Report an unknown identity in the public sealing view
     Given I am an anonymous user
+    And I register a test IPFS network with id "123e4567-e89b-12d3-a456-426614174000" and name "device-authorization-network"
     When I GET the sealing view of an identity the node does not hold
     Then response code is equal to 404
     And response body should contain "404050"

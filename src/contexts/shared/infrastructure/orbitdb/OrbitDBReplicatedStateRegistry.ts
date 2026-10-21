@@ -3563,6 +3563,19 @@ export default class OrbitDBReplicatedStateRegistry {
     return this.cachedHead(key);
   }
 
+  /**
+   * The cached head of a key once the key is settled: no copy of it is held or
+   * dropped unverified. Unlike `findCachedHead`, a key that waits is never read
+   * as absent: the read rejects as not ready.
+   */
+  public findSettledCachedHead(
+    key: string,
+  ): Record<string, unknown> | undefined {
+    if (this.awaitsVerifiedHead(key)) throw new ReplicatedStateNotReadyError();
+
+    return this.cachedHead(key);
+  }
+
   public cacheHeadLocally(key: string, value: Record<string, unknown>): void {
     this.assertReady();
     const cleanValue = this.cleanDocument(value);
