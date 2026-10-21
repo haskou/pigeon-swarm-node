@@ -1,4 +1,4 @@
-FROM node:24.22.0-bookworm AS base
+FROM node:24.22.1-bookworm AS base
 ENV NODE_OPTIONS=--max_old_space_size=4096
 WORKDIR /var/www/
 COPY package.json yarn.lock ./
