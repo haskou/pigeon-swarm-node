@@ -41,7 +41,7 @@ export class DeviceAuthorizationTransitionLog {
    * The whole signed log. Every entry is public: each carries its author's
    * signature and a client replays it with the shared rules, so the node adds
    * no trust of its own. The history is disclosed to any served caller by
-   * design, as an accepted waiver of the add and remove order of a device set.
+   * design: a first-contact sender replays it to verify a sealing view.
    */
   public disclose(): DeviceAuthorizationTransitionDisclosure {
     return new DeviceAuthorizationTransitionDisclosure(

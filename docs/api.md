@@ -6739,8 +6739,8 @@ inventory. Other routes disclose parts of it: the transitions read serves the
 history of the device set by design to any identity this node serves, and the
 anonymous `sealing-view` below serves the device credentials and the device
 count of any identity this node holds. The anonymous view is flagged for
-security review, not by design. The response is `{ credentials, epoch,
-identityId, revision }`, where
+security review, not by design. The response is
+`{ credentials, epoch, identityId, revision }`, where
 `credentials` holds the normalized public credentials authorized at the
 current head. It carries no labels, commitments, revoked credentials or
 revocation history; a client keeps its own device names. Failures are the same
