@@ -99,70 +99,82 @@ paths:
     get:
       tags:
         - identity-devices
-      summary: Read the signed transitions the requesting device or recovery authority may verify
+      summary: Read a page of the signed transitions of an identity
       description: |
-        Owner-only. The path identity must equal the signing identity and
-        exactly one complete device or recovery proof is required, checked
-        before the query is parsed. Unlike the checkpoint read, the device
-        credential does not have to be authorized at the head: a removed device
-        reads the transitions up to its removal so it can verify that removal
-        itself. The recovery authority and a device some replayed state
-        authorized take a replay slot, so a replayed read is refused (401020);
-        any other key takes none and reads only recoveries and
-        concurrentRecoveries.
+        Any signed caller. The signer may be any identity, not the path
+        identity; an anonymous request is refused (401). No device or recovery
+        proof header is read. Authorization is not widened on any other route.
+
+        This discloses the add and remove history of the device set (the count
+        and order of enrollments, revocations and recoveries) of any identity
+        the node holds to every signed identity of the node. It is an explicit
+        design position that lets a sender replay the log and verify the
+        sealing view it was served; it is scoped to private networks and is
+        flagged for security review.
 
         Every entry is the stored signed transition, byte-for-byte the
-        primitives POST /identity-devices/{identityId}/transitions accepted, never re-signed
-        or rewritten and never carrying sealedSecrets. Records the replay
-        rejected are never served. The recovery authority reads every list. A
-        device authorized in some replayed state reads recoveries,
-        concurrentRecoveries and the transitions whose previousRevision is at
-        most the revision of the last state that authorizes it. Any other
-        device reads recoveries and concurrentRecoveries only.
+        primitives POST /identity-devices/{identityId}/transitions accepted,
+        never re-signed or rewritten and never carrying sealedSecrets. Records
+        the replay rejected are never served. No head revision is returned
+        beyond what the entries carry; clients derive it by replaying what they
+        verify.
 
-        No head revision, epoch, network id or authorized-device list is
-        returned; clients derive them by replaying what they verify. A client
-        deciding whether it was removed fetches without after and wipes only on
-        positive signed evidence, never on absence.
+        Pages hold whole revision groups ascending, at most limit entries
+        (a group larger than limit is served whole, and the first group is
+        always served). nextCursor is the revision of the last served group, to
+        send as cursor on the next request, or null once the log is exhausted.
+        recoveries and concurrentRecoveries are served on every page.
+
+        The read is rate limited per signing identity (60 per minute) and per
+        node (600 per minute), code 429030. Any query parameter other than
+        cursor and limit is refused (400050).
       parameters:
         - in: path
           name: identityId
           required: true
           schema:
             type: string
-          description: Percent-encoded identity id. It must equal X-Identity-Id.
+          description: Percent-encoded identity id whose transitions are read.
         - in: query
-          name: after
+          name: cursor
           required: false
           schema:
             type: string
             pattern: '^(0|[1-9][0-9]*)$'
             default: '0'
-          description: Keep only entries whose revision is greater than this non-negative safe integer, without leading zeros. It is part of the signed request target, so changing it invalidates the signature, and it can only narrow the response. Incremental sync only; never the basis of a wipe.
+          description: Keep only entries whose revision is greater than this non-negative safe integer, without leading zeros. It is part of the signed request target.
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+          description: Maximum transitions per page.
         - $ref: '#/components/parameters/XIdentityId'
         - $ref: '#/components/parameters/XTimestamp'
         - $ref: '#/components/parameters/XSignature'
-        - $ref: '#/components/parameters/XDeviceCredential'
-        - $ref: '#/components/parameters/XDeviceSignature'
-        - $ref: '#/components/parameters/XRecoverySignature'
       operationId: getIdentityDevicesByIdentityIdTransitions
       responses:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
-          description: The signed transitions disclosed to the requesting key.
+          description: A page of the signed transitions.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeviceAuthorizationTransitionLog'
         '400':
-          description: after is not a non-negative decimal safe integer without leading zeros (code 400050).
+          description: cursor or limit is malformed or out of range, or the query holds another parameter such as the retired after (code 400050).
         '401':
-          description: The signature is missing, invalid or stale, the signer does not own the requested identity, the supplied proof is not exactly one valid device or recovery proof, or the proof was already used (code 401020).
+          description: The signature is missing, invalid or stale.
         '409':
           description: The authorization checkpoint is unavailable on this node.
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '429':
+          description: Per-signer (60 per minute) or per-node (600 per minute) transition read rate limit exceeded (code 429030).
     post:
       tags:
         - identity-devices
@@ -228,6 +240,92 @@ paths:
           description: Expired, replayed, causally stale or unauthorized transition, or a hand-over that is not sealed to exactly the remaining devices, not signed by the retiring device, or not newer than the stored generation.
         '429':
           description: Per-identity (20 per minute) or per-node (300 per minute) transition rate limit exceeded (code 429030).
+  /identity-devices/{identityId}/sealing-records:
+    put:
+      tags:
+        - identity-devices
+      summary: Publish the daily sealing key of a device
+      description: |
+        Signed by the identity itself: the signer must equal the path identity.
+        Admits one sealing record per (identity, device, UTC day). The
+        signature is the device's own signature over the record, verified at
+        the authorization head: the credential must be authorized there, and
+        the day must be today or yesterday in UTC. The record is stored as a
+        head under the device-sealing-record registry prefix; the node never
+        sees a private key. No rate limit applies to this route beyond the
+        signed-request replay guard. The body limit is 8 KB.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id. It must equal X-Identity-Id.
+        - $ref: '#/components/parameters/XIdentityId'
+        - $ref: '#/components/parameters/XTimestamp'
+        - $ref: '#/components/parameters/XSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceSealingRecordRequest'
+      operationId: putIdentityDevicesByIdentityIdSealingRecords
+      responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
+        '200':
+          description: An identical record was already admitted; nothing changed.
+        '201':
+          description: The record was admitted.
+        '400':
+          description: The body is not the four string fields.
+        '401':
+          description: The signature is missing, invalid or stale, or the signer is not the path identity.
+        '409':
+          description: A different sealingPublicKey is already admitted for the same identity, device and day.
+        '413':
+          description: The body exceeds 8 KB.
+        '415':
+          description: Request body is not application/json.
+        '422':
+          description: The record was not admitted - the credential is not authorized at the head, the day is not today or yesterday in UTC, the signature is invalid or a field is malformed or oversized (code 422040).
+  /identity-devices/{identityId}/sealing-view:
+    get:
+      tags:
+        - identity-devices
+      summary: Read the current sealing keys of an identity
+      description: |
+        Public, no authentication: a sender needs it before it can sign a
+        request on the node. Returns every device authorized at the head with
+        the sealing keys admitted for UTC days D (today) and D-1 only. It
+        carries no labels, no timestamps and no compromisedSince. A sender
+        verifies it by replaying the signed transitions read from
+        GET /identity-devices/{identityId}/transitions.
+
+        Rate limited per target identity (60 per minute) and per node (600 per
+        minute), code 429030.
+      parameters:
+        - in: path
+          name: identityId
+          required: true
+          schema:
+            type: string
+          description: Percent-encoded identity id.
+      operationId: getIdentityDevicesByIdentityIdSealingView
+      responses:
+        default:
+          $ref: '../open-api.yaml#/components/responses/Error'
+        '200':
+          description: The sealing view.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceSealingView'
+        '404':
+          description: The node holds no authorization for the identity (code 404050).
+        '429':
+          description: Per-identity (60 per minute) or per-node (600 per minute) sealing view rate limit exceeded (code 429030).
   /identity-devices/{identityId}/sealed-secrets:
     put:
       tags:
@@ -472,12 +570,70 @@ components:
         revision:
           type: integer
           minimum: 0
+    DeviceSealingRecordRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - deviceCredential
+        - sealingPublicKey
+        - signature
+        - utcDay
+      properties:
+        deviceCredential:
+          type: string
+        sealingPublicKey:
+          type: string
+        signature:
+          type: string
+          description: The device signature over the record.
+        utcDay:
+          type: string
+          pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+    DeviceSealingView:
+      type: object
+      additionalProperties: false
+      required:
+        - devices
+        - identityId
+        - revision
+      properties:
+        devices:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - deviceCredential
+              - sealingKeys
+            properties:
+              deviceCredential:
+                type: string
+              sealingKeys:
+                type: array
+                description: Keys for UTC days D and D-1 only, ascending by day. Empty when the device published none.
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - sealingPublicKey
+                    - utcDay
+                  properties:
+                    sealingPublicKey:
+                      type: string
+                    utcDay:
+                      type: string
+        identityId:
+          type: string
+        revision:
+          type: integer
+          minimum: 0
     DeviceAuthorizationTransitionLog:
       type: object
       additionalProperties: false
       required:
         - concurrentRecoveries
         - identityId
+        - nextCursor
         - recoveries
         - transitions
       properties:
@@ -488,6 +644,10 @@ components:
           description: Recoveries that lost the checkpoint, at its revision or an earlier one, and still carry a cap it lacks, with the lost recoveries they recovered from. Their carried caps still hold; they never count as removal evidence.
         identityId:
           type: string
+        nextCursor:
+          type: string
+          nullable: true
+          description: The revision to send as cursor for the next page, or null once the log is exhausted.
         recoveries:
           type: array
           items:

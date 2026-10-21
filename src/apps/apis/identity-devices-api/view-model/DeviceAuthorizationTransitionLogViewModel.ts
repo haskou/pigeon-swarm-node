@@ -13,6 +13,7 @@ export class DeviceAuthorizationTransitionLogViewModel {
         .getConcurrentRecoveries()
         .map((transition) => transition.toPrimitives()),
       identityId: this.disclosure.getIdentityId().valueOf(),
+      nextCursor: this.disclosure.getNextCursor()?.valueOf().toString() ?? null,
       recoveries: this.disclosure
         .getRecoveries()
         .map((transition) => transition.toPrimitives()),

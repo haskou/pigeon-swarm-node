@@ -12,11 +12,11 @@ import {
   Get,
   JsonController,
   Param,
-  QueryParam,
   Req,
   Res,
 } from 'routing-controllers';
 
+import DeviceAuthorizationTransitionReadRateLimiter from '../DeviceAuthorizationTransitionReadRateLimiter';
 import { DeviceAuthorizationRequestAuthenticator } from '../DeviceAuthorizationRequestAuthenticator';
 import { GetDeviceAuthorizationTransitionLogRequest } from '../requests/GetDeviceAuthorizationTransitionLogRequest';
 import { DeviceAuthorizationTransitionLogViewModel } from '../view-model/DeviceAuthorizationTransitionLogViewModel';
@@ -35,6 +35,11 @@ export class GetDeviceAuthorizationRoute extends Route {
   private readonly finder = this.get<DeviceAuthorizationFinder>(
     DeviceAuthorizationFinder,
   );
+
+  private readonly transitionReadRateLimiter =
+    this.get<DeviceAuthorizationTransitionReadRateLimiter>(
+      DeviceAuthorizationTransitionReadRateLimiter,
+    );
 
   /** The identity that signed the request for itself. */
   private async authenticateRequester(
@@ -101,26 +106,30 @@ export class GetDeviceAuthorizationRoute extends Route {
   }
 
   /**
-   * The signed transitions the requesting device or recovery authority may
-   * verify. A device the head no longer authorizes still reads the transitions
-   * up to its removal, so it can verify that removal itself.
+   * The signed transitions of any identity, for any signed caller: a sender
+   * replays them to verify the sealing view it was served. Rate-limited per
+   * requester, so one caller cannot exhaust another's reads. This discloses the
+   * add and remove history of the device set, an accepted waiver.
    */
   @Get('/:identityId/transitions')
   public async findTransitions(
     @Param('identityId') identityId: string,
-    @QueryParam('after') after: string | undefined,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
+    const requester = await this.authenticator.authenticate(request);
+    this.transitionReadRateLimiter.consume(requester);
+    const page = GetDeviceAuthorizationTransitionLogRequest.fromQuery(
+      request.query,
+    );
     const log = await this.finder.findTransitionLog(
       new DeviceAuthorizationFindMessage(
-        await this.authenticateRequester(identityId, request),
+        new IdentityId(decodeURIComponent(identityId)),
       ),
     );
-    const reader = this.deviceAuthenticator.authenticateReader(request, log);
     const disclosure = log
-      .disclosedTo(reader)
-      .after(new GetDeviceAuthorizationTransitionLogRequest(after).getAfter());
+      .disclose()
+      .page(page.getCursor(), page.getLimit());
 
     return response
       .status(HttpRouteStatusEnum.OK)

@@ -37,12 +37,6 @@ type Vectors = {
   logs: {
     head: { credentials: string[]; epoch: string; revision: number };
     name: string;
-    reads: {
-      after: number;
-      expected: TransitionLogBody;
-      name: string;
-      reader: KeyName;
-    }[];
     stored: TransitionLogBody;
     verdicts: {
       local: LocalCheckpoint;
@@ -218,24 +212,18 @@ describe('Device authorization transition log vectors', () => {
     },
   );
 
-  it.each(
-    vectors.logs.flatMap(({ reads, stored }) =>
-      reads.map((read) => ({ ...read, stored })),
-    ),
-  )('serves the body where $name', ({ after, expected, reader, stored }) => {
-    const publicKeyPem = vectors.keys[reader].publicKeyPem;
-    const disclosure = replayOf(stored)
-      .log.disclosedTo(
-        reader === 'recoveryAuthority'
-          ? RecoveryAuthority.fromString(publicKeyPem)
-          : DeviceCredential.fromString(publicKeyPem),
-      )
-      .after(new DeviceAuthorizationRevision(after));
+  it.each(vectors.logs.map(({ name, stored }) => ({ name, stored })))(
+    'serves the whole stored log from the start where $name',
+    ({ stored }) => {
+      const disclosure = replayOf(stored)
+        .log.disclose()
+        .page(new DeviceAuthorizationRevision(0), 100);
 
-    expect(
-      new DeviceAuthorizationTransitionLogViewModel(disclosure).toResource(),
-    ).toEqual(expected);
-  });
+      expect(
+        new DeviceAuthorizationTransitionLogViewModel(disclosure).toResource(),
+      ).toEqual({ ...stored, nextCursor: null });
+    },
+  );
 
   it.each(vectors.logs.flatMap(({ verdicts }) => verdicts))(
     'decides that $name',

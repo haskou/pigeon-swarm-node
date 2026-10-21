@@ -4,8 +4,7 @@ import { DeviceAuthorizationTransition } from './DeviceAuthorizationTransition';
 import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorizationRevision';
 
 /**
- * The part of a device-authorization transition log one reader may verify,
- * every entry exactly as its author signed it.
+ * A page of a device-authorization transition log, every entry exactly as its author signed it.
  */
 export class DeviceAuthorizationTransitionDisclosure {
   private readonly recoveries: DeviceAuthorizationTransition[];
@@ -17,25 +16,76 @@ export class DeviceAuthorizationTransitionDisclosure {
     recoveries: DeviceAuthorizationTransition[],
     concurrentRecoveries: DeviceAuthorizationTransition[],
     transitions: DeviceAuthorizationTransition[],
+    private readonly nextCursor?: DeviceAuthorizationRevision,
   ) {
     this.recoveries = [...recoveries];
     this.concurrentRecoveries = [...concurrentRecoveries];
     this.transitions = [...transitions];
   }
 
-  /** Only the entries that land above a revision the reader already verified. */
-  public after(
-    revision: DeviceAuthorizationRevision,
+  /**
+   * One page of entries above the cursor, whole revisions at a time in
+   * ascending revision order, so a revision never splits across pages. The
+   * first revision is always served, even when it alone exceeds the limit, so
+   * a reader always advances. The next cursor is the last revision served, or
+   * none when the log is exhausted.
+   */
+  public page(
+    cursor: DeviceAuthorizationRevision,
+    limit: number,
   ): DeviceAuthorizationTransitionDisclosure {
     const landsAfter = (transition: DeviceAuthorizationTransition): boolean =>
-      transition.getRevision().isGreaterThan(revision);
+      transition.getRevision().isGreaterThan(cursor);
+    const byRevision = (
+      a: DeviceAuthorizationTransition,
+      b: DeviceAuthorizationTransition,
+    ): number => a.getRevision().compareTo(b.getRevision());
+    const recoveries = this.recoveries.filter(landsAfter).sort(byRevision);
+    const concurrentRecoveries = this.concurrentRecoveries
+      .filter(landsAfter)
+      .sort(byRevision);
+    const transitions = this.transitions.filter(landsAfter).sort(byRevision);
+    const revisions = [
+      ...new Set(
+        [...recoveries, ...concurrentRecoveries, ...transitions].map(
+          (transition) => transition.getRevision().valueOf(),
+        ),
+      ),
+    ].sort((a, b) => a - b);
+    const countAt = (revision: number): number =>
+      [...recoveries, ...concurrentRecoveries, ...transitions].filter(
+        (transition) => transition.getRevision().valueOf() === revision,
+      ).length;
+    let served = 0;
+    let lastRevision: number | undefined;
+
+    for (const revision of revisions) {
+      if (lastRevision !== undefined && served + countAt(revision) > limit) {
+        break;
+      }
+      served += countAt(revision);
+      lastRevision = revision;
+    }
+    const included = (transition: DeviceAuthorizationTransition): boolean =>
+      lastRevision !== undefined &&
+      transition.getRevision().valueOf() <= lastRevision;
+    const hasMore =
+      lastRevision !== undefined && revisions[revisions.length - 1] > lastRevision;
 
     return new DeviceAuthorizationTransitionDisclosure(
       this.identityId,
-      this.recoveries.filter(landsAfter),
-      this.concurrentRecoveries.filter(landsAfter),
-      this.transitions.filter(landsAfter),
+      recoveries.filter(included),
+      concurrentRecoveries.filter(included),
+      transitions.filter(included),
+      hasMore && lastRevision !== undefined
+        ? new DeviceAuthorizationRevision(lastRevision)
+        : undefined,
     );
+  }
+
+  /** The cursor of the next page, or none once the log is exhausted. */
+  public getNextCursor(): DeviceAuthorizationRevision | undefined {
+    return this.nextCursor;
   }
 
   public getIdentityId(): IdentityId {

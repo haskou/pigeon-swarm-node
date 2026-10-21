@@ -2043,7 +2043,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       expect(
         log
-          .disclosedTo(genesis.getRecoveryAuthority())
+          .disclose()
           .getTransitions()
           .map((transition) => transition.toPrimitives()),
       ).toEqual(
@@ -2051,12 +2051,6 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           transition.toPrimitives(),
         ),
       );
-      expect(
-        log
-          .disclosedTo(credentialOf(phone))
-          .getTransitions()
-          .map((transition) => transition.toPrimitives()),
-      ).toEqual([enrolled.toPrimitives(), retired.toPrimitives()]);
     });
 
     it('serves the recovery that replaced the history below its checkpoint', async () => {
@@ -2085,7 +2079,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       const disclosure = (
         await repository.requireTransitionLog(identityId)
-      ).disclosedTo(credentialOf(phone));
+      ).disclose();
 
       expect(
         disclosure

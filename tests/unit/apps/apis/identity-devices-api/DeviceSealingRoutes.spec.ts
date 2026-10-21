@@ -163,7 +163,12 @@ describe('Device sealing routes', () => {
       utcDay: overrides.utcDay ?? dayOf(0),
     });
 
-    return { ...record, signature };
+    return {
+      deviceCredential: record.deviceCredential,
+      sealingPublicKey: record.sealingPublicKey,
+      signature,
+      utcDay: record.utcDay,
+    };
   };
 
   const getSigned = (target: string, signer?: KeyPair) =>

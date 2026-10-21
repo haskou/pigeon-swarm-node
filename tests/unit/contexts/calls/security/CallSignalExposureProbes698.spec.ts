@@ -87,27 +87,36 @@ const startNode = async (network: IPFSNetwork): Promise<ProbeNode> => {
   return { adapter, repository };
 };
 
-const signalAttributes = (
-  overrides: Partial<CallSignalSentAttributes>,
-): CallSignalSentAttributes => {
-  const sentAt = Date.now();
+const CREATED_AT = 1_770_000_000_000;
+const ENVELOPE = 'opaque-sealed-envelope-for-the-recipient-device';
 
-  return {
-    attempt: 1,
-    callId: CALL_ID,
-    expiresAt: sentAt + 20_000,
-    networkId: PRIVATE_NETWORK_ID,
-    ownerNodeId: OWNER_NODE_ID,
-    participantIds: [SENDER_IDENTITY_ID, RECIPIENT_IDENTITY_ID],
-    payload: { sdp: 'probe' },
-    recipientIdentityId: RECIPIENT_IDENTITY_ID,
-    senderIdentityId: SENDER_IDENTITY_ID,
-    sentAt,
-    signalId: randomUUID(),
-    signalType: 'offer',
-    ...overrides,
-  };
-};
+/** A signal as the origin publishes it: sealed entries and a signature only. */
+const signalAttributes = (
+  overrides: Record<string, unknown>,
+): CallSignalSentAttributes => ({
+  attempt: 1,
+  callId: CALL_ID,
+  createdAt: CREATED_AT,
+  expiresAt: CREATED_AT + 20_000,
+  networkId: PRIVATE_NETWORK_ID,
+  ownerNodeId: OWNER_NODE_ID,
+  participantIds: [SENDER_IDENTITY_ID, RECIPIENT_IDENTITY_ID],
+  recipientIdentityId: RECIPIENT_IDENTITY_ID,
+  scopeType: 'conversation',
+  sealedEntries: [
+    {
+      envelope: ENVELOPE,
+      recipientDeviceCredential: 'recipient-device-credential',
+    },
+  ],
+  senderDeviceCredential: 'sender-device-credential',
+  senderIdentityId: SENDER_IDENTITY_ID,
+  sentAt: CREATED_AT,
+  signalId: randomUUID(),
+  signalType: 'offer',
+  signature: 'signature-over-the-signed-bytes',
+  ...overrides,
+});
 
 const registeredText = async (
   node: ProbeNode,
@@ -124,331 +133,114 @@ const registeredText = async (
   );
 };
 
-describe('#698 stage-2 red probes on 5602c2e2 (E1, E2, E4)', () => {
-  describe('E1: private-network payload read by a non-recipient key holder', () => {
+describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
+  const networks = [
+    ['private', PRIVATE_NETWORK_ID, PrivateKey.generate()],
+    ['public', PUBLIC_NETWORK_ID, undefined],
+  ] as const;
+
+  describe.each(networks)('on a %s network', (kind, networkId, key) => {
     const scenario = async () => {
-      const key = PrivateKey.generate();
       const fabric = new FakeFabric();
-      const sender = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PRIVATE_NETWORK_ID, 'private', key),
-          fabric.connection,
-        ),
-      );
-      const recipient = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PRIVATE_NETWORK_ID, 'private', key),
-          fabric.connection,
-        ),
-      );
-      const keyHolder = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PRIVATE_NETWORK_ID, 'private', key),
-          fabric.connection,
-        ),
-      );
-      const outsider = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(
-            PRIVATE_NETWORK_ID,
-            'private',
-            PrivateKey.generate(),
+      const join = (): Promise<ProbeNode> =>
+        startNode(
+          new IPFSNetwork(
+            new IPFSNetworkConfig(networkId, kind, key),
+            fabric.connection,
           ),
-          fabric.connection,
-        ),
-      );
-      const marker = `probe-e1-${randomUUID()}`;
+        );
+
+      return {
+        bystander: await join(),
+        fabric,
+        recipient: await join(),
+        sender: await join(),
+      };
+    };
+
+    it('registers a sealed signal for the recipient and serves only the opaque envelope', async () => {
+      const s = await scenario();
       const signalId = randomUUID();
 
-      await sender.adapter.publish([
+      await s.sender.adapter.publish([
+        new CallSignalSentEvent(CALL_ID, signalAttributes({ networkId, signalId })),
+      ]);
+
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(true);
+      expect(
+        s.fabric.carried.every((payload) => payload.includes(ENVELOPE)),
+      ).toBe(true);
+    });
+
+    it('E1/E2: never registers or relays a plaintext payload that a sender adds', async () => {
+      const s = await scenario();
+      const marker = `probe-${randomUUID()}`;
+      const signalId = randomUUID();
+
+      await s.sender.adapter.publish([
         new CallSignalSentEvent(
           CALL_ID,
-          signalAttributes({
-            networkId: PRIVATE_NETWORK_ID,
-            payload: { sdp: marker },
-            signalId,
-          }),
+          signalAttributes({ networkId, payload: { sdp: marker }, signalId }),
         ),
       ]);
 
-      return { fabric, keyHolder, marker, outsider, recipient, signalId };
-    };
-
-    it('E1 control: recipient registers the private-network signal', async () => {
-      const s = await scenario();
-
-      expect({
-        e1RecipientRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(s.signalId),
-        ),
-      }).toEqual({ e1RecipientRegistered: true });
+      expect(
+        (await registeredText(s.bystander, signalId))?.includes(marker) ??
+          false,
+      ).toBe(false);
+      expect(
+        (await registeredText(s.recipient, signalId))?.includes(marker) ??
+          false,
+      ).toBe(false);
     });
 
-    it('E1 control: private-network wire bytes carry no payload plaintext', async () => {
-      const s = await scenario();
-
-      expect({
-        e1WireCarriesMarker: s.fabric.carried.some((payload) =>
-          payload.includes(s.marker),
-        ),
-      }).toEqual({ e1WireCarriesMarker: false });
-    });
-
-    it('E1 control: holder of a different network key registers nothing', async () => {
-      const s = await scenario();
-
-      expect({
-        e1OutsiderRegistered: await s.outsider.repository.hasById(
-          new CallSignalId(s.signalId),
-        ),
-      }).toEqual({ e1OutsiderRegistered: false });
-    });
-
-    it('E1: non-recipient network key holder must not read the signal payload', async () => {
-      const s = await scenario();
-      const text = await registeredText(s.keyHolder, s.signalId);
-
-      expect({
-        e1KeyHolderReadsPayload: text?.includes(s.marker) ?? false,
-      }).toEqual({ e1KeyHolderReadsPayload: false });
-    });
-  });
-
-  describe('E2: public-network payload readable by any subscriber', () => {
-    const scenario = async () => {
-      const fabric = new FakeFabric();
-      const sender = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PUBLIC_NETWORK_ID, 'public'),
-          fabric.connection,
-        ),
-      );
-      const recipient = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PUBLIC_NETWORK_ID, 'public'),
-          fabric.connection,
-        ),
-      );
-      const subscriber = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PUBLIC_NETWORK_ID, 'public'),
-          fabric.connection,
-        ),
-      );
-      const marker = `probe-e2-${randomUUID()}`;
-      const signalId = randomUUID();
-
-      await sender.adapter.publish([
-        new CallSignalSentEvent(
-          CALL_ID,
-          signalAttributes({
-            networkId: PUBLIC_NETWORK_ID,
-            payload: { sdp: marker },
-            signalId,
-          }),
-        ),
-      ]);
-
-      return { fabric, marker, recipient, signalId, subscriber };
-    };
-
-    it('E2 control: recipient registers the public-network signal', async () => {
-      const s = await scenario();
-
-      expect({
-        e2RecipientRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(s.signalId),
-        ),
-      }).toEqual({ e2RecipientRegistered: true });
-    });
-
-    it('E2: public-network non-recipient subscriber must not read the payload', async () => {
-      const s = await scenario();
-      const text = await registeredText(s.subscriber, s.signalId);
-
-      expect({
-        e2SubscriberReadsPayload: text?.includes(s.marker) ?? false,
-      }).toEqual({ e2SubscriberReadsPayload: false });
-    });
-
-    it('E2: public-network wire bytes must not carry payload plaintext', async () => {
-      const s = await scenario();
-
-      expect({
-        e2WireCarriesMarker: s.fabric.carried.some((payload) =>
-          payload.includes(s.marker),
-        ),
-      }).toEqual({ e2WireCarriesMarker: false });
-    });
-  });
-
-  describe('E4: forged call signal accepted without sender authentication', () => {
-    const scenario = async () => {
-      const key = PrivateKey.generate();
-      const fabric = new FakeFabric();
-      const sender = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PRIVATE_NETWORK_ID, 'private', key),
-          fabric.connection,
-        ),
-      );
-      const recipient = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PRIVATE_NETWORK_ID, 'private', key),
-          fabric.connection,
-        ),
-      );
-      // Attacker is a network member that holds the network key.
-      const attacker = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PRIVATE_NETWORK_ID, 'private', key),
-          fabric.connection,
-        ),
-      );
-
-      return { attacker, recipient, sender };
-    };
-
-    it('E4 control: recipient registers a signal published by the real sender', async () => {
+    it.each([
+      ['no signature', { signature: '' }],
+      ['no sender device', { senderDeviceCredential: '' }],
+      ['no sealed entries', { sealedEntries: [] }],
+      ['an expiry that is not twenty seconds after creation', { expiresAt: CREATED_AT + 30_000 }],
+    ])('E4: refuses a signal with %s', async (_case, override) => {
       const s = await scenario();
       const signalId = randomUUID();
 
       await s.sender.adapter.publish([
         new CallSignalSentEvent(
           CALL_ID,
-          signalAttributes({
-            networkId: PRIVATE_NETWORK_ID,
-            payload: { sdp: 'real-offer' },
-            signalId,
-          }),
+          signalAttributes({ networkId, signalId, ...override }),
         ),
       ]);
 
-      expect({
-        e4RealSignalRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(signalId),
-        ),
-      }).toEqual({ e4RealSignalRegistered: true });
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(false);
     });
 
-    it('E4: forged sender identity without signature must be refused', async () => {
-      const s = await scenario();
-      const signalId = randomUUID();
-
-      await s.attacker.adapter.publish([
-        new CallSignalSentEvent(
-          CALL_ID,
-          signalAttributes({
-            networkId: PRIVATE_NETWORK_ID,
-            payload: { sdp: 'forged-offer' },
-            senderIdentityId: SENDER_IDENTITY_ID,
-            signalId,
-          }),
-        ),
-      ]);
-
-      expect({
-        e4ForgedSenderRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(signalId),
-        ),
-      }).toEqual({ e4ForgedSenderRegistered: false });
-    });
-
-    it('E4: sender-attributed signal with a forged DTLS fingerprint must be refused', async () => {
-      const s = await scenario();
-      const signalId = randomUUID();
-
-      await s.attacker.adapter.publish([
-        new CallSignalSentEvent(
-          CALL_ID,
-          signalAttributes({
-            networkId: PRIVATE_NETWORK_ID,
-            payload: {
-              sdp: 'v=0\r\na=fingerprint:sha-256 AA:BB:CC:DD:EE:FF:00:11',
-            },
-            senderIdentityId: SENDER_IDENTITY_ID,
-            signalId,
-          }),
-        ),
-      ]);
-
-      expect({
-        e4ForgedFingerprintRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(signalId),
-        ),
-      }).toEqual({ e4ForgedFingerprintRegistered: false });
-    });
-  });
-
-  describe('E4 (public network): forged call signal with no private-network key', () => {
-    const scenario = async () => {
-      const fabric = new FakeFabric();
-      const sender = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PUBLIC_NETWORK_ID, 'public'),
-          fabric.connection,
-        ),
-      );
-      const recipient = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PUBLIC_NETWORK_ID, 'public'),
-          fabric.connection,
-        ),
-      );
-      // Attacker holds no private-network key; it is a plain public subscriber.
-      const attacker = await startNode(
-        new IPFSNetwork(
-          new IPFSNetworkConfig(PUBLIC_NETWORK_ID, 'public'),
-          fabric.connection,
-        ),
-      );
-
-      return { attacker, recipient, sender };
-    };
-
-    it('E4 public control: recipient registers a signal published by the real sender', async () => {
+    it('E4: refuses a legacy unsigned plaintext signal', async () => {
       const s = await scenario();
       const signalId = randomUUID();
 
       await s.sender.adapter.publish([
-        new CallSignalSentEvent(
-          CALL_ID,
-          signalAttributes({
-            networkId: PUBLIC_NETWORK_ID,
-            payload: { sdp: 'real-public-offer' },
-            signalId,
-          }),
-        ),
+        new CallSignalSentEvent(CALL_ID, {
+          attempt: 1,
+          callId: CALL_ID,
+          expiresAt: Date.now() + 20_000,
+          networkId,
+          ownerNodeId: OWNER_NODE_ID,
+          participantIds: [SENDER_IDENTITY_ID, RECIPIENT_IDENTITY_ID],
+          payload: { sdp: 'legacy-offer' },
+          recipientIdentityId: RECIPIENT_IDENTITY_ID,
+          senderIdentityId: SENDER_IDENTITY_ID,
+          sentAt: Date.now(),
+          signalId,
+          signalType: 'offer',
+        } as unknown as CallSignalSentAttributes),
       ]);
 
-      expect({
-        e4PublicRealSignalRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(signalId),
-        ),
-      }).toEqual({ e4PublicRealSignalRegistered: true });
-    });
-
-    it('E4 public: forged sender identity on the public network must be refused', async () => {
-      const s = await scenario();
-      const signalId = randomUUID();
-
-      await s.attacker.adapter.publish([
-        new CallSignalSentEvent(
-          CALL_ID,
-          signalAttributes({
-            networkId: PUBLIC_NETWORK_ID,
-            payload: { sdp: 'forged-public-offer' },
-            senderIdentityId: SENDER_IDENTITY_ID,
-            signalId,
-          }),
-        ),
-      ]);
-
-      expect({
-        e4PublicForgedSenderRegistered: await s.recipient.repository.hasById(
-          new CallSignalId(signalId),
-        ),
-      }).toEqual({ e4PublicForgedSenderRegistered: false });
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(false);
     });
   });
 });
