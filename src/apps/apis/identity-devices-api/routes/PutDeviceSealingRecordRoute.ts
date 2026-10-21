@@ -1,5 +1,5 @@
-import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import { InvalidSignedRequestError } from '@app/apps/apis/shared/errors/InvalidSignedRequestError';
+import SignedHttpRequestAuthenticator from '@app/apps/apis/shared/SignedHttpRequestAuthenticator';
 import DeviceSealingRecordPublisher from '@app/contexts/identity-devices/application/publish/DeviceSealingRecordPublisher';
 import { PublishDeviceSealingRecordMessage } from '@app/contexts/identity-devices/application/publish/messages/PublishDeviceSealingRecordMessage';
 import { DeviceSealingRecordRejectedError } from '@app/contexts/identity-devices/domain/errors/DeviceSealingRecordRejectedError';
@@ -8,7 +8,14 @@ import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { assert } from '@haskou/value-objects';
 import { Request, Response } from 'express';
-import { Body, JsonController, Param, Put, Req, Res } from 'routing-controllers';
+import {
+  Body,
+  JsonController,
+  Param,
+  Put,
+  Req,
+  Res,
+} from 'routing-controllers';
 
 import { PutDeviceSealingRecordBody } from '../bodies/PutDeviceSealingRecordBody';
 import { DeviceSealingRecordRejectedHttpError } from '../errors/DeviceSealingRecordRejectedHttpError';

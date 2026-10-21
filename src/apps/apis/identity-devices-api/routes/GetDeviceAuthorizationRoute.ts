@@ -8,16 +8,10 @@ import { Route } from '@haskou/ddd-kernel/adapters/ui';
 import { HttpRouteStatusEnum } from '@haskou/ddd-kernel/contracts/ui';
 import { assert } from '@haskou/value-objects';
 import { Request, Response } from 'express';
-import {
-  Get,
-  JsonController,
-  Param,
-  Req,
-  Res,
-} from 'routing-controllers';
+import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 
-import DeviceAuthorizationTransitionReadRateLimiter from '../DeviceAuthorizationTransitionReadRateLimiter';
 import { DeviceAuthorizationRequestAuthenticator } from '../DeviceAuthorizationRequestAuthenticator';
+import DeviceAuthorizationTransitionReadRateLimiter from '../DeviceAuthorizationTransitionReadRateLimiter';
 import { GetDeviceAuthorizationTransitionLogRequest } from '../requests/GetDeviceAuthorizationTransitionLogRequest';
 import { DeviceAuthorizationTransitionLogViewModel } from '../view-model/DeviceAuthorizationTransitionLogViewModel';
 import { DeviceAuthorizationViewModel } from '../view-model/DeviceAuthorizationViewModel';
@@ -127,9 +121,7 @@ export class GetDeviceAuthorizationRoute extends Route {
         new IdentityId(decodeURIComponent(identityId)),
       ),
     );
-    const disclosure = log
-      .disclose()
-      .page(page.getCursor(), page.getLimit());
+    const disclosure = log.disclose().page(page.getCursor(), page.getLimit());
 
     return response
       .status(HttpRouteStatusEnum.OK)

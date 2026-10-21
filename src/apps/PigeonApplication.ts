@@ -30,9 +30,9 @@ import DiagnosticsSessionRepository from '../contexts/diagnostics/domain/reposit
 import InMemoryDiagnosticsSessionRepository from '../contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceSealedSecretRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
+import { DeviceSealingRecordRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealingRecordRepository';
 import LocalDeviceSealedSecretRepository from '../contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
 import OrbitDBDeviceAuthorizationRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
-import { DeviceSealingRecordRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealingRecordRepository';
 import OrbitDBDeviceSealingRecordRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository';
 import { MailboxLimits } from '../contexts/mailboxes/domain/MailboxLimits';
 import MailboxRepository from '../contexts/mailboxes/domain/repositories/MailboxRepository';

@@ -4,21 +4,18 @@ import { assert } from '@haskou/value-objects';
 import { InvalidDeviceAuthorizationTransitionLogRequestError } from '../errors/InvalidDeviceAuthorizationTransitionLogRequestError';
 
 export class GetDeviceAuthorizationTransitionLogRequest {
-  public static readonly DEFAULT_LIMIT = 50;
-  public static readonly MAX_LIMIT = 100;
   private static readonly INTEGER_PATTERN = /^(0|[1-9]\d*)$/;
   private static readonly QUERY_KEYS = ['cursor', 'limit'];
-
-  public constructor(
-    private readonly cursor: unknown,
-    private readonly limit: unknown,
-  ) {}
+  public static readonly DEFAULT_LIMIT = 50;
+  public static readonly MAX_LIMIT = 100;
 
   /** A non-negative decimal safe integer without leading zeros. */
   private static integerOf(value: unknown): number {
     assert(
       typeof value === 'string' &&
-        GetDeviceAuthorizationTransitionLogRequest.INTEGER_PATTERN.test(value) &&
+        GetDeviceAuthorizationTransitionLogRequest.INTEGER_PATTERN.test(
+          value,
+        ) &&
         Number.isSafeInteger(Number(value)),
       new InvalidDeviceAuthorizationTransitionLogRequestError(),
     );
@@ -42,6 +39,11 @@ export class GetDeviceAuthorizationTransitionLogRequest {
       query.limit,
     );
   }
+
+  public constructor(
+    private readonly cursor: unknown,
+    private readonly limit: unknown,
+  ) {}
 
   /** The last revision the reader already holds; the log start when absent. */
   public getCursor(): DeviceAuthorizationRevision {
