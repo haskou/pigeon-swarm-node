@@ -41,9 +41,9 @@ export class CallSignalDeliveryRegisterMessage {
     }
   }
 
-  /** A signal created far ahead of the clock would outlive every purge. */
-  public assertSignalIsNotFromTheFuture(now: Timestamp): void {
-    this.signal.assertNotCreatedInTheFutureAt(now);
+  /** A signal that is expired or created far ahead of the clock is refused. */
+  public assertSignalIsFresh(now: Timestamp): void {
+    this.signal.assertFreshAt(now);
   }
 
   public toDelivery(): CallSignalDelivery {

@@ -290,6 +290,14 @@ acknowledges it or its 20-second TTL expires. It republishes the signal after
 same `signalId`, allowing recipients to acknowledge duplicates without
 applying SDP or ICE twice.
 
+A recipient refuses and does not register a received signal whose `expiresAt` has
+passed, or whose `createdAt` is more than 5 seconds ahead of its clock; the refusal
+is logged at debug level. A retry supersedes only the registered delivery with the
+same route (`callId`, `ownerNodeId`, `networkId` and the ordered `participantIds`),
+and only with a strictly greater `attempt` and non-decreasing `sentAt` and
+`nextRetryAt`. A delivery on another route, or one whose clock values run backwards,
+never replaces the stored one.
+
 Signal event attributes are:
 
 ```json

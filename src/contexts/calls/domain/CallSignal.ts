@@ -148,14 +148,6 @@ export class CallSignal {
     );
   }
 
-  /** Refuses a signal created beyond the clock-skew bound; an expired one is still a signal. */
-  public assertNotCreatedInTheFutureAt(at: Timestamp): void {
-    assert(
-      this.createdAt.valueOf() <= at.valueOf() + CALL_SIGNAL_MAX_CLOCK_SKEW_MS,
-      new InvalidCallSignalError(),
-    );
-  }
-
   public getCallId(): CallId {
     return this.callId;
   }
