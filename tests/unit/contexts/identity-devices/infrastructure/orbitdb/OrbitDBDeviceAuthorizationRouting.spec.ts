@@ -321,39 +321,36 @@ describe(OrbitDBDeviceAuthorizationRouting.name, () => {
     ['the previous identity cannot be checked', 'has'],
     ['the previous identity cannot be read', 'require'],
     ['the previous identity vanished between check and read', 'missing'],
-  ])(
-    'answers not ready, never no genesis, when %s',
-    async (_case, failure) => {
-      const { identityId, identityRepository, routing } = await fixture();
-      const latest = await signedIdentity({
-        networkIds: [privateNetworkId],
-        previous: new IdentityExternalIdentifier('bafy-v1'),
-        timestamp: 2,
-        version: 2,
-      });
-      identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
-        new IdentityCandidate(
-          new IdentityExternalIdentifier('bafy-v2'),
-          latest.identity,
-        ),
-      ]);
-      identityRepository.hasByExternalIdentifier.mockImplementation(() =>
-        failure === 'has'
-          ? Promise.reject(new Error('datastore down'))
-          : Promise.resolve(true),
-      );
-      identityRepository.requireByExternalIdentifier.mockRejectedValue(
-        failure === 'missing'
-          ? new IdentityNotFoundError('bafy-v1')
-          : new Error('datastore down'),
-      );
+  ])('answers not ready, never no genesis, when %s', async (_case, failure) => {
+    const { identityId, identityRepository, routing } = await fixture();
+    const latest = await signedIdentity({
+      networkIds: [privateNetworkId],
+      previous: new IdentityExternalIdentifier('bafy-v1'),
+      timestamp: 2,
+      version: 2,
+    });
+    identityRepository.findFreshCandidateReferencesById.mockResolvedValue([
+      new IdentityCandidate(
+        new IdentityExternalIdentifier('bafy-v2'),
+        latest.identity,
+      ),
+    ]);
+    identityRepository.hasByExternalIdentifier.mockImplementation(() =>
+      failure === 'has'
+        ? Promise.reject(new Error('datastore down'))
+        : Promise.resolve(true),
+    );
+    identityRepository.requireByExternalIdentifier.mockRejectedValue(
+      failure === 'missing'
+        ? new IdentityNotFoundError('bafy-v1')
+        : new Error('datastore down'),
+    );
 
-      await expect(routing.resolveTrustedGenesis(identityId)).rejects.toThrow(
-        ReplicatedStateNotReadyError,
-      );
-      expect(routing.trustedGenesis(identityId.valueOf())).toBeUndefined();
-    },
-  );
+    await expect(routing.resolveTrustedGenesis(identityId)).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
+    expect(routing.trustedGenesis(identityId.valueOf())).toBeUndefined();
+  });
 
   it('rejects a candidate whose chain does not reach a version-1 identity', async () => {
     const { identityId, identityRepository, routing } = await fixture();
