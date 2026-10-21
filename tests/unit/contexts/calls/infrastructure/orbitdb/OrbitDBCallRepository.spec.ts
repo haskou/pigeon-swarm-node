@@ -14,6 +14,7 @@ import OrbitDBCallRepository from '@app/contexts/calls/infrastructure/orbitdb/Or
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
+import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
@@ -240,23 +241,121 @@ describe('OrbitDBCallRepository', () => {
     ).resolves.toEqual([]);
   });
 
-  it('ignores a participant or end record that arrives before its start, then applies it', async () => {
-    const start = conversationStart();
-    const joined = signCallParticipant({
-      at: now() + 1,
-      callId: start.callId,
-      signer: peer,
-      state: 'joined',
+  describe('holding records of a call whose start it has not projected', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
     });
 
-    await replicate(joined.payload, joined.proof);
-    await expect(repository.hasById(new CallId(start.callId))).resolves.toBe(
-      false,
-    );
+    afterEach(() => {
+      jest.useRealTimers();
+    });
 
-    await replicate(start.payload, start.proof);
-    const found = await repository.requireById(new CallId(start.callId));
-    expect(found.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
+    it('answers the call as not ready, not as missing, then applies the records to the start', async () => {
+      const start = conversationStart();
+      const joined = signCallParticipant({
+        at: now() + 1,
+        callId: start.callId,
+        signer: peer,
+        state: 'joined',
+      });
+      const callId = new CallId(start.callId);
+
+      await replicate(joined.payload, joined.proof);
+      await expect(repository.hasById(callId)).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.requireById(callId)).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+
+      await replicate(start.payload, start.proof);
+      const found = await repository.requireById(callId);
+      expect(found.hasJoinedParticipant(new IdentityId(peer.id))).toBe(true);
+    });
+
+    it('answers the call as missing once the bounded wait for its start is over', async () => {
+      const start = conversationStart();
+      const joined = signCallParticipant({
+        at: now() + 1,
+        callId: start.callId,
+        signer: peer,
+        state: 'joined',
+      });
+      const callId = new CallId(start.callId);
+
+      await replicate(joined.payload, joined.proof);
+      await jest.advanceTimersByTimeAsync(OrbitDBCallProjection.START_AWAIT_MS);
+
+      await expect(repository.hasById(callId)).resolves.toBe(false);
+      await expect(repository.requireById(callId)).rejects.toBeInstanceOf(
+        CallNotFoundError,
+      );
+    });
+  });
+
+  it('answers a call whose start it cannot fold as not ready, not as missing', async () => {
+    const callId = '550e8400-e29b-41d4-a716-446655440031';
+
+    await calls.put({
+      callId,
+      id: `call:${callId}`,
+      scope: { type: 'unknown-scope' },
+      scopeType: 'call_start',
+    });
+    await flush();
+
+    await expect(repository.hasById(new CallId(callId))).rejects.toBeInstanceOf(
+      ReplicatedStateNotReadyError,
+    );
+    await expect(
+      repository.requireById(new CallId(callId)),
+    ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+  });
+
+  describe('listing the calls of a participant', () => {
+    it('rejects instead of leaving out a call whose read fails', async () => {
+      const start = communityStart();
+      await replicate(start.payload, start.proof);
+      jest
+        .spyOn(leases, 'findByCallIds')
+        .mockRejectedValue(new InvalidPrivateAuthorizationError());
+
+      await expect(
+        repository.findActiveByParticipant(new IdentityId(creator.id)),
+      ).rejects.toBeInstanceOf(InvalidPrivateAuthorizationError);
+    });
+
+    it('leaves out only a call of a community verified to be private', async () => {
+      const start = communityStart();
+      await replicate(start.payload, start.proof);
+      await leases.save(
+        CallParticipantLease.connect(
+          new CallId(start.callId),
+          new IdentityId(creator.id),
+          new NodeId('550e8400-e29b-41d4-a716-446655440012'),
+          new NetworkId(networkId),
+          [],
+        ),
+      );
+      const hasScope = jest.fn().mockResolvedValue(true);
+      const privateRepository = new OrbitDBCallRepository(
+        registry,
+        projection,
+        leases,
+        new PrivateCommunityPublicStorageGuard(
+          { hasScope } as never,
+          new PrivateAuthorizationStorageCoordinator(),
+        ),
+      );
+
+      await expect(
+        privateRepository.findActiveByParticipant(new IdentityId(creator.id)),
+      ).resolves.toEqual([]);
+      hasScope.mockRejectedValue(new ReplicatedStateNotReadyError());
+      await expect(
+        privateRepository.findActiveByParticipant(new IdentityId(creator.id)),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    });
   });
 
   it('marks a ringing call missed locally without writing a replicated record', async () => {
@@ -466,9 +565,9 @@ describe('OrbitDBCallRepository', () => {
 
       const call = await repository.requireById(new CallId(start.callId));
 
-      expect(call.getJoinedParticipantIds().map((id) => id.valueOf())).toEqual(
-        [peer.id],
-      );
+      expect(call.getJoinedParticipantIds().map((id) => id.valueOf())).toEqual([
+        peer.id,
+      ]);
       const active = await repository.findActiveByParticipant(
         new IdentityId(peer.id),
       );

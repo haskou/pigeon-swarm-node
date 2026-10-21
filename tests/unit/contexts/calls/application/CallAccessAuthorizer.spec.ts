@@ -4,6 +4,7 @@ import { CallScope } from '@app/contexts/calls/domain/CallScope';
 import { CallNotFoundError } from '@app/contexts/calls/domain/errors/CallNotFoundError';
 import { CallCapabilityHash } from '@app/contexts/calls/domain/value-objects/CallCapabilityHash';
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityMemberNotFoundError } from '@app/contexts/communities/domain/errors/CommunityMemberNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -12,6 +13,7 @@ import ConversationRepository from '@app/contexts/conversations/domain/repositor
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
 import { mock } from 'jest-mock-extended';
 
@@ -70,7 +72,7 @@ describe('CallAccessAuthorizer', () => {
       new CommunityChannelId('voice-1'),
     );
     community.authorizeVoiceChannelCall.mockImplementation(() => {
-      throw new Error('revoked');
+      throw new CommunityMemberNotFoundError();
     });
     await expect(
       authorizer.assertAccess(call, identity),
@@ -79,6 +81,106 @@ describe('CallAccessAuthorizer', () => {
     await expect(
       authorizer.assertAccess(call, identity),
     ).rejects.toBeInstanceOf(CallNotFoundError);
+  });
+
+  describe('when a repository it reads cannot answer', () => {
+    const peer = new IdentityId(
+      'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=',
+    );
+    const communityCall = () => {
+      const call = Call.start(
+        identity,
+        network,
+        CallScope.communityChannel(
+          new CommunityId('community-1'),
+          new CommunityChannelId('voice-1'),
+        ),
+        [identity],
+        ...callStartArgs(),
+      );
+
+      call.restoreLeaseRosteredParticipants([identity, peer]);
+
+      return call;
+    };
+
+    beforeEach(() => {
+      jest.resetAllMocks();
+    });
+
+    it('rejects instead of reading a community it cannot read as no access', async () => {
+      communities.hasById.mockRejectedValue(new ReplicatedStateNotReadyError());
+
+      await expect(
+        authorizer.canAccess(communityCall(), identity),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    });
+
+    it('rejects instead of dropping participants from the authorized audience', async () => {
+      const community = mock<Community>();
+      communities.hasById.mockResolvedValue(true);
+      communities.requireById
+        .mockResolvedValueOnce(community)
+        .mockRejectedValueOnce(new ReplicatedStateNotReadyError());
+
+      await expect(
+        authorizer.authorizedParticipants(communityCall()),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    });
+
+    it('rejects a conversation it cannot read instead of hiding the call', async () => {
+      const call = Call.start(
+        identity,
+        network,
+        CallScope.conversation(new ConversationId('conversation-1')),
+        [identity],
+        ...callStartArgs(),
+      );
+      conversations.hasById.mockResolvedValue(true);
+      conversations.requireMetadataById.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await expect(authorizer.canAccess(call, identity)).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('rejects a voice check that fails outside the community rules', async () => {
+      const community = mock<Community>();
+      communities.hasById.mockResolvedValue(true);
+      communities.requireById.mockResolvedValue(community);
+      community.authorizeVoiceChannelCall.mockImplementation(() => {
+        throw new Error('unreadable channel permissions');
+      });
+
+      await expect(
+        authorizer.canAccess(communityCall(), identity),
+      ).rejects.toThrow('unreadable channel permissions');
+    });
+
+    it('still denies a verified outsider without rejecting', async () => {
+      const community = mock<Community>();
+      communities.hasById.mockResolvedValue(true);
+      communities.requireById.mockResolvedValue(community);
+      community.authorizeVoiceChannelCall.mockImplementation(
+        (identityId: IdentityId) => {
+          if (identityId.isEqual(peer))
+            throw new CommunityMemberNotFoundError();
+        },
+      );
+
+      await expect(authorizer.canAccess(communityCall(), peer)).resolves.toBe(
+        false,
+      );
+      await expect(
+        authorizer.authorizedParticipants(communityCall()),
+      ).resolves.toEqual([identity]);
+      communities.hasById.mockResolvedValue(false);
+      await expect(
+        authorizer.canAccess(communityCall(), identity),
+      ).resolves.toBe(false);
+    });
   });
 
   describe('a group-capability call', () => {

@@ -29,6 +29,20 @@ describe('OrbitDBCallFold', () => {
     expect(OrbitDBCallFold.fold({ participants: new Map() })).toBeUndefined();
   });
 
+  it('rejects a start it cannot fold instead of folding it to nothing', () => {
+    expect(() =>
+      OrbitDBCallFold.fold({
+        participants: new Map(),
+        start: {
+          callId: 'unfoldable',
+          id: 'call:unfoldable',
+          scope: { type: 'unknown-scope' },
+          scopeType: 'call_start',
+        },
+      }),
+    ).toThrow();
+  });
+
   it('derives the same call from the same records in every arrival order', async () => {
     const alice = await newCallSigner();
     const bob = await newCallSigner();
