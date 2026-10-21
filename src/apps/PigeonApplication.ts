@@ -83,6 +83,7 @@ import LocalPrivateBlobRepository from '../contexts/private-blobs/infrastructure
 import NetworkPrivacyDirectory from '../contexts/shared/domain/networks/NetworkPrivacyDirectory';
 import { IdentityId } from '../contexts/shared/domain/value-objects/IdentityId';
 import IPFSNetworkPrivacyDirectory from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkPrivacyDirectory';
+import IPFSNetworkRegistry from '../contexts/shared/infrastructure/ipfs/networks/IPFSNetworkRegistry';
 import {
   pigeonEnvironmentSchema,
   validatePigeonEnvironment,
@@ -94,6 +95,7 @@ import { PublicStaticContent } from '../shared/infrastructure/express/PublicStat
 import { parseTrustProxySetting } from '../shared/infrastructure/express/TrustProxySetting';
 import { Initializer } from '../shared/infrastructure/lifecycle/Initializer';
 import { Runtime } from '../shared/infrastructure/lifecycle/Runtime';
+import EmbeddedLocalDatabase from '../shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import WinstonLogger from '../shared/infrastructure/logs/WinstonLogger';
 import { DomainEventConsumer } from '../shared/infrastructure/messageBus/DomainEventConsumer';
 import { DomainEventPublisher } from '../shared/infrastructure/messageBus/DomainEventPublisher';
@@ -411,8 +413,16 @@ export default class PigeonApplication {
           : idempotency.handle(event, next, context),
     });
 
-    // The kernel runs shutdown hooks after consumers and schedulers. The
-    // container shares this instance with the MessageBus every consumer uses.
+    // Kernel shutdown runs hooks in reverse, after consumers and schedulers:
+    // registered last, the in-memory bus timers stop first, then the networks
+    // (OrbitDB stores, Helia) stop, then the local database closes.
+    this.kernel.registerShutdownHook(() => EmbeddedLocalDatabase.closeAll());
+    this.kernel.registerShutdownHook(() =>
+      this.kernel.di
+        .getService<IPFSNetworkRegistry>(IPFSNetworkRegistry)
+        .stopAll(),
+    );
+    // The container shares this instance with the MessageBus every consumer uses.
     const memoryMessageBusAdapter =
       this.kernel.di.getService<MemoryMessageBusAdapter>(
         MemoryMessageBusAdapter,

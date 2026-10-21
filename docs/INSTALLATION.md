@@ -31,7 +31,11 @@ SERVICE_NAME=pigeon-swarm
 
 ## Startup Failures
 
-If initialization fails (for example an invalid environment value, an `API_PORT` already in use by another process, which logs `API server could not listen on port <port>`, an unwritable `IPFS_STORAGE_PATH`, or a startup initializer that does not finish within `NODE_INITIALIZER_TIMEOUT_MS`, which logs `Initializer <name> did not finish within <ms> ms`), the node logs `Application error`, stops the services it already started on a best-effort basis (at most 10 seconds), and exits with status `1`. Container restart policies such as Docker `on-failure` act on that status. Fix the reported error before starting the node again.
+If initialization fails (for example an invalid environment value, an `API_PORT` already in use by another process, which logs `API server could not listen on port <port>`, an unwritable `IPFS_STORAGE_PATH`, or a startup initializer that does not finish within `NODE_INITIALIZER_TIMEOUT_MS`, which logs `Initializer <name> did not finish within <ms> ms`), the node logs `Application error`, stops the services it already started on a best-effort basis (at most 8 seconds), and exits with status `1`. Container restart policies such as Docker `on-failure` act on that status. Fix the reported error before starting the node again.
+
+## Stopping the Node
+
+The node stops on `SIGTERM` (sent by `docker stop`) and on `SIGINT` (Ctrl-C). It closes its IPFS networks, OrbitDB stores and local database, so every write it acknowledged is on disk when it exits with status `0`. The shutdown gets 8 seconds. If it does not finish, the node logs `Shutdown on SIGTERM` (or `SIGINT`) and exits with status `1`. Docker sends `SIGKILL` 10 seconds after `SIGTERM` by default, so the node is never killed mid-close by a clean stop. The production image starts `node dist/index.js` in exec form, so the signal reaches the node process itself.
 
 ## Resetting the Node Owner
 

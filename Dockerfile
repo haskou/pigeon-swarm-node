@@ -32,14 +32,14 @@ RUN mkdir -p private_blobs local_storage ipfs_storage logs var/log var/cache \
   && chmod 0700 private_blobs
 USER node
 ENV NODE_ENV=
-CMD yarn start
+CMD ["node", "dist/index.js"]
 
 FROM base AS local
 COPY . ./
 RUN yarn --ignore-engines
 # RUN rm .npmrc
 ENV NODE_ENV=local
-CMD yarn local
+CMD ["yarn", "local"]
 
 FROM base AS tests
 RUN yarn --prefer-offline --frozen-lockfile --ignore-engines
