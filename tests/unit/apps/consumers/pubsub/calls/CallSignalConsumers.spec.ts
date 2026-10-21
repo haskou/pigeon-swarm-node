@@ -109,6 +109,15 @@ describe('Call signal consumers', () => {
         sentAt: Date.now(),
       },
     ],
+    [
+      'a send time before the signal was created',
+      { sentAt: createdAt - 60_000 },
+    ],
+    ['a send time after the signal expires', { sentAt: createdAt + 3_600_000 }],
+    [
+      'a send time beyond the clock-skew bound',
+      { sentAt: Date.now() + 15_000 },
+    ],
   ])(
     'refuses a received signal with %s without a raw error and without registering',
     async (_case, override) => {

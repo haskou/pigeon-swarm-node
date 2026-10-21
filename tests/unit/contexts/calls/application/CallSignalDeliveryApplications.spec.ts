@@ -32,6 +32,7 @@ describe('Call signal delivery applications', () => {
   const signalId = '68da3440-c60e-4fe3-b86a-2b8931ea345f';
   const callId = '550e8400-e29b-41d4-a716-446655440000';
   const ownerNodeId = '9278e9db-bc4d-4a8f-9577-7cad4386512f';
+  const receivingNodeId = '3c9d2f4e-7a1b-4c8d-9e0f-1a2b3c4d5e6f';
   const networkId = 'f8955c6e-39b1-42cc-8182-42ef86982b4e';
   const senderIdentityId =
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
@@ -106,19 +107,32 @@ describe('Call signal delivery applications', () => {
 
   function registerMessage(
     attempt: number = 1,
+    sentAt: number = createdAt,
   ): CallSignalDeliveryRegisterMessage {
     return new CallSignalDeliveryRegisterMessage({
       ...signalFor(),
       attempt,
       ownerNodeId,
       participantIds: [senderIdentityId, recipientIdentityId],
-      sentAt: createdAt,
+      sentAt,
     });
+  }
+
+  /** A registrar on a node that is not the delivery owner unless stated. */
+  function registrarFor(
+    repository: InMemoryCallSignalDeliveryRepository,
+    localNodeId: string = receivingNodeId,
+  ): CallSignalDeliveryRegistrar {
+    const nodeRepository = mock<NodeRepository>();
+
+    nodeRepository.loadLocalNodeId.mockResolvedValue(new NodeId(localNodeId));
+
+    return new CallSignalDeliveryRegistrar(repository, nodeRepository);
   }
 
   it('registers a received signal for acknowledgement', async () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
-    const registrar = new CallSignalDeliveryRegistrar(repository);
+    const registrar = registrarFor(repository);
 
     await registrar.register(registerMessage());
 
@@ -127,10 +141,43 @@ describe('Call signal delivery applications', () => {
     ).resolves.toBeDefined();
   });
 
+  it('never lets a received delivery replace one this node owns', async () => {
+    const repository = new InMemoryCallSignalDeliveryRepository();
+
+    await repository.save(registerMessage().toDelivery());
+    await registrarFor(repository, ownerNodeId).register(
+      registerMessage(4, createdAt + 1_000),
+    );
+
+    const stored = await repository.requireById(new CallSignalId(signalId));
+    expect(stored.toPrimitives().attempt).toBe(1);
+  });
+
+  it('does not register a received delivery that names this node as owner', async () => {
+    const repository = new InMemoryCallSignalDeliveryRepository();
+
+    await registrarFor(repository, ownerNodeId).register(registerMessage());
+
+    await expect(repository.hasById(new CallSignalId(signalId))).resolves.toBe(
+      false,
+    );
+  });
+
+  it('lets a later attempt from the owner replace a received delivery', async () => {
+    const repository = new InMemoryCallSignalDeliveryRepository();
+    const registrar = registrarFor(repository);
+
+    await registrar.register(registerMessage());
+    await registrar.register(registerMessage(2, createdAt + 1_000));
+
+    const stored = await repository.requireById(new CallSignalId(signalId));
+    expect(stored.toPrimitives().attempt).toBe(2);
+  });
+
   it('acknowledges a signal and publishes the acknowledgement', async () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
-    const registrar = new CallSignalDeliveryRegistrar(repository);
+    const registrar = registrarFor(repository);
     const acknowledger = new CallSignalAcknowledger(repository, eventPublisher);
 
     jest.spyOn(Date, 'now').mockReturnValue(1_770_000_000_500);
@@ -147,7 +194,7 @@ describe('Call signal delivery applications', () => {
   it('republishes an acknowledgement when the recipient repeats it', async () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
-    const registrar = new CallSignalDeliveryRegistrar(repository);
+    const registrar = registrarFor(repository);
     const acknowledger = new CallSignalAcknowledger(repository, eventPublisher);
     const message = new CallSignalAcknowledgeMessage(
       signalId,
@@ -164,7 +211,7 @@ describe('Call signal delivery applications', () => {
 
   it('registers a remote acknowledgement idempotently', async () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
-    const deliveryRegistrar = new CallSignalDeliveryRegistrar(repository);
+    const deliveryRegistrar = registrarFor(repository);
     const acknowledgementRegistrar = new CallSignalAcknowledgementRegistrar(
       repository,
     );
@@ -193,10 +240,9 @@ describe('Call signal delivery applications', () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
     const eventPublisher = mock<DomainEventPublisher>();
     const nodeRepository = mock<NodeRepository>();
-    const registrar = new CallSignalDeliveryRegistrar(repository);
 
     nodeRepository.loadLocalNodeId.mockResolvedValue(new NodeId(ownerNodeId));
-    await registrar.register(registerMessage());
+    await repository.save(registerMessage().toDelivery());
 
     await new CallSignalDeliveryRetrier(
       repository,
@@ -211,7 +257,7 @@ describe('Call signal delivery applications', () => {
 
   it('purges expired deliveries', async () => {
     const repository = new InMemoryCallSignalDeliveryRepository();
-    const registrar = new CallSignalDeliveryRegistrar(repository);
+    const registrar = registrarFor(repository);
 
     await registrar.register(registerMessage());
     await new CallSignalDeliveryExpirationRegistrar(repository).expire(
