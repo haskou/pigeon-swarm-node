@@ -1,7 +1,7 @@
+import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceSealingView } from '@app/contexts/identity-devices/domain/DeviceSealingView';
 import { DeviceAuthorizationRevision } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationRevision';
-import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { mock } from 'jest-mock-extended';
 
 function credentialStub(wire: string): DeviceCredential {
@@ -31,6 +31,6 @@ describe(DeviceSealingView.name, () => {
 
     expect(
       view.getDevices().map((device) => device.credential.toWire()),
-    ).toEqual(['BBBB', 'a_AA', 'aAAA']);
+    ).toEqual(['BBBB', 'aAAA', 'a_AA']);
   });
 });
