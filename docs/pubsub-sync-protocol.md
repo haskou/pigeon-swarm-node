@@ -1173,14 +1173,15 @@ are tracked as a follow-up issue.
 
 On a cold reconciliation a node replays the heads log newest first, so a
 sealing record can reach its merger before the authorization head it is judged
-against. The merger then answers not ready instead of refusing: the registry
-defers the key, logs no rejection, and offers every deferred head to its merger
-again once a reconciliation finishes (one log pass per hosted network; past
-4096 deferred keys, every mergeable head). Until then the sealing view of that
-identity answers `503020`, and the head cache is not marked warm, so a restart
-reconciles again instead of restoring a cache without the record. A settled
-read of a head that is absent while any network is still reconciling also
-answers not ready, never absent.
+against. The same happens live while that authorization head is held. The
+merger then answers not ready instead of refusing: the registry defers the
+key, logs no rejection, and offers every deferred head to its merger again
+once a reconciliation finishes or a held key stops waiting (one log pass per
+hosted network; past 4096 deferred keys, every mergeable head). Until then the
+sealing view of that identity answers `503020`, and the head cache is not
+marked warm, so a restart reconciles again instead of restoring a cache
+without the record. A settled read of a head that is absent while any network
+is still reconciling also answers not ready, never absent.
 
 ## Live call projection boundary
 
