@@ -256,7 +256,9 @@ components:
     Error:
       description: >-
         Any refused request. The body is a JSON error object; `code` is a stable
-        numeric code or the error class name, see "Errors" in docs/api.md.
+        numeric code or the error class name, see "Errors" in docs/api.md. An
+        unanticipated failure answers 500 with code `InternalServerError` and the
+        fixed message `Internal server error.`.
       content:
         application/json:
           schema:
