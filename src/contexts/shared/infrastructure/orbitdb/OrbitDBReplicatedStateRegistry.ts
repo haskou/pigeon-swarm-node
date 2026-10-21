@@ -180,6 +180,13 @@ export default class OrbitDBReplicatedStateRegistry {
   private static readonly HYDRATION_BATCH_SIZE = 16;
 
   /**
+   * How many keys a merger answered not ready for are tracked one by one.
+   * Past it the next settle offers every mergeable head again, so no
+   * deferred head is lost however many a reconciliation defers.
+   */
+  private static readonly MAX_DEFERRED_HEAD_KEYS = 4_096;
+
+  /**
    * How long after a store first deferred a subscriber bootstrap its readers
    * answer "not ready" instead of "missing". Past it, a store that still cannot
    * replay answers as before, so a block nobody serves cannot hold reads off.
@@ -269,6 +276,25 @@ export default class OrbitDBReplicatedStateRegistry {
    * open over heads that may be missing from the cache.
    */
   private readonly networksAwaitingHeadReconciliation = new Set<string>();
+
+  /**
+   * Keys a merger answered not ready for while it could not judge them (a
+   * head it depends on was not reconciled yet). They are offered to it again
+   * once a reconciliation finishes; until then reads under them answer not
+   * ready, never absent.
+   */
+  private readonly deferredHeadKeys = new Set<string>();
+
+  /** More keys were deferred than are tracked: settle every mergeable head. */
+  private deferredHeadOverflow = false;
+
+  /** The keys the running settle offers again; still pending until it ends. */
+  private settlingHeadKeys: ReadonlySet<string> = new Set();
+
+  private settlingAllHeads = false;
+
+  /** Settles run one at a time, so each one sees what the previous left. */
+  private headSettlement: Promise<boolean> = Promise.resolve(true);
 
   private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
@@ -2002,11 +2028,102 @@ export default class OrbitDBReplicatedStateRegistry {
         : candidate;
     try {
       return merger(current, candidate, key);
-    } catch {
+    } catch (error) {
+      if (error instanceof ReplicatedStateNotReadyError) {
+        this.deferHead(key);
+
+        return current;
+      }
       Kernel.logger.warn?.('Rejected incompatible replicated state');
 
       return current;
     }
+  }
+
+  private deferHead(key: string): void {
+    if (this.deferredHeadOverflow) return;
+
+    if (
+      !this.deferredHeadKeys.has(key) &&
+      this.deferredHeadKeys.size >=
+        OrbitDBReplicatedStateRegistry.MAX_DEFERRED_HEAD_KEYS
+    ) {
+      this.deferredHeadOverflow = true;
+      this.deferredHeadKeys.clear();
+      Kernel.logger.warn?.(
+        'OrbitDB deferred head keys overflowed: every mergeable head settles again',
+      );
+
+      return;
+    }
+    this.deferredHeadKeys.add(key);
+  }
+
+  /**
+   * Offers every deferred head to its merger again, in one log pass per
+   * network. Resolves whether every head it offered was persisted and none
+   * is deferred anymore. A pass that fails keeps every head it offered
+   * deferred, so a failed read never drops one.
+   */
+  private settleDeferredHeads(): Promise<boolean> {
+    this.headSettlement = this.headSettlement.then(async () => {
+      if (!this.deferredHeadOverflow && this.deferredHeadKeys.size === 0) {
+        return true;
+      }
+      this.settlingHeadKeys = new Set(this.deferredHeadKeys);
+      this.settlingAllHeads = this.deferredHeadOverflow;
+      this.deferredHeadKeys.clear();
+      this.deferredHeadOverflow = false;
+      const settles = this.settlingAllHeads
+        ? (key: string): boolean => this.isMergeableHeadKey(key)
+        : (key: string): boolean => this.settlingHeadKeys.has(key);
+      let persisted = true;
+      let completed = false;
+
+      try {
+        for (const [networkId, { heads }] of this.storesByNetworkId) {
+          persisted =
+            (await this.hydrateHeadKeyHistory(networkId, heads, settles)) &&
+            persisted;
+        }
+        completed = true;
+      } catch (error) {
+        Kernel.logger.warn?.(
+          `OrbitDB deferred head settle failed: error=${errorClassName(error)}`,
+        );
+      } finally {
+        if (!completed) {
+          this.deferredHeadOverflow ||= this.settlingAllHeads;
+          this.settlingHeadKeys.forEach((key) => this.deferHead(key));
+        }
+        this.settlingHeadKeys = new Set();
+        this.settlingAllHeads = false;
+      }
+
+      return (
+        completed &&
+        persisted &&
+        !this.deferredHeadOverflow &&
+        this.deferredHeadKeys.size === 0
+      );
+    });
+
+    return this.headSettlement;
+  }
+
+  /**
+   * Whether a head under the prefix was deferred by its merger and is not
+   * settled yet: a list read under it would be partial, so it answers not
+   * ready instead.
+   */
+  public hasDeferredHeadsUnder(prefix: string): boolean {
+    return (
+      this.deferredHeadOverflow ||
+      this.settlingAllHeads ||
+      [...this.deferredHeadKeys, ...this.settlingHeadKeys].some((key) =>
+        key.startsWith(prefix),
+      )
+    );
   }
 
   private cacheHeadIn(
@@ -2275,46 +2392,43 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
-  private async hydrateMergeableHeadHistory(
+  /**
+   * Replays the log of a heads store, newest entry first, through the head cache for
+   * every key it includes. Resolves whether every replayed head was
+   * persisted.
+   */
+  private async hydrateHeadKeyHistory(
     networkId: string,
     store: OrbitDBDatabase,
-  ): Promise<void> {
-    if (!store.log?.get || this.headRecordMergers.size === 0) return;
+    includes: (key: string) => boolean,
+  ): Promise<boolean> {
+    if (!store.log?.get) return true;
+    let persisted = true;
 
     for await (const entry of new OrbitDBHeadHistoryReader(
       store.log,
     ).entries()) {
       const { key, value } = entry.payload ?? {};
 
-      if (!this.isMergeableHeadKey(key) || !this.isRecord(value)) continue;
-      await this.hydrateHeadRecord(networkId, { key, value });
-    }
-  }
-
-  private async hydrateHeadKeyHistory(
-    networkId: string,
-    store: OrbitDBDatabase,
-    key: string,
-  ): Promise<void> {
-    if (!store.log?.get) return;
-
-    for await (const entry of new OrbitDBHeadHistoryReader(
-      store.log,
-    ).entries()) {
-      const { value } = entry.payload ?? {};
-
-      if (entry.payload?.key === key && this.isRecord(value)) {
-        await this.hydrateHeadRecord(networkId, { key, value });
+      if (typeof key === 'string' && includes(key) && this.isRecord(value)) {
+        persisted =
+          (await this.hydrateHeadRecord(networkId, { key, value })) &&
+          persisted;
       }
     }
+
+    return persisted;
   }
 
   private async hydrateHeadCache(
     networkId: string,
     stores: OrbitDBPrivateNetworkStores,
-    reconciledHeadSignature?: string,
-  ): Promise<number> {
-    await this.hydrateMergeableHeadHistory(networkId, stores.heads);
+  ): Promise<{ heads: number; persistedAllHeads: boolean }> {
+    if (this.headRecordMergers.size > 0) {
+      await this.hydrateHeadKeyHistory(networkId, stores.heads, (key) =>
+        this.isMergeableHeadKey(key),
+      );
+    }
     const records = await this.allRecords(stores.heads);
     let persistedAllHeads = true;
 
@@ -2330,11 +2444,7 @@ export default class OrbitDBReplicatedStateRegistry {
       await this.yieldAfterHydrationBatch(index);
     }
 
-    if (persistedAllHeads) {
-      await this.markHeadCacheWarm(networkId, reconciledHeadSignature);
-    }
-
-    return records.length;
+    return { heads: records.length, persistedAllHeads };
   }
 
   private async currentHeadSignature(
@@ -2384,25 +2494,28 @@ export default class OrbitDBReplicatedStateRegistry {
       this.rebuildingHeadsByNetworkId.set(networkId, new Map());
     }
     let succeeded = false;
-    let reconciledHeads: number;
+    let hydrated: { heads: number; persistedAllHeads: boolean };
 
     try {
       await this.resetReplicatedHeadCache(networkId);
-      reconciledHeads = await this.hydrateHeadCache(
-        networkId,
-        stores,
-        reconciledHeadSignature,
-      );
+      hydrated = await this.hydrateHeadCache(networkId, stores);
       succeeded = true;
       this.networksAwaitingHeadReconciliation.delete(networkId);
     } finally {
       this.finishHeadCacheRebuild(networkId, succeeded);
     }
+    // Heads a merger could not judge before the rebuild are judged now; the
+    // cache is warm only once none of them is left over.
+    const settled = await this.settleDeferredHeads();
+
+    if (hydrated.persistedAllHeads && settled) {
+      await this.markHeadCacheWarm(networkId, reconciledHeadSignature);
+    }
     const elapsedMilliseconds =
       Number(process.hrtime.bigint() - startedAt) / 1_000_000;
 
     Kernel.logger.debug?.(
-      `OrbitDB replicated head cache reconciled: heads=${reconciledHeads}` +
+      `OrbitDB replicated head cache reconciled: heads=${hydrated.heads}` +
         ` durationMs=${elapsedMilliseconds.toFixed(3)}`,
     );
   }
@@ -3155,6 +3268,7 @@ export default class OrbitDBReplicatedStateRegistry {
       )
     ) {
       this.networksAwaitingHeadReconciliation.delete(networkId);
+      await this.settleDeferredHeads();
 
       if (currentHeadSignature) {
         this.reconciledStoreHeadSignatures.set(
@@ -3209,6 +3323,8 @@ export default class OrbitDBReplicatedStateRegistry {
         this.storesAwaitingReplay.delete(store);
       }
     }
+    // Heads deferred under the departed network settle against those left.
+    await this.settleDeferredHeads();
     await stores?.stop();
   }
 
@@ -3228,6 +3344,11 @@ export default class OrbitDBReplicatedStateRegistry {
     this.restoredHeadKeys.clear();
     this.verifiedHeadKeys.clear();
     this.expiredHeadKeys.clear();
+    this.deferredHeadKeys.clear();
+    this.deferredHeadOverflow = false;
+    this.settlingHeadKeys = new Set();
+    this.settlingAllHeads = false;
+    this.headSettlement = Promise.resolve(true);
     this.stopHeadRetries();
   }
 
@@ -3513,15 +3634,25 @@ export default class OrbitDBReplicatedStateRegistry {
    * Offers every persisted entry of a head key to its merger again. A merger
    * can refuse a head it cannot judge yet (the genesis of its identity is not
    * verified); once that is known the refused history is merged from the log.
+   * Resolves whether any hosted network stores the key: only then is a
+   * further read of the store worth its cost.
    */
-  public async rehydrateHead(key: string): Promise<void> {
+  public async rehydrateHead(key: string): Promise<boolean> {
     this.assertReady();
+    let stored = false;
 
     for (const [networkId, { heads }] of this.storesByNetworkId) {
       if (await heads.get?.(key)) {
-        await this.hydrateHeadKeyHistory(networkId, heads, key);
+        stored = true;
+        await this.hydrateHeadKeyHistory(
+          networkId,
+          heads,
+          (candidate) => candidate === key,
+        );
       }
     }
+
+    return stored;
   }
 
   public findCachedHeadsByPrefix(
@@ -3565,15 +3696,23 @@ export default class OrbitDBReplicatedStateRegistry {
 
   /**
    * The cached head of a key once the key is settled: no copy of it is held or
-   * dropped unverified. Unlike `findCachedHead`, a key that waits is never read
-   * as absent: the read rejects as not ready.
+   * dropped unverified, and no network is still rebuilding the cache it may
+   * be in. Unlike `findCachedHead`, a key that waits is never read as absent:
+   * the read rejects as not ready.
    */
   public findSettledCachedHead(
     key: string,
   ): Record<string, unknown> | undefined {
-    if (this.awaitsVerifiedHead(key)) throw new ReplicatedStateNotReadyError();
+    this.assertReady();
 
-    return this.cachedHead(key);
+    if (this.awaitsVerifiedHead(key)) throw new ReplicatedStateNotReadyError();
+    const head = this.cachedHead(key);
+
+    if (!head && this.networksAwaitingHeadReconciliation.size > 0) {
+      throw new ReplicatedStateNotReadyError();
+    }
+
+    return head;
   }
 
   public cacheHeadLocally(key: string, value: Record<string, unknown>): void {

@@ -122,7 +122,17 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
     return true;
   }
 
+  /**
+   * The admitted records of the identity for today and yesterday. While a
+   * record of it waits for its authorization head to be reconciled, the list
+   * would be partial, so it rejects as not ready instead.
+   */
   public findCurrent(identityId: string): DeviceSealingRecord[] {
+    const prefix = `${DEVICE_SEALING_RECORD_HEAD_PREFIX}${identityId}:`;
+
+    if (this.registry.hasDeferredHeadsUnder(prefix)) {
+      throw new ReplicatedStateNotReadyError();
+    }
     let loaded = false;
     let authorization: DeviceAuthorization | undefined;
     const authorizationOf = (): DeviceAuthorization | undefined => {
@@ -136,9 +146,7 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
     const now = new Date(Date.now());
 
     return this.registry
-      .findCachedHeadsByPrefix(
-        `${DEVICE_SEALING_RECORD_HEAD_PREFIX}${identityId}:`,
-      )
+      .findCachedHeadsByPrefix(prefix)
       .map((value) => DeviceSealingRecord.fromStored(value))
       .filter(
         (record): record is DeviceSealingRecord =>
