@@ -1181,7 +1181,13 @@ hosted network; past 4096 deferred keys, every mergeable head). Until then the
 sealing view of that identity answers `503020`, and the head cache is not
 marked warm, so a restart reconciles again instead of restoring a cache
 without the record. A settled read of a head that is absent while any network
-is still reconciling also answers not ready, never absent.
+is still reconciling also answers not ready, never absent. While a head is
+deferred, or being settled and not merged yet by that settle, a head read or
+settled read of it answers not ready instead of its older cached copy; a
+sealing record whose authorization head is deferred is therefore deferred too,
+not refused. A settle repeats its log pass, at most four times, while each pass
+merges a head no earlier pass merged, so a record replayed before its
+authorization in the same pass is merged once that authorization is.
 
 ## Live call projection boundary
 

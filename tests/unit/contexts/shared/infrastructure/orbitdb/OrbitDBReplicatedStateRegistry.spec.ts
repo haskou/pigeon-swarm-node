@@ -570,11 +570,14 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const { heads, stores } = createStores();
 
-      registry.registerHeadRecordMerger('stale-test:', (_current, candidate) => {
-        if (candidate.held) throw new ReplicatedStateNotReadyError();
+      registry.registerHeadRecordMerger(
+        'stale-test:',
+        (_current, candidate) => {
+          if (candidate.held) throw new ReplicatedStateNotReadyError();
 
-        return candidate;
-      });
+          return candidate;
+        },
+      );
       heads.all.mockResolvedValue([
         { key: 'stale-test:a', value: { version: 1 } },
       ]);

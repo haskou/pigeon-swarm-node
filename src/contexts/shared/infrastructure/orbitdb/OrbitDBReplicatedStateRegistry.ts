@@ -187,6 +187,12 @@ export default class OrbitDBReplicatedStateRegistry {
   private static readonly MAX_DEFERRED_HEAD_KEYS = 4_096;
 
   /**
+   * Passes one settle runs at most while each merges a head the earlier ones
+   * did not; a head still deferred after them waits for the next settle.
+   */
+  private static readonly MAX_DEFERRED_HEAD_SETTLE_PASSES = 4;
+
+  /**
    * How long after a store first deferred a subscriber bootstrap its readers
    * answer "not ready" instead of "missing". Past it, a store that still cannot
    * replay answers as before, so a block nobody serves cannot hold reads off.
@@ -298,6 +304,12 @@ export default class OrbitDBReplicatedStateRegistry {
 
   /** A settle is queued that no settle has started yet. */
   private deferredHeadSettleScheduled = false;
+
+  /**
+   * The settling heads a pass of the running settle merged. Their copy is
+   * current again, so a later pass, and a merger in it, reads them.
+   */
+  private readonly settledHeadKeys = new Set<string>();
 
   private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
@@ -2038,7 +2050,11 @@ export default class OrbitDBReplicatedStateRegistry {
         ? this.mergeHeadRecordCollection(current, candidate)
         : candidate;
     try {
-      return merger(current, candidate, key);
+      const merged = merger(current, candidate, key);
+
+      if (this.isSettlingHead(key)) this.settledHeadKeys.add(key);
+
+      return merged;
     } catch (error) {
       if (error instanceof ReplicatedStateNotReadyError) {
         this.deferHead(key);
@@ -2079,24 +2095,55 @@ export default class OrbitDBReplicatedStateRegistry {
   private settleDeferredHeads(): Promise<boolean> {
     this.headSettlement = this.headSettlement.then(async () => {
       this.deferredHeadSettleScheduled = false;
+      let settled = false;
 
-      if (!this.deferredHeadOverflow && this.deferredHeadKeys.size === 0) {
-        return true;
+      // A sealing record can replay before the authorization it waits on, in
+      // the same pass, and is deferred again. Repeat while a pass merges a
+      // head no earlier pass merged, a bounded number of times.
+      try {
+        for (
+          let pass = 0;
+          pass < OrbitDBReplicatedStateRegistry.MAX_DEFERRED_HEAD_SETTLE_PASSES;
+          pass += 1
+        ) {
+          const merged = this.settledHeadKeys.size;
+
+          settled = await this.settleDeferredHeadPass();
+
+          if (settled || this.settledHeadKeys.size === merged) break;
+        }
+      } finally {
+        this.settledHeadKeys.clear();
       }
-      this.settlingHeadKeys = new Set(this.deferredHeadKeys);
-      this.settlingAllHeads = this.deferredHeadOverflow;
-      this.deferredHeadKeys.clear();
-      this.deferredHeadOverflow = false;
-      const persisted = await this.offerSettlingHeads();
 
-      return (
-        persisted &&
-        !this.deferredHeadOverflow &&
-        this.deferredHeadKeys.size === 0
-      );
+      return settled;
     });
 
     return this.headSettlement;
+  }
+
+  private async settleDeferredHeadPass(): Promise<boolean> {
+    if (!this.deferredHeadOverflow && this.deferredHeadKeys.size === 0) {
+      return true;
+    }
+    this.settlingHeadKeys = new Set(this.deferredHeadKeys);
+    this.settlingAllHeads = this.deferredHeadOverflow;
+    this.deferredHeadKeys.clear();
+    this.deferredHeadOverflow = false;
+    const persisted = await this.offerSettlingHeads();
+
+    return (
+      persisted &&
+      !this.deferredHeadOverflow &&
+      this.deferredHeadKeys.size === 0
+    );
+  }
+
+  private isSettlingHead(key: string): boolean {
+    return (
+      this.settlingHeadKeys.has(key) ||
+      (this.settlingAllHeads && this.isMergeableHeadKey(key))
+    );
   }
 
   /**
@@ -2145,7 +2192,24 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
     this.deferredHeadSettleScheduled = true;
-    void this.settleDeferredHeads();
+    this.settleDeferredHeads().catch((error: unknown) => {
+      Kernel.logger.warn?.(
+        `OrbitDB deferred head settle aborted: error=${errorClassName(error)}`,
+      );
+    });
+  }
+
+  /**
+   * Whether a head is deferred by its merger, was deferred by an overflow, or
+   * is being settled and no pass of the running settle merged it yet. Its
+   * cached copy may be stale, so no read serves it until then.
+   */
+  private isDeferredHead(key: string): boolean {
+    return (
+      this.deferredHeadKeys.has(key) ||
+      (this.deferredHeadOverflow && this.isMergeableHeadKey(key)) ||
+      (this.isSettlingHead(key) && !this.settledHeadKeys.has(key))
+    );
   }
 
   private cacheHeadIn(
@@ -3370,6 +3434,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.settlingAllHeads = false;
     this.headSettlement = Promise.resolve(true);
     this.deferredHeadSettleScheduled = false;
+    this.settledHeadKeys.clear();
     this.stopHeadRetries();
   }
 
@@ -3636,7 +3701,7 @@ export default class OrbitDBReplicatedStateRegistry {
   public findHead(key: string): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
 
-    if (this.awaitsVerifiedHead(key)) {
+    if (this.awaitsVerifiedHead(key) || this.isDeferredHead(key)) {
       return Promise.reject(new ReplicatedStateNotReadyError());
     }
 
@@ -3741,7 +3806,9 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Record<string, unknown> | undefined {
     this.assertReady();
 
-    if (this.awaitsVerifiedHead(key)) throw new ReplicatedStateNotReadyError();
+    if (this.awaitsVerifiedHead(key) || this.isDeferredHead(key)) {
+      throw new ReplicatedStateNotReadyError();
+    }
     const head = this.cachedHead(key);
 
     if (!head && this.networksAwaitingHeadReconciliation.size > 0) {
