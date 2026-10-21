@@ -92,10 +92,17 @@
       ]
     },
     {
-      "allowedVersions": "<13.3.0",
-      "description": "Blocked: @cucumber/cucumber 13.3 with cucumber-tsflow fails with Reflect.getMetadata is not a function.",
+      "description": "Held back: @cucumber/cucumber 13.2.1 with cucumber-tsflow fails with Reflect.getMetadata is not a function (PRs #258, #768, #773). Lift when #778 is fixed.",
+      "enabled": false,
       "matchPackageNames": [
         "@cucumber/cucumber"
+      ]
+    },
+    {
+      "description": "Held back: @helia/bitswap 4.0.20 breaks scripts/patch-helia-bitswap-limited-connections.js with Unable to patch network.js (PRs #279, #767, #772). Lift when #777 is fixed.",
+      "enabled": false,
+      "matchPackageNames": [
+        "@helia/bitswap"
       ]
     }
   ],
