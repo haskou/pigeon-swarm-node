@@ -566,6 +566,76 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       }
     });
 
+    it('refuses a read of a head whose merge is deferred instead of its stale copy', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+
+      registry.registerHeadRecordMerger('stale-test:', (_current, candidate) => {
+        if (candidate.held) throw new ReplicatedStateNotReadyError();
+
+        return candidate;
+      });
+      heads.all.mockResolvedValue([
+        { key: 'stale-test:a', value: { version: 1 } },
+      ]);
+      await registry.register('network-1', stores);
+      heads.emitUpdate({
+        payload: { key: 'stale-test:a', value: { version: 2, held: true } },
+      });
+      await flushPromises();
+
+      expect(registry.hasDeferredHeadsUnder('stale-test:')).toBe(true);
+      await expect(registry.findHead('stale-test:a')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+      expect(() => registry.findSettledCachedHead('stale-test:a')).toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      registry.clear();
+    });
+
+    it('settles a head replayed before the head it waits on in the same settle pass', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const network = createStores();
+      const otherNetwork = createStores();
+      let authorityReady = false;
+
+      registry.registerHeadRecordMerger('auth-test:', (_current, candidate) => {
+        if (!authorityReady) throw new ReplicatedStateNotReadyError();
+
+        return candidate;
+      });
+      registry.registerHeadRecordMerger('seal-test:', (_current, candidate) => {
+        if (!registry.findSettledCachedHead('auth-test:owner'))
+          throw new ReplicatedStateNotReadyError();
+
+        return candidate;
+      });
+      await registry.register('network-1', network.stores);
+      network.heads.emitUpdate({
+        payload: { key: 'auth-test:owner', value: { owner: 'owner' } },
+      });
+      network.heads.emitUpdate({
+        payload: { key: 'seal-test:device', value: { device: 'device' } },
+      });
+      await flushPromises();
+      expect(registry.hasDeferredHeadsUnder('seal-test:')).toBe(true);
+
+      // Newest first: the sealing record replays before its authorization.
+      network.heads.log = logOf([
+        { key: 'seal-test:device', value: { device: 'device' } },
+        { key: 'auth-test:owner', value: { owner: 'owner' } },
+      ]);
+      authorityReady = true;
+      await registry.register('network-2', otherNetwork.stores);
+
+      expect(registry.hasDeferredHeadsUnder('seal-test:')).toBe(false);
+      expect(registry.findCachedHead('seal-test:device')).toEqual({
+        device: 'device',
+      });
+      registry.clear();
+    });
+
     describe('when the merger still cannot judge a head after reconciliation', () => {
       const warn = jest.fn();
       const debug = jest.fn();
