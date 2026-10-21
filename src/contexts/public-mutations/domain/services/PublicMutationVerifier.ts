@@ -50,6 +50,29 @@ export default class PublicMutationVerifier {
     }
   }
 
+  /** Structural checks: a proof that fails them can never be valid. */
+  public assertIntrinsic(
+    proof: PublicMutationProof,
+    expectation: PublicMutationExpectation,
+  ): void {
+    this.assertBoundTo(proof, expectation);
+
+    if (!this.isSignedByDevice(proof)) {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
+  /**
+   * State-dependent check. A revision the local chain has not reached is held
+   * (the authorization port rejects with a pending error); a device that was
+   * not authorized at the revision it signed is refused.
+   */
+  public async assertAuthorized(proof: PublicMutationProof): Promise<void> {
+    if (!(await this.authorization.isAuthorized(proof.getAuthor()))) {
+      throw new InvalidPublicMutationError();
+    }
+  }
+
   /**
    * Fails closed: wrong scope, wrong payload, wrong signature, a device that
    * is not authorized for the identity, or an unexpected author all throw.
@@ -58,13 +81,7 @@ export default class PublicMutationVerifier {
     proof: PublicMutationProof,
     expectation: PublicMutationExpectation,
   ): Promise<void> {
-    this.assertBoundTo(proof, expectation);
-
-    if (
-      !this.isSignedByDevice(proof) ||
-      !(await this.authorization.isAuthorized(proof.getAuthor()))
-    ) {
-      throw new InvalidPublicMutationError();
-    }
+    this.assertIntrinsic(proof, expectation);
+    await this.assertAuthorized(proof);
   }
 }

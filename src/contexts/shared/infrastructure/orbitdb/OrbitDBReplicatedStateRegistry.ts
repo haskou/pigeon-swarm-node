@@ -17,7 +17,10 @@ import { OrbitDBHeadRecordMerger } from './OrbitDBHeadRecordMerger';
 import { OrbitDBHeadRecordScope } from './OrbitDBHeadRecordScope';
 import { OrbitDBHeadRepairPublisher } from './OrbitDBHeadRepairPublisher';
 import { OrbitDBHistoryReplayObserver } from './OrbitDBHistoryReplayObserver';
-import { OrbitDBMutationGate } from './OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from './OrbitDBMutationGate';
 import { OrbitDBPendingHeadReconciliation } from './OrbitDBPendingHeadReconciliation';
 import { OrbitDBPrivateNetworkStores } from './OrbitDBPrivateNetworkStores';
 import { OrbitDBRecordReadmission } from './OrbitDBRecordReadmission';
@@ -31,6 +34,107 @@ type PersistedHeadCacheHydration = {
   heads: number;
   reconciledHeadSignature?: string;
   warm: boolean;
+};
+
+type UnverifiedCopyKey = string | symbol;
+
+type UnverifiedHeadCopy = {
+  /** Digest of the admitted part last delivered for this copy. */
+  delivered?: UnverifiedCopyKey;
+  heldAt: number;
+  onAdmitted: OrbitDBHeadReadmission['onAdmitted'];
+  /** Restored from this node's own persisted head cache. */
+  own: boolean;
+  value: Record<string, unknown>;
+};
+
+/** A head's admitted part, and how many of its gated records were kept. */
+type GatedAdmission = {
+  admitted: Record<string, unknown>;
+  kept: number;
+  verdict: OrbitDBMutationVerdict;
+};
+
+type UnverifiedHeadCopies = Map<UnverifiedCopyKey, UnverifiedHeadCopy>;
+
+/** Held heads of one network, by head key. */
+type UnverifiedHeads = Map<string, UnverifiedHeadCopies>;
+
+/** When copies of a head key last expired unverified, and how often. */
+type ExpiredHeadKey = { at: number; expiries: number };
+
+/** Oldest held copies beyond this are dropped, per head key. */
+const MAX_UNVERIFIED_COPIES_PER_HEAD = 8;
+
+/** Held head keys per network that are offered to the gate first. */
+const MAX_UNVERIFIED_HEADS_PER_NETWORK = 256;
+
+/**
+ * A held copy no longer gates reads once it has waited this long. A peer
+ * plants copies that never prove out, so a hold must end by itself. The head
+ * KEY is then remembered as expired: it is not held again for the same time,
+ * whatever the digest of the copy offered, and never again after
+ * `MAX_HOLDS_PER_HEAD_KEY` expiries while remembered. So one fresh copy per
+ * period cannot renew a hold for good.
+ */
+const MAX_HELD_COPY_AGE_MS = 15 * 60_000;
+
+const MAX_HOLDS_PER_HEAD_KEY = 3;
+
+const MAX_EXPIRED_KEYS_REMEMBERED = 1024;
+
+/** Dropped head keys remembered per network; past it a key is not remembered. */
+const MAX_DROPPED_HEAD_KEYS_PER_NETWORK = 1024;
+
+/**
+ * Verified head keys remembered per network. A peer drives the set, so the
+ * oldest keys are evicted past it, except the keys restored from this node's
+ * own cache.
+ */
+const MAX_VERIFIED_HEAD_KEYS_PER_NETWORK = 8192;
+
+/** Pending records are logged, as counts, at most this often. */
+const PENDING_RECORD_LOG_INTERVAL_MS = 60_000;
+
+/**
+ * Held head keys per network that queue behind the active ones, in arrival
+ * order. A head beyond both bounds is dropped and overflows its network.
+ */
+const MAX_QUEUED_UNVERIFIED_HEADS_PER_NETWORK = 256;
+
+/** Held heads are offered again this often once their offers retire. */
+const HEAD_RETRY_INTERVAL_MS = 60_000;
+
+const updatedAtOf = (value: Record<string, unknown>): number | undefined =>
+  typeof value.updatedAt === 'number' ? value.updatedAt : undefined;
+
+/**
+ * A head that is not accepted is delivered demoted, so the records it does
+ * admit still reach readers without outranking a valid head.
+ */
+const deliveredHead = (
+  admitted: Record<string, unknown>,
+  verdict: OrbitDBMutationVerdict,
+): Record<string, unknown> =>
+  verdict === 'accepted' ? admitted : { ...admitted, updatedAt: 0 };
+
+/**
+ * The admitted part of a head with withheld records. Nothing is delivered
+ * until a gated record is kept, so a head with none admitted stays absent.
+ */
+const withheldPart = ({
+  admitted,
+  kept,
+}: GatedAdmission): Record<string, unknown> | undefined =>
+  kept > 0 ? deliveredHead(admitted, 'pending') : undefined;
+
+/** Pending outranks refused, and refused outranks accepted. */
+const worstVerdict = (
+  verdicts: OrbitDBMutationVerdict[],
+): OrbitDBMutationVerdict => {
+  if (verdicts.includes('pending')) return 'pending';
+
+  return verdicts.includes('refused') ? 'refused' : 'accepted';
 };
 
 export default class OrbitDBReplicatedStateRegistry {
@@ -199,6 +303,61 @@ export default class OrbitDBReplicatedStateRegistry {
 
   private readonly headReadmissions = new OrbitDBRecordReadmission();
 
+  private readonly unverifiedHeads = new Map<string, UnverifiedHeads>();
+
+  /**
+   * Networks whose held heads overflowed, with the count of heads dropped.
+   * It gates no read by itself: a read waits only on a key the network
+   * dropped (see `droppedHeadKeys`). It clears once the held heads drained and
+   * the network was rescanned in full without dropping again; the rescan
+   * offers the dropped heads again.
+   */
+  private readonly overflowedHeadNetworks = new Map<string, number>();
+
+  /**
+   * The head keys each network settled: a head fully admitted with gated
+   * records kept under a key its gate accepts proves its key, and a trivial,
+   * empty, refused or ungoverned head never does. The entry only ever ungates
+   * a read: it never makes one wait. A peer drives it, so it is bounded per
+   * network (see `MAX_VERIFIED_HEAD_KEYS_PER_NETWORK`) and cleared with the
+   * network.
+   */
+  private readonly verifiedHeadKeys = new Map<string, Set<string>>();
+
+  /** Expiries of held head keys, per network and key (see `expiryKey`). */
+  private readonly expiredHeadKeys = new Map<string, ExpiredHeadKey>();
+
+  /**
+   * The head keys each overflowed network dropped that are not ours, bounded
+   * per network. A peer can drive it, so a key past the bound is not
+   * remembered: it waits for nothing and is offered again by the rescan.
+   */
+  private readonly droppedHeadKeys = new Map<string, Set<string>>();
+
+  /**
+   * The head keys each overflowed network dropped that this node restored
+   * from its own persisted head cache. Bounded by those persisted heads, so a
+   * peer cannot crowd it, and the only dropped keys a list read waits on.
+   */
+  private readonly droppedRestoredHeadKeys = new Map<string, Set<string>>();
+
+  /**
+   * The head keys each network restored from this node's own persisted head
+   * cache at start. Bounded by those persisted heads; a read of such a key
+   * waits on its own network alone, and an eviction never takes one.
+   */
+  private readonly restoredHeadKeys = new Map<string, Set<string>>();
+
+  private readonly pendingRecordCounts = new Map<string, number>();
+
+  private lastPendingRecordLogAt = 0;
+
+  private loggedNodeStarting = false;
+
+  private readonly rescanningHeadNetworks = new Set<string>();
+
+  private headRetryTimer?: NodeJS.Timeout;
+
   private headCache?: OrbitDBReplicatedHeadCache;
 
   private mutationGate?: OrbitDBMutationGate;
@@ -274,9 +433,39 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   private assertReady(): void {
-    if (this.storesByNetworkId.size === 0) {
-      throw new ReplicatedStateNotReadyError();
+    if (this.storesByNetworkId.size > 0) {
+      this.loggedNodeStarting = false;
+
+      return;
     }
+
+    // Once per start, so a node that is opening is told apart from a hold a
+    // peer induced (see `recordHeadDrop`) without a line per read.
+    if (!this.loggedNodeStarting) {
+      this.loggedNodeStarting = true;
+      Kernel.logger.debug?.(
+        'Node starting: replicated state is not ready, reads answer not ready',
+      );
+    }
+
+    throw new ReplicatedStateNotReadyError();
+  }
+
+  private isStoreOverflowed(
+    storeName: OrbitDBReplicatedDocumentStoreName,
+    id: string,
+  ): boolean {
+    const subject = `${storeName}:${id}`;
+
+    for (const stores of this.storesByNetworkId.values()) {
+      const store = this.getStore(stores, storeName);
+
+      if (store && this.readmissions.isOverflowedFor(store, subject)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private getStore(
@@ -311,23 +500,44 @@ export default class OrbitDBReplicatedStateRegistry {
     );
   }
 
+  /** A throw is treated as pending: a record is refused only by a verdict. */
   private async admitRecord(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
+  ): Promise<OrbitDBMutationVerdict> {
     const gate = this.mutationGate;
 
-    if (!gate?.governs(collection)) return true;
+    if (!gate?.governs(collection)) return 'accepted';
 
     try {
-      return await gate.accepts(collection, record);
+      return await gate.verdictOf(collection, record);
     } catch {
-      Kernel.logger.warn?.(
-        `Rejected unauthenticated replicated record: collection=${collection}`,
-      );
+      this.notePendingRecord(collection);
 
-      return false;
+      return 'pending';
     }
+  }
+
+  /** Counts a pending record; the counts are logged once per interval. */
+  private notePendingRecord(collection: string): void {
+    this.pendingRecordCounts.set(
+      collection,
+      (this.pendingRecordCounts.get(collection) ?? 0) + 1,
+    );
+
+    const now = Date.now();
+
+    if (now - this.lastPendingRecordLogAt < PENDING_RECORD_LOG_INTERVAL_MS) {
+      return;
+    }
+
+    this.lastPendingRecordLogAt = now;
+    const counts = [...this.pendingRecordCounts]
+      .map(([name, count]) => `${name}=${count}`)
+      .join(' ');
+
+    this.pendingRecordCounts.clear();
+    Kernel.logger.warn?.(`Replicated records not yet verified: ${counts}`);
   }
 
   /**
@@ -352,59 +562,94 @@ export default class OrbitDBReplicatedStateRegistry {
     storeName: OrbitDBReplicatedDocumentStoreName,
     cleanDocument: Record<string, unknown>,
   ): Promise<void> {
-    if (!(await this.admitRecord(storeName, cleanDocument))) {
+    const verdict = await this.admitRecord(storeName, cleanDocument);
+
+    if (verdict !== 'accepted') {
       throw new InvalidPublicMutationError();
     }
   }
 
   /**
    * A record can depend on another record of the same batch (an operation
-   * lists its parents), so rejected records are offered again while the
-   * batch keeps admitting new ones. The order of the batch never matters.
+   * lists its parents), so records not yet admitted are offered again while
+   * the batch keeps admitting new ones. The order of the batch never matters.
    */
   private async admittedRecords(
     collection: string,
     records: Record<string, unknown>[],
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<{
+    admitted: Record<string, unknown>[];
+    unproven: OrbitDBMutationVerdict[];
+  }> {
     const admitted: Record<string, unknown>[] = [];
     let pending = records;
+    let unproven: OrbitDBMutationVerdict[] = [];
 
     while (pending.length > 0) {
-      const rejected: Record<string, unknown>[] = [];
+      const unadmitted: Record<string, unknown>[] = [];
+      const verdicts: OrbitDBMutationVerdict[] = [];
 
       for (const record of pending) {
-        if (await this.admitRecord(collection, record)) admitted.push(record);
-        else rejected.push(record);
+        const verdict = await this.admitRecord(collection, record);
+
+        if (verdict === 'accepted') {
+          admitted.push(record);
+        } else {
+          unadmitted.push(record);
+          verdicts.push(verdict);
+        }
       }
 
-      if (rejected.length === pending.length) break;
-      pending = rejected;
+      unproven = verdicts;
+
+      if (unadmitted.length === pending.length) break;
+
+      pending = unadmitted;
     }
 
-    return admitted;
+    return { admitted, unproven };
   }
 
   /**
-   * Drops records of gated collections that carry no valid proof. Index heads
-   * are unsigned wrappers, so a head that lost records, or that claims an
-   * empty gated collection, is demoted to the oldest possible timestamp: it
-   * can never replace a head built from admitted records. Rejection can be
-   * transient (the community that grants the permission may replicate after
-   * the head), so a demoted head is offered again while its network stays
-   * registered.
+   * Admits the gated records of a head. A pending record is withheld: the head
+   * is held under its key until that record can be verified, and only its
+   * admitted records are delivered, demoted, in the meantime. A head whose
+   * gated records can never prove out is delivered demoted. A pending head
+   * with no `readmission` has no key to be held under, so it is dropped, and
+   * so is a head that cannot be held.
    */
   private async admitHead(
     value: Record<string, unknown>,
     readmission?: OrbitDBHeadReadmission,
-  ): Promise<Record<string, unknown>> {
+  ): Promise<Record<string, unknown> | undefined> {
     if (!this.mutationGate) return value;
-    const { admitted, degraded } = await this.admitGatedCollections(value);
 
-    if (degraded && readmission) {
-      this.scheduleReadmission(value, admitted, readmission);
+    const admission = await this.admitGatedCollections(value);
+
+    if (admission.verdict === 'pending') {
+      const part = withheldPart(admission);
+
+      if (!readmission) return undefined;
+
+      if (!this.holdUnverifiedHead(value, readmission, part)) return undefined;
+
+      return part;
     }
 
-    return degraded ? { ...admitted, updatedAt: 0 } : admitted;
+    const delivered = deliveredHead(admission.admitted, admission.verdict);
+
+    if (
+      readmission &&
+      (await this.acceptsDeliveredHead(
+        admission,
+        readmission.headKey,
+        delivered,
+      ))
+    ) {
+      this.settleHead(readmission, delivered, admission.kept > 0);
+    }
+
+    return delivered;
   }
 
   /**
@@ -430,6 +675,9 @@ export default class OrbitDBReplicatedStateRegistry {
       try {
         if (await gate.acceptsHead(key, value)) admitted.push(key);
       } catch {
+        // A gate that cannot decide (for example the identity or keychain gate
+        // when IPFS fails) drops the head key: it is neither held nor retried.
+        // The head is offered again when a peer sends it again.
         Kernel.logger.warn?.('Rejected unauthenticated replicated head');
       }
     }
@@ -457,90 +705,626 @@ export default class OrbitDBReplicatedStateRegistry {
     }
   }
 
+  /**
+   * A head's verdict is its worst gated record. A non-record item in a gated
+   * list is refused: it can never prove out. An empty gated list has nothing
+   * unproven, so it is accepted. `kept` counts the gated records admitted.
+   */
   private async admitGatedCollections(
     value: Record<string, unknown>,
-  ): Promise<{ admitted: Record<string, unknown>; degraded: boolean }> {
+  ): Promise<GatedAdmission> {
     const admitted = { ...value };
-    let degraded = false;
+    const verdicts: OrbitDBMutationVerdict[] = [];
+    let kept = 0;
 
     for (const [collection, records] of Object.entries(value)) {
       if (!this.isGatedHeadCollection(collection, records)) continue;
 
-      const kept = await this.admittedRecords(
-        collection,
-        records.filter((record) => this.isRecord(record)),
-      );
+      const stored = records.filter((record) => this.isRecord(record));
+      const proven = await this.admittedRecords(collection, stored);
 
-      degraded ||= kept.length === 0 || kept.length !== records.length;
-      admitted[collection] = kept;
+      if (stored.length !== records.length) verdicts.push('refused');
+
+      verdicts.push(...proven.unproven);
+      kept += proven.admitted.length;
+      admitted[collection] = proven.admitted;
     }
 
-    return { admitted, degraded };
+    return { admitted, kept, verdict: worstVerdict(verdicts) };
   }
 
   /**
-   * Each offer that admits more records than the last one delivers the
-   * still demoted head, so the records already proven show up before the
-   * rest; an offer that admits nothing new delivers nothing. A head is keyed
-   * by its value too: a copy received again waits once, and a different
-   * value under the same key (from any peer) never takes the place of the
-   * pending one. A head that is not plain JSON has no digest, so it stays
-   * demoted and is never offered again.
+   * Holds a head whose gated records are pending under its head key and a
+   * digest of its value, so a copy received again waits once. A head key
+   * keeps its first copies up to a bound, and a key that expired unverified
+   * is not held again for a while (see `MAX_HELD_COPY_AGE_MS`). A copy is
+   * offered on every wake and every retry interval until the gate admits it
+   * or its hold expires. A head that is not plain JSON has no digest, so it
+   * is held under a fresh key. `delivered` is the admitted part already
+   * delivered for the copy. Returns whether the head is held.
    */
-  private scheduleReadmission(
+  private holdUnverifiedHead(
     value: Record<string, unknown>,
-    admitted: Record<string, unknown>,
-    { key, networkId, onReadmitted }: OrbitDBHeadReadmission,
-  ): void {
-    let digest: string;
+    { headKey, networkId, onAdmitted, own }: OrbitDBHeadReadmission,
+    delivered?: Record<string, unknown>,
+  ): boolean {
+    const heads: UnverifiedHeads =
+      this.unverifiedHeads.get(networkId) ?? new Map();
+    const copies: UnverifiedHeadCopies = heads.get(headKey) ?? new Map();
+    const copyKey = this.unverifiedCopyKey(value);
 
-    try {
-      digest = StateDigest.of(value);
-    } catch {
+    if (copies.has(copyKey)) return true;
+
+    if (this.isCoolingDown(networkId, headKey)) return false;
+
+    if (!this.canHoldHead(networkId, heads, headKey)) return false;
+
+    // A full key keeps the copies it has: a flood of junk copies cannot evict
+    // the copy that was held first. The refused copy overflows the network,
+    // so it is offered again once the held copies expire or prove out.
+    if (copies.size >= MAX_UNVERIFIED_COPIES_PER_HEAD) {
+      this.recordHeadDrop(networkId, headKey);
+
+      return false;
+    }
+
+    const deliveredKey = delivered && this.unverifiedCopyKey(delivered);
+    const copy: UnverifiedHeadCopy = {
+      delivered: deliveredKey,
+      heldAt: Date.now(),
+      onAdmitted,
+      own: own === true,
+      value,
+    };
+
+    copies.set(copyKey, copy);
+
+    heads.set(headKey, copies);
+    this.unverifiedHeads.set(networkId, heads);
+    this.startHeadRetries();
+    this.scheduleUnverifiedCopy(networkId, headKey, copyKey, copy);
+
+    return true;
+  }
+
+  /**
+   * A held head key keeps its copies; a new key needs a free active or queued
+   * slot. Past both, the head is dropped and its network overflows.
+   */
+  private canHoldHead(
+    networkId: string,
+    heads: UnverifiedHeads,
+    headKey: string,
+  ): boolean {
+    if (
+      heads.has(headKey) ||
+      heads.size <
+        MAX_UNVERIFIED_HEADS_PER_NETWORK +
+          MAX_QUEUED_UNVERIFIED_HEADS_PER_NETWORK
+    ) {
+      return true;
+    }
+
+    this.recordHeadDrop(networkId, headKey);
+
+    return false;
+  }
+
+  /**
+   * Counts a head that could not be held and remembers its key where a read
+   * about it waits: a key this node restored always (bounded by its persisted
+   * heads), any other up to a bound per network. Past the bound the key is
+   * not remembered, so a flood of planted keys gates nothing; the rescan
+   * offers the dropped heads again.
+   */
+  private recordHeadDrop(networkId: string, headKey: string): void {
+    const dropped = (this.overflowedHeadNetworks.get(networkId) ?? 0) + 1;
+
+    if (dropped === 1) {
+      Kernel.logger.warn?.(
+        'Peer-induced hold: held head bound reached, dropped heads are offered again once there is room',
+      );
+    }
+    this.overflowedHeadNetworks.set(networkId, dropped);
+
+    const own = this.isRestoredHead(networkId, headKey);
+    const droppedByNetwork = own
+      ? this.droppedRestoredHeadKeys
+      : this.droppedHeadKeys;
+    const keys = droppedByNetwork.get(networkId) ?? new Set<string>();
+
+    if (own || keys.size < MAX_DROPPED_HEAD_KEYS_PER_NETWORK) {
+      keys.add(headKey);
+      droppedByNetwork.set(networkId, keys);
+    }
+    this.startHeadRetries();
+  }
+
+  private clearHeadOverflow(networkId: string): void {
+    this.overflowedHeadNetworks.delete(networkId);
+    this.droppedHeadKeys.delete(networkId);
+    this.droppedRestoredHeadKeys.delete(networkId);
+  }
+
+  /** Key of a head key's expiry record: the same key in two networks differs. */
+  private expiryKey(networkId: string, headKey: string): string {
+    return `${networkId}\n${headKey}`;
+  }
+
+  /** Whether the head key expired unverified lately, or too often. */
+  private isCoolingDown(networkId: string, headKey: string): boolean {
+    const expired = this.expiredHeadKeys.get(
+      this.expiryKey(networkId, headKey),
+    );
+
+    if (!expired) return false;
+
+    return (
+      expired.expiries >= MAX_HOLDS_PER_HEAD_KEY ||
+      Date.now() - expired.at < MAX_HELD_COPY_AGE_MS
+    );
+  }
+
+  /** Whether the held heads of a network leave room for a new key and copy. */
+  private hasHeadRoom(networkId: string): boolean {
+    const heads = this.unverifiedHeads.get(networkId);
+
+    if (!heads) return true;
+
+    if (heads.size >= MAX_UNVERIFIED_HEADS_PER_NETWORK) return false;
+
+    for (const copies of heads.values()) {
+      if (copies.size >= MAX_UNVERIFIED_COPIES_PER_HEAD) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Ends the hold of copies that waited too long. They stop gating reads and
+   * are not held again, so a peer cannot keep a key unavailable.
+   */
+  private expireHeldCopies(): void {
+    const oldest = Date.now() - MAX_HELD_COPY_AGE_MS;
+    let expired = 0;
+
+    for (const [networkId, heads] of this.unverifiedHeads) {
+      for (const [headKey, copies] of heads) {
+        expired += this.expireCopiesOf(networkId, headKey, copies, oldest);
+        this.pruneUnverifiedHead(networkId, headKey);
+      }
+    }
+
+    if (expired > 0) {
+      Kernel.logger.warn?.(
+        `Peer-induced hold: expired held head copies: count=${expired}`,
+      );
+    }
+  }
+
+  private expireCopiesOf(
+    networkId: string,
+    headKey: string,
+    copies: UnverifiedHeadCopies,
+    oldest: number,
+  ): number {
+    let expired = 0;
+
+    for (const [copyKey, copy] of copies) {
+      if (copy.heldAt > oldest) continue;
+
+      copies.delete(copyKey);
+      expired += 1;
+    }
+
+    if (expired > 0) this.rememberExpiredKey(networkId, headKey);
+
+    return expired;
+  }
+
+  private rememberExpiredKey(networkId: string, headKey: string): void {
+    const key = this.expiryKey(networkId, headKey);
+    const previous = this.expiredHeadKeys.get(key);
+
+    this.expiredHeadKeys.delete(key);
+    this.expiredHeadKeys.set(key, {
+      at: Date.now(),
+      expiries: (previous?.expiries ?? 0) + 1,
+    });
+
+    for (const oldest of this.expiredHeadKeys.keys()) {
+      if (this.expiredHeadKeys.size <= MAX_EXPIRED_KEYS_REMEMBERED) break;
+
+      this.expiredHeadKeys.delete(oldest);
+    }
+  }
+
+  private isHeadScopeOverflowed(): boolean {
+    return this.overflowedHeadNetworks.size > 0;
+  }
+
+  /** Rescans each overflowed network whose held heads have drained. */
+  private settleHeadOverflows(): void {
+    for (const [networkId, dropped] of this.overflowedHeadNetworks) {
+      if (
+        !this.hasHeadRoom(networkId) ||
+        this.rescanningHeadNetworks.has(networkId)
+      ) {
+        continue;
+      }
+
+      void this.rescanOverflowedHeads(networkId, dropped);
+    }
+  }
+
+  private async rescanOverflowedHeads(
+    networkId: string,
+    dropped: number,
+  ): Promise<void> {
+    const stores = this.storesByNetworkId.get(networkId);
+
+    if (!stores) {
+      this.clearHeadOverflow(networkId);
+
       return;
     }
-    let admittedRecords = this.gatedRecordCount(admitted);
 
+    this.rescanningHeadNetworks.add(networkId);
+
+    try {
+      await this.reconcileHeadCache(networkId, stores, undefined);
+
+      if (this.overflowedHeadNetworks.get(networkId) === dropped) {
+        this.clearHeadOverflow(networkId);
+        Kernel.logger.warn?.(
+          `Held head queue drained and rescanned: dropped=${dropped}`,
+        );
+      }
+    } catch (error) {
+      Kernel.logger.warn?.(
+        `Held head rescan failed: error=${errorClassName(error)}`,
+      );
+    } finally {
+      this.rescanningHeadNetworks.delete(networkId);
+    }
+  }
+
+  private scheduleUnverifiedCopy(
+    networkId: string,
+    headKey: string,
+    copyKey: UnverifiedCopyKey,
+    copy: UnverifiedHeadCopy,
+  ): void {
     this.headReadmissions.schedule({
       isCurrent: () => this.storesByNetworkId.has(networkId),
-      key: key === undefined ? undefined : `${key}:${digest}`,
-      offer: async (): Promise<boolean> => {
-        const offered = await this.admitGatedCollections(value);
-
-        if (!offered.degraded) {
-          await onReadmitted(offered.admitted);
-
-          return true;
-        }
-        const offeredRecords = this.gatedRecordCount(offered.admitted);
-
-        if (offeredRecords > admittedRecords) {
-          admittedRecords = offeredRecords;
-          await onReadmitted({ ...offered.admitted, updatedAt: 0 });
-        }
-
-        return false;
-      },
+      key: typeof copyKey === 'string' ? `${headKey}:${copyKey}` : undefined,
+      offer: () => this.offerUnverifiedCopy(networkId, headKey, copyKey, copy),
       scope: networkId,
+      subject: headKey,
     });
   }
 
-  private gatedRecordCount(value: Record<string, unknown>): number {
-    let count = 0;
-
-    for (const [collection, records] of Object.entries(value)) {
-      if (this.isGatedHeadCollection(collection, records))
-        count += records.length;
+  private async offerUnverifiedCopy(
+    networkId: string,
+    headKey: string,
+    copyKey: UnverifiedCopyKey,
+    copy: UnverifiedHeadCopy,
+  ): Promise<boolean> {
+    // Superseded, evicted, or unregistered since it was scheduled.
+    if (this.unverifiedCopiesOf(networkId, headKey)?.get(copyKey) !== copy) {
+      return true;
     }
 
-    return count;
+    const admission = await this.admitGatedCollections(copy.value);
+
+    if (admission.verdict === 'pending') {
+      // The admitted part is delivered whenever it changes, so a record that
+      // proves out is not held back by a sibling that is still pending.
+      const part = withheldPart(admission);
+      const partKey = part && this.unverifiedCopyKey(part);
+
+      if (part && partKey !== copy.delivered) {
+        copy.delivered = partKey;
+        await copy.onAdmitted(part);
+      }
+
+      return false;
+    }
+
+    await this.finishOffer(networkId, headKey, copyKey, copy, admission);
+
+    return true;
+  }
+
+  /** Delivers a fully decided copy and settles its key when it is accepted. */
+  private async finishOffer(
+    networkId: string,
+    headKey: string,
+    copyKey: UnverifiedCopyKey,
+    copy: UnverifiedHeadCopy,
+    admission: GatedAdmission,
+  ): Promise<void> {
+    const delivered = deliveredHead(admission.admitted, admission.verdict);
+    const accepted = await this.acceptsDeliveredHead(
+      admission,
+      headKey,
+      delivered,
+    );
+
+    await copy.onAdmitted(delivered);
+    this.unverifiedCopiesOf(networkId, headKey)?.delete(copyKey);
+
+    if (accepted) {
+      this.settleHead(
+        { headKey, networkId, own: copy.own },
+        delivered,
+        admission.kept > 0,
+      );
+    } else {
+      this.pruneUnverifiedHead(networkId, headKey);
+    }
   }
 
   /**
-   * Admitted state can be what a rejected record or a demoted head rests on.
+   * Drops the held copies of a head that an admitted `value` supersedes: the
+   * copies not newer than it. A newer copy stays held, so the head keeps
+   * waiting for the state it rests on.
+   */
+  private supersedeUnverifiedCopies(
+    networkId: string,
+    headKey: string,
+    value: Record<string, unknown>,
+  ): void {
+    const copies = this.unverifiedCopiesOf(networkId, headKey);
+    const updatedAt = updatedAtOf(value);
+
+    if (!copies) return;
+
+    if (updatedAt !== undefined) {
+      for (const [copyKey, copy] of copies) {
+        const copyUpdatedAt = updatedAtOf(copy.value);
+
+        if (copyUpdatedAt !== undefined && copyUpdatedAt <= updatedAt) {
+          copies.delete(copyKey);
+        }
+      }
+    }
+
+    this.pruneUnverifiedHead(networkId, headKey);
+  }
+
+  private unverifiedCopiesOf(
+    networkId: string,
+    headKey: string,
+  ): UnverifiedHeadCopies | undefined {
+    return this.unverifiedHeads.get(networkId)?.get(headKey);
+  }
+
+  private pruneUnverifiedHead(networkId: string, headKey: string): void {
+    const heads = this.unverifiedHeads.get(networkId);
+
+    if (!heads) return;
+
+    if (heads.get(headKey)?.size === 0) heads.delete(headKey);
+
+    if (heads.size === 0) {
+      this.unverifiedHeads.delete(networkId);
+      this.settleHeadOverflows();
+    }
+  }
+
+  /**
+   * Whether a head is accepted in full under a key its gate accepts. A
+   * refused head, or one under a key its gate rejects, is not.
+   */
+  private async acceptsDeliveredHead(
+    admission: GatedAdmission,
+    headKey: string,
+    delivered: Record<string, unknown>,
+  ): Promise<boolean> {
+    if (admission.verdict !== 'accepted') return false;
+
+    return (await this.admittedHeadKeys([headKey], delivered)).length > 0;
+  }
+
+  /**
+   * Settles a head key in a network with an accepted head: the copies it
+   * supersedes are dropped, and a head that also kept gated records (it
+   * `proves` the key) verifies it. A trivial or empty head verifies nothing.
+   * A key whose restored own copy still waits is settled by that copy alone
+   * (or by its expiry): a head a peer offers, in any network, neither
+   * verifies it nor supersedes the copy.
+   */
+  private settleHead(
+    {
+      headKey,
+      networkId,
+      own,
+    }: Pick<OrbitDBHeadReadmission, 'headKey' | 'networkId' | 'own'>,
+    delivered: Record<string, unknown>,
+    proves: boolean,
+  ): void {
+    if (!own && this.hasPendingOwnCopy(networkId, headKey)) {
+      this.pruneUnverifiedHead(networkId, headKey);
+
+      return;
+    }
+
+    if (proves) this.markVerifiedHead(networkId, headKey);
+
+    this.supersedeUnverifiedCopies(networkId, headKey, delivered);
+  }
+
+  /** Whether a restored own copy of the key still waits in the network. */
+  private hasPendingOwnCopy(networkId: string, headKey: string): boolean {
+    if (this.isVerifiedHead(networkId, headKey)) return false;
+
+    if (this.droppedRestoredHeadKeys.get(networkId)?.has(headKey)) return true;
+
+    const copies = this.unverifiedCopiesOf(networkId, headKey);
+
+    return (
+      copies !== undefined && [...copies.values()].some((copy) => copy.own)
+    );
+  }
+
+  private isVerifiedHead(networkId: string, headKey: string): boolean {
+    return this.verifiedHeadKeys.get(networkId)?.has(headKey) ?? false;
+  }
+
+  private isVerifiedAnywhere(headKey: string): boolean {
+    for (const keys of this.verifiedHeadKeys.values()) {
+      if (keys.has(headKey)) return true;
+    }
+
+    return false;
+  }
+
+  private isRestoredHead(networkId: string, headKey: string): boolean {
+    return this.restoredHeadKeys.get(networkId)?.has(headKey) ?? false;
+  }
+
+  private markRestoredHead(networkId: string, headKey: string): void {
+    const keys = this.restoredHeadKeys.get(networkId) ?? new Set<string>();
+
+    keys.add(headKey);
+    this.restoredHeadKeys.set(networkId, keys);
+  }
+
+  /**
+   * Remembers that a network settled a head key. Past the bound the oldest
+   * keys go first, never a key restored from this node's own cache.
+   */
+  private markVerifiedHead(networkId: string, headKey: string): void {
+    const keys = this.verifiedHeadKeys.get(networkId) ?? new Set<string>();
+
+    keys.delete(headKey);
+    keys.add(headKey);
+    this.verifiedHeadKeys.set(networkId, keys);
+
+    for (const oldest of keys) {
+      if (keys.size <= MAX_VERIFIED_HEAD_KEYS_PER_NETWORK) break;
+
+      if (!this.isRestoredHead(networkId, oldest)) keys.delete(oldest);
+    }
+  }
+
+  /**
+   * Whether a read of the key must wait. Per network, a key waits while a
+   * copy of it is held, or a head of it was dropped, and the network has not
+   * settled it. A key restored from this node's own cache waits on its own
+   * network alone: nothing a peer offers in another network ends the wait.
+   * Any other key waits only while no network has settled it, so a copy a
+   * peer plants under a key this node settled cannot make it unavailable. A
+   * network that overflowed delays only the keys it dropped and remembers.
+   */
+  private awaitsVerifiedHead(headKey: string): boolean {
+    let unsettled = false;
+
+    for (const networkId of this.unsettledNetworks(headKey)) {
+      if (this.isRestoredHead(networkId, headKey)) return true;
+
+      unsettled = true;
+    }
+
+    return unsettled && !this.isVerifiedAnywhere(headKey);
+  }
+
+  /** The networks that hold a copy of the key, or dropped one, unsettled. */
+  private *unsettledNetworks(headKey: string): Generator<string> {
+    const networkIds = [
+      ...this.unverifiedHeads.keys(),
+      ...this.droppedHeadKeys.keys(),
+      ...this.droppedRestoredHeadKeys.keys(),
+    ];
+
+    for (const networkId of networkIds) {
+      if (this.isUnsettledHere(networkId, headKey)) yield networkId;
+    }
+  }
+
+  /** Whether the network holds or dropped a copy of the key, unverified. */
+  private isUnsettledHere(networkId: string, headKey: string): boolean {
+    return (
+      !this.isVerifiedHead(networkId, headKey) &&
+      (this.unverifiedHeads.get(networkId)?.has(headKey) === true ||
+        this.droppedHeadKeys.get(networkId)?.has(headKey) === true ||
+        this.droppedRestoredHeadKeys.get(networkId)?.has(headKey) === true)
+    );
+  }
+
+  private unverifiedCopyKey(value: Record<string, unknown>): UnverifiedCopyKey {
+    try {
+      return StateDigest.of(value);
+    } catch {
+      return Symbol('unverified head');
+    }
+  }
+
+  /**
+   * Offers the held copies of every head with no offer pending, on wake and
+   * on each retry interval, until a copy is admitted or its hold expires.
+   */
+  private retryUnverifiedHeads(): void {
+    this.expireHeldCopies();
+    this.settleHeadOverflows();
+
+    if (this.unverifiedHeads.size === 0 && !this.isHeadScopeOverflowed()) {
+      this.stopHeadRetries();
+
+      return;
+    }
+
+    for (const [networkId, heads] of this.unverifiedHeads) {
+      this.offerIdleHeads(networkId, heads);
+    }
+  }
+
+  private offerIdleHeads(networkId: string, heads: UnverifiedHeads): void {
+    for (const [headKey, copies] of heads) {
+      if (this.headReadmissions.isPending(headKey)) continue;
+
+      for (const [copyKey, copy] of copies) {
+        this.scheduleUnverifiedCopy(networkId, headKey, copyKey, copy);
+      }
+    }
+  }
+
+  private startHeadRetries(): void {
+    if (this.headRetryTimer) return;
+
+    this.headRetryTimer = setInterval(
+      () => this.retryUnverifiedHeads(),
+      HEAD_RETRY_INTERVAL_MS,
+    );
+    this.headRetryTimer.unref();
+  }
+
+  private stopHeadRetries(): void {
+    clearInterval(this.headRetryTimer);
+    this.headRetryTimer = undefined;
+  }
+
+  private cachedHeadReadmission(
+    networkId: string,
+    headKey: string,
+    own: boolean = false,
+  ): OrbitDBHeadReadmission {
+    return {
+      headKey,
+      networkId,
+      onAdmitted: (admitted) =>
+        this.cacheReadmittedHead(networkId, headKey, admitted),
+      own,
+    };
+  }
+
+  /**
+   * Admitted state can be what a rejected record or a held head rests on.
    */
   private wakeReadmissions(): void {
     this.readmissions.wake();
+    this.retryUnverifiedHeads();
     this.headReadmissions.wake();
   }
 
@@ -569,7 +1353,7 @@ export default class OrbitDBReplicatedStateRegistry {
     for (const record of await this.allRecords(store)) {
       if (
         this.isOfStoreNetwork(storeName, record.value, networkId) &&
-        (await this.admitRecord(storeName, record.value))
+        (await this.admitRecord(storeName, record.value)) === 'accepted'
       )
         admitted.push(record);
     }
@@ -656,21 +1440,36 @@ export default class OrbitDBReplicatedStateRegistry {
     )
       return;
 
-    if (await this.admitRecord(storeName, document)) {
+    const verdict = await this.admitRecord(storeName, document);
+
+    if (verdict === 'accepted') {
       await deliver();
       this.wakeReadmissions();
 
       return;
     }
 
+    // Refused documents can never prove out: dropped, not offered again.
+    if (verdict === 'refused') return;
+
     this.readmissions.schedule({
       isCurrent: () => this.networkIdOfStore(storeName, store) !== undefined,
       offer: async (): Promise<boolean> => {
-        if (!(await this.admitRecord(storeName, document))) return false;
+        const latest = await this.admitRecord(storeName, document);
+
+        if (latest === 'pending') return false;
+
+        // A refused document is retired without delivery.
+        if (latest === 'refused') return true;
         await deliver();
         this.wakeReadmissions();
 
         return true;
+      },
+      reconcile: async (): Promise<void> => {
+        if (this.networkIdOfStore(storeName, store) === undefined) return;
+
+        await this.projectCanonicalDocuments(storeName, store);
       },
       scope: store,
       subject:
@@ -1053,14 +1852,17 @@ export default class OrbitDBReplicatedStateRegistry {
 
     this.markPersistedHeadKey(networkId, record.key);
 
-    let persisted = true;
     const recordKey = record.key;
-    const value = await this.admitHead(record.value, {
-      key: `cached:${recordKey}`,
-      networkId,
-      onReadmitted: (readmitted) =>
-        this.cacheReadmittedHead(networkId, recordKey, readmitted),
-    });
+    const value = await this.admitHead(
+      record.value,
+      this.cachedHeadReadmission(networkId, recordKey),
+    );
+
+    // Held until admitted: there is nothing to persist yet, and onAdmitted
+    // persists the head once it is.
+    if (!value) return true;
+
+    let persisted = true;
 
     const keys = await this.admittedHeadKeys(
       this.headKeyDeriver.cachedKeys(record.key, value),
@@ -1454,13 +2256,14 @@ export default class OrbitDBReplicatedStateRegistry {
 
     const key = entry.payload?.key;
 
-    await gated(
-      await this.admitHead(received, {
-        key: key === undefined ? undefined : `update:${key}`,
-        networkId,
-        onReadmitted: gated,
-      }),
+    const admitted = await this.admitHead(
+      received,
+      key === undefined
+        ? undefined
+        : { headKey: key, networkId, onAdmitted: gated },
     );
+
+    if (admitted) await gated(admitted);
   }
 
   private isMergeableHeadKey(key: unknown): key is string {
@@ -1647,15 +2450,16 @@ export default class OrbitDBReplicatedStateRegistry {
 
       for (const head of heads) {
         this.markPersistedHeadKey(networkId, head.key);
+        this.markRestoredHead(networkId, head.key);
         const headKey = head.key;
-        const value = await this.admitHead(head.value, {
-          key: `cached:${headKey}`,
-          networkId,
-          onReadmitted: (readmitted) =>
-            this.cacheReadmittedHead(networkId, headKey, readmitted),
-        });
+        const value = await this.admitHead(
+          head.value,
+          this.cachedHeadReadmission(networkId, headKey, true),
+        );
 
-        await this.cacheReadmittedHead(networkId, headKey, value, false);
+        if (value) {
+          await this.cacheReadmittedHead(networkId, headKey, value, false);
+        }
       }
 
       if (heads.length > 0) {
@@ -2166,25 +2970,47 @@ export default class OrbitDBReplicatedStateRegistry {
   private async findStoredHead(
     key: string,
   ): Promise<Record<string, unknown> | undefined> {
+    let cached: Record<string, unknown> | undefined;
+
     for (const [networkId, stores] of this.storesByNetworkId) {
-      const stored = this.recordValue(await stores.heads.get?.(key));
-      const directRecord = stored && (await this.admitHead(stored));
-
-      if (
-        directRecord &&
-        (await this.admittedHeadKeys([key], directRecord)).length > 0
-      ) {
-        const cachedHead = this.cacheReplicatedHead(
-          networkId,
-          key,
-          directRecord,
-        );
-
-        return cachedHead ?? this.cachedHead(key);
-      }
+      cached = (await this.cacheStoredHead(networkId, stores, key)) ?? cached;
     }
 
-    return undefined;
+    // A key waiting on a held copy never reads as a partial head: its admitted
+    // part waits in the cache until the held head is admitted.
+    if (this.awaitsVerifiedHead(key)) throw new ReplicatedStateNotReadyError();
+
+    return cached;
+  }
+
+  /**
+   * Admits the head one network stores under `key` and caches its admitted
+   * part; undefined when nothing is admitted.
+   */
+  private async cacheStoredHead(
+    networkId: string,
+    stores: OrbitDBPrivateNetworkStores,
+    key: string,
+  ): Promise<Record<string, unknown> | undefined> {
+    const stored = this.recordValue(await stores.heads.get?.(key));
+
+    if (!stored) return undefined;
+
+    const directRecord = await this.admitHead(
+      stored,
+      this.cachedHeadReadmission(networkId, key),
+    );
+
+    if (!directRecord) return undefined;
+
+    if ((await this.admittedHeadKeys([key], directRecord)).length === 0) {
+      return undefined;
+    }
+
+    return (
+      this.cacheReplicatedHead(networkId, key, directRecord) ??
+      this.cachedHead(key)
+    );
   }
 
   private registerHeadCacheListeners(
@@ -2242,6 +3068,45 @@ export default class OrbitDBReplicatedStateRegistry {
 
       if (scoped) heads.set(key, scoped);
       else heads.delete(key);
+    }
+  }
+
+  private hasPendingHeadUnder(prefix: string, onlyRestored: boolean): boolean {
+    for (const [networkId, key] of this.pendingHeads(onlyRestored)) {
+      if (!key.startsWith(prefix) || this.isVerifiedHead(networkId, key)) {
+        continue;
+      }
+
+      if (
+        onlyRestored
+          ? this.isRestoredHead(networkId, key)
+          : this.awaitsVerifiedHead(key)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Every head key held in any network with its network, and those a network
+   * dropped for want of room: the keys this node restored always, the others
+   * unless `onlyRestored`.
+   */
+  private *pendingHeads(onlyRestored: boolean): Generator<[string, string]> {
+    yield* this.headKeysByNetwork(this.droppedRestoredHeadKeys);
+
+    if (!onlyRestored) yield* this.headKeysByNetwork(this.droppedHeadKeys);
+
+    yield* this.headKeysByNetwork(this.unverifiedHeads);
+  }
+
+  private *headKeysByNetwork(
+    byNetwork: ReadonlyMap<string, { keys(): Iterable<string> }>,
+  ): Generator<[string, string]> {
+    for (const [networkId, keys] of byNetwork) {
+      for (const key of keys.keys()) yield [networkId, key];
     }
   }
 
@@ -2328,6 +3193,14 @@ export default class OrbitDBReplicatedStateRegistry {
     this.persistedHeadKeysByNetworkId.delete(networkId);
     this.replicatedHeadsByNetworkId.delete(networkId);
     this.rebuildingHeadsByNetworkId.delete(networkId);
+    this.unverifiedHeads.delete(networkId);
+    this.clearHeadOverflow(networkId);
+    this.verifiedHeadKeys.delete(networkId);
+    this.restoredHeadKeys.delete(networkId);
+
+    for (const key of this.expiredHeadKeys.keys()) {
+      if (key.startsWith(`${networkId}\n`)) this.expiredHeadKeys.delete(key);
+    }
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
 
@@ -2348,6 +3221,14 @@ export default class OrbitDBReplicatedStateRegistry {
     this.rebuildingHeadsByNetworkId.clear();
     this.projectedHeads.clear();
     this.exactProjectedHeadKeys.clear();
+    this.unverifiedHeads.clear();
+    this.overflowedHeadNetworks.clear();
+    this.droppedHeadKeys.clear();
+    this.droppedRestoredHeadKeys.clear();
+    this.restoredHeadKeys.clear();
+    this.verifiedHeadKeys.clear();
+    this.expiredHeadKeys.clear();
+    this.stopHeadRetries();
   }
 
   public async onDocumentUpdated(
@@ -2459,12 +3340,14 @@ export default class OrbitDBReplicatedStateRegistry {
                 .map((record) => record.value)
                 .filter(matcher);
 
-          return this.admittedRecords(
+          const { admitted } = await this.admittedRecords(
             storeName,
             matched.filter((record) =>
               this.isOfStoreNetwork(storeName, record, networkId),
             ),
           );
+
+          return admitted;
         },
       ),
     );
@@ -2504,17 +3387,28 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   /**
-   * Whether this node holds the document but has not admitted it yet and still
-   * may: the gate rejected it, possibly because the authorization it rests on
-   * had not loaded yet (right after a restart), and it waits to be offered
-   * again. It lets a read tell "not ready yet" from "missing". The wait is
-   * bounded, so a forged document keeps this answer for a short while at most.
+   * Whether a read of the document must wait rather than answer "missing".
+   * This node holds the document but has not admitted it yet and still may:
+   * the gate rejected it, possibly because the authorization it rests on had
+   * not loaded yet (right after a restart), and it waits to be offered again.
+   * Or the store dropped the record of this very document when its
+   * re-admission overflowed and has not been readmitted in full since. A
+   * pending record is offered a bounded number of times, but a peer can
+   * schedule a new one about the same subject, so the answer lasts as long as
+   * a peer keeps doing so: the subject is not scoped to a network (issue
+   * #734), and a record any hosted network holds about it counts. An overflow
+   * lasts until the store is readmitted, and only for the documents it
+   * dropped and remembers (a peer that makes it drop more than it can
+   * remember delays no other document). Another store's overflow never counts.
    */
   public isDocumentPendingAdmission(
     storeName: OrbitDBReplicatedDocumentStoreName,
     id: string,
   ): boolean {
-    return this.readmissions.isPending(`${storeName}:${id}`);
+    return (
+      this.readmissions.isPending(`${storeName}:${id}`) ||
+      this.isStoreOverflowed(storeName, id)
+    );
   }
 
   /**
@@ -2576,7 +3470,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.assertReady();
     const cleanDocument = this.cleanDocument(document);
 
-    if (!(await this.admitRecord(storeName, cleanDocument))) {
+    if ((await this.admitRecord(storeName, cleanDocument)) !== 'accepted') {
       throw new InvalidPublicMutationError();
     }
 
@@ -2599,6 +3493,10 @@ export default class OrbitDBReplicatedStateRegistry {
 
   public findHead(key: string): Promise<Record<string, unknown> | undefined> {
     this.assertReady();
+
+    if (this.awaitsVerifiedHead(key)) {
+      return Promise.reject(new ReplicatedStateNotReadyError());
+    }
 
     return Promise.resolve(this.cachedHead(key));
   }
@@ -2630,12 +3528,38 @@ export default class OrbitDBReplicatedStateRegistry {
     prefix: string,
   ): Array<Record<string, unknown>> {
     return [...this.cachedHeadKeys()]
-      .filter((key) => key.startsWith(prefix))
+      .filter((key) => key.startsWith(prefix) && !this.awaitsVerifiedHead(key))
       .map((key) => this.cachedHead(key))
       .filter((head): head is Record<string, unknown> => head !== undefined);
   }
 
+  /**
+   * Whether a head under the prefix is held in any network, or was dropped
+   * for want of room. A peer drives all of it, so it is for observation only:
+   * no read of a list may wait on it (see `hasPendingRestoredHeadAdmissions`).
+   */
+  public hasPendingHeadAdmissions(prefix: string): boolean {
+    return this.hasPendingHeadUnder(prefix, false);
+  }
+
+  /**
+   * Whether a head under the prefix that this node restored from its own head
+   * cache at start is held, or was dropped for want of room, and has not been
+   * admitted yet: the only state a list read waits on. A head a peer plants
+   * under a key this node never had is not one of them, however many it
+   * plants, so it never makes a list wait.
+   */
+  public hasPendingRestoredHeadAdmissions(prefix: string): boolean {
+    return this.hasPendingHeadUnder(prefix, true);
+  }
+
+  /**
+   * The cached head of a key, or nothing while the key is held: a held head's
+   * admitted part is not complete, so a write built on it would be partial.
+   */
   public findCachedHead(key: string): Record<string, unknown> | undefined {
+    if (this.awaitsVerifiedHead(key)) return undefined;
+
     return this.cachedHead(key);
   }
 
@@ -2644,6 +3568,10 @@ export default class OrbitDBReplicatedStateRegistry {
     const cleanValue = this.cleanDocument(value);
 
     for (const headKey of this.headKeyDeriver.cachedKeys(key, cleanValue)) {
+      // A local write is this node's own head: every hosted network settles it.
+      for (const networkId of this.storesByNetworkId.keys()) {
+        this.markVerifiedHead(networkId, headKey);
+      }
       this.cacheProjectedHead(headKey, cleanValue);
     }
   }

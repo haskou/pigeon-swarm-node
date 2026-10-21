@@ -29,6 +29,11 @@ export default class NodeReadiness {
     return this.replicatedState.hasNetworks();
   }
 
+  /**
+   * Whether a list read may answer as verified. Communities listing uses this
+   * check: a fresh node with no networks and an empty configuration answers
+   * `[]`, while an unverified store answers 503020.
+   */
   public async isReady(): Promise<boolean> {
     if (!this.started) {
       return false;

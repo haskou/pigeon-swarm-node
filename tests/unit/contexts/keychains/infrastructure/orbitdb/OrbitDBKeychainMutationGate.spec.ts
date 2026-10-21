@@ -173,6 +173,25 @@ describe('OrbitDBKeychainMutationGate', () => {
     ).resolves.toBe(false);
   });
 
+  it('should leave an unavailable content id to the caller rather than refuse the record', async () => {
+    const mother = await KeychainMother.create();
+    const record = await metadata(mother);
+
+    ipfs.calculateJSONId.mockRejectedValueOnce(new Error('ipfs unavailable'));
+
+    await expect(gate.verdictOf('keychains', record)).rejects.toThrow(
+      'ipfs unavailable',
+    );
+  });
+
+  it('should refuse a record whose id differs from its cid, as a verdict', async () => {
+    const mother = await KeychainMother.create();
+
+    await expect(
+      gate.verdictOf('keychains', await metadata(mother, { id: 'bafy-other' })),
+    ).resolves.toBe('refused');
+  });
+
   describe('heads', () => {
     it('should accept a signed record under its owner and cid head keys', async () => {
       const mother = await KeychainMother.create();

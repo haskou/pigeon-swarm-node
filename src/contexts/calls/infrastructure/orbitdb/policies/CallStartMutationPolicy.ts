@@ -7,6 +7,7 @@ import ConversationRepository from '@app/contexts/conversations/domain/repositor
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import IdentityRepository from '@app/contexts/identities/domain/repositories/IdentityRepository';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
@@ -81,6 +82,13 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
     ) {
       throw new InvalidPublicMutationError();
     }
+
+    if (scope.type === 'conversation') {
+      new ConversationId(scope.conversationId as string);
+    } else if (scope.type === 'community_channel') {
+      new CommunityId(scope.communityId as string);
+      new CommunityChannelId(scope.channelId as string);
+    }
   }
 
   private assertConversationFields(record: Record<string, unknown>): void {
@@ -130,7 +138,7 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       },
     );
 
-    if (!conversation) throw new InvalidPublicMutationError();
+    if (!conversation) throw new PublicMutationPendingError();
 
     const admitted = conversation
       .getParticipantIds()
@@ -161,6 +169,8 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       new IdentityId(authorIdentityId),
     );
 
+    if (!creator) throw new PublicMutationPendingError();
+
     if (
       !creator
         .getNetworkIds()
@@ -186,14 +196,20 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       },
     );
 
-    if (!community || community.getNetworkId().valueOf() !== record.networkId) {
+    if (!community) throw new PublicMutationPendingError();
+
+    if (community.getNetworkId().valueOf() !== record.networkId) {
       throw new InvalidPublicMutationError();
     }
 
-    community.authorizeVoiceChannelCall(
-      new IdentityId(authorIdentityId),
-      new CommunityChannelId(scope.channelId as string),
-    );
+    try {
+      community.authorizeVoiceChannelCall(
+        new IdentityId(authorIdentityId),
+        new CommunityChannelId(scope.channelId as string),
+      );
+    } catch {
+      throw new InvalidPublicMutationError();
+    }
 
     // Sibling starts of this very collection: `queryDocuments` would admit each
     // of them again through this policy and recurse once per start.
@@ -271,18 +287,14 @@ export default class CallStartMutationPolicy extends PublicMutationPolicy {
       throw new InvalidPublicMutationError();
     }
 
-    try {
-      const type = this.scopeOf(record).type;
+    const type = this.scopeOf(record).type;
 
-      if (type === 'conversation') {
-        await this.assertConversation(record, authorIdentityId);
-      } else if (type === 'group_capability') {
-        await this.assertGroupCapability(record, authorIdentityId);
-      } else {
-        await this.assertCommunity(record, authorIdentityId);
-      }
-    } catch {
-      throw new InvalidPublicMutationError();
+    if (type === 'conversation') {
+      await this.assertConversation(record, authorIdentityId);
+    } else if (type === 'group_capability') {
+      await this.assertGroupCapability(record, authorIdentityId);
+    } else {
+      await this.assertCommunity(record, authorIdentityId);
     }
   }
 }

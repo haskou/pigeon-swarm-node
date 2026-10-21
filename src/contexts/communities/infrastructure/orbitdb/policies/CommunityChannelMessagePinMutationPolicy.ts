@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
@@ -8,6 +9,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 
 import { Community } from '../../../domain/Community';
 import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '../../../domain/errors/CommunityOperationParentsMissingError';
 import CommunityRepository from '../../../domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '../../../domain/value-objects/CommunityChannelId';
 import { CommunityChannelMessageId } from '../../../domain/value-objects/CommunityChannelMessageId';
@@ -46,8 +48,11 @@ export default class CommunityChannelMessagePinMutationPolicy extends PublicMuta
         ),
       )
       .catch((error: unknown) => {
-        if (error instanceof CommunityNotFoundError) {
-          throw new InvalidPublicMutationError();
+        if (
+          error instanceof CommunityNotFoundError ||
+          error instanceof CommunityOperationParentsMissingError
+        ) {
+          throw new PublicMutationPendingError();
         }
 
         throw error;

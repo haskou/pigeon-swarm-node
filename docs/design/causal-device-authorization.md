@@ -24,14 +24,14 @@ recomputed whenever a record is admitted or read, so:
 
 | Check | Evaluated against | Causal? |
 | --- | --- | --- |
-| Community operation permission (`CommunityOperationLedger.admit`) | `CommunityStateFold` of `closureOf(parents)`; unknown parents are refused. The fold then voids invitations and invitation admissions whose author's permission a standing cut removes outside their causal past (`CommunityAuthorityCuts`, see `signed-community-invitations.md`) | yes |
+| Community operation permission (`CommunityOperationLedger.admit`) | `CommunityStateFold` of `closureOf(parents)`; unknown parents are held until they arrive. The fold then voids invitations and invitation admissions whose author's permission a standing cut removes outside their causal past (`CommunityAuthorityCuts`, see `signed-community-invitations.md`) | yes |
 | Conversation operation permission (`ConversationOperationApplier.create`) | the genesis alone; a 1:1 accepts no other operation, and the group member and admin operations are refused since D15 | yes |
 | Device authorization of **every** signed record, operations included | the current head of the author's identity | **no** |
 | Community / conversation permission of non-operation records (community channel messages, pins and reactions, moderation log, membership requests, polls, calls) | the current folded community or conversation state | no, evaluated at admission (see [Residuals](#residuals)) |
 
 Operation ledgers are in memory; after a restart they are rebuilt by the
 registry replaying the stored records, whatever the order. Unknown parents are
-refused and retried, so the rebuild converges.
+held until they arrive, so the rebuild converges.
 
 ## Mechanism
 
@@ -77,10 +77,11 @@ Consequences:
   that is revoked cannot claim `N >= R` without being refused, and it cannot
   *obtain* a signed higher revision because only authorized devices can apply
   transitions.
-- **Unknown revisions fail closed.** `N > h` means the verifying node has not
-  yet replicated that part of the chain; the record is refused and retried by
-  the registry exactly as a record from a not-yet-replicated device always was.
-  `N < b` cannot be checked (see recovery below) and is refused.
+- **Unknown revisions are held, never trusted.** `N > h`, or an identity whose
+  chain has not arrived, means the verifying node has not replicated that part
+  of the chain yet: the proof is pending (`PublicMutationPendingError`) and the
+  registry retries it until the chain arrives. `N < b` cannot be checked (see
+  recovery below) and is refused.
 - **Deterministic.** The verdict is a pure function of `(proof, authorization
   chain)`. It does not depend on wall-clock time, arrival order or the moment of
   evaluation. The chain itself already converges (`OrbitDBDeviceAuthorizationReplayer`
@@ -155,9 +156,9 @@ to publish records as the identity.
      `sequence` first and the legitimate authors have moved on.
 4. **Re-enrolling the revoked key.** Requires an authorized device to sign a
    new enrolment (a new revision, `>= R`). Out of scope for the key thief.
-5. **Claiming a future revision.** `N > h` is unknown to every node and refused
-   (no node can verify it; a later head that reaches `N` makes the record valid
-   only if the device is actually in that state).
+5. **Claiming a future revision.** `N > h` is held by every node that has not
+   reached it (pending, never trusted); a later head that reaches `N` admits the
+   record only if the device is actually in that state.
 6. **Recovery after total compromise.** Recovery makes every pre-recovery
    revision unverifiable (`N < b`): a thief cannot backdate at all after a
    recovery.

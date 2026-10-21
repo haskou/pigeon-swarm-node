@@ -1,4 +1,5 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
@@ -9,6 +10,7 @@ import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId
 import { Community } from '../../../domain/Community';
 import { CommunityModerationLogEntry } from '../../../domain/entities/moderation/CommunityModerationLogEntry';
 import { CommunityNotFoundError } from '../../../domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '../../../domain/errors/CommunityOperationParentsMissingError';
 import { CommunityId } from '../../../domain/value-objects/CommunityId';
 import { CommunityModerationAction } from '../../../domain/value-objects/CommunityModerationAction';
 import { CommunityModerationLogId } from '../../../domain/value-objects/CommunityModerationLogId';
@@ -56,8 +58,11 @@ export default class CommunityModerationLogMutationPolicy extends PublicMutation
         ),
       )
       .catch((error: unknown) => {
-        if (error instanceof CommunityNotFoundError) {
-          throw new InvalidPublicMutationError();
+        if (
+          error instanceof CommunityNotFoundError ||
+          error instanceof CommunityOperationParentsMissingError
+        ) {
+          throw new PublicMutationPendingError();
         }
 
         throw error;

@@ -41,6 +41,8 @@ paths:
                 $ref: '#/components/schemas/CommunitiesResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Node not ready (code 503020). The node has not finished startup, or its replicated state is not open yet, for example right after a restart while a network's store replays. It also answers 503 while a community head this node restored from its own storage at start (or one it dropped for lack of room) has not been admitted yet, because a record it rests on is still missing, so a 200 never leaves out such a community. A head a peer merely announced and the node never stored does not block the list. An empty list is returned only once the node has verified its own readiness, so a 503 never means the caller has no communities. Readiness is checked before the query is validated, so a malformed cursor on a node that is not ready answers 503, not 400. The verified state covers node readiness only; it does not certify that every private community is listed. Retry; the request is safe to repeat.
     post:
       tags:
         - communities
@@ -123,6 +125,8 @@ paths:
                 $ref: '#/components/schemas/CommunityDiscoveryResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Node not ready (code 503020). A community whose head the node restored at start and has not verified yet (a record it rests on is not admitted and no earlier head of it was verified) makes the node answer 503 rather than a partial list, so a 200 never leaves out such a community. A community with a verified head is listed from it while a peer's unverified copy is held; held copies expire after 15 minutes and are not held again for 15 minutes. Retry; the request is safe to repeat.
   /community-membership-requests:
     get:
       tags:
@@ -159,6 +163,8 @@ paths:
                 $ref: '#/components/schemas/CommunityMembershipRequestsResource'
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
+        '503':
+          description: Node not ready (code 503020). A community whose head the node restored at start and has not verified yet (a record it rests on is not admitted and no earlier head of it was verified) makes the node answer 503 rather than a partial list, so a 200 never leaves out such a community. A community with a verified head is listed from it while a peer's unverified copy is held; held copies expire after 15 minutes and are not held again for 15 minutes. Retry; the request is safe to repeat.
     post:
       tags:
         - communities

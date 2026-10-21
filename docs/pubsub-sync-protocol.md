@@ -418,9 +418,8 @@ so an operator learns who asked to join which community. Admissions can overshoo
 `maxUses` by one `maxUses` per mutually concurrent branch; this accepted residual
 is never repaired and evicts nobody. An admission counts toward the operation
 quota of its admitter, its author, like every operation.
-An
-operation with an unknown parent or unreplicated evidence is not stored; its head
-is demoted and re-admitted when the evidence replicates (see
+An operation with an unknown parent or unreplicated evidence is not stored; its head
+is held, not cached, until the evidence replicates (see
 [readmission](#readmission-of-rejected-records)).
 
 Limits: a member that holds a valid device can sign as many operations as it likes,
@@ -683,8 +682,9 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   digest. A tombstone (`removed: true`) must be a signed `delete`; a `put` must not
   be removed. `removed`, `deletedAt` or `updatedAt` alone never win. A signed record
   outranks an unsigned one; unsigned records are rejected.
-- Index heads are unsigned wrappers: a head that lost records after admission is
-  demoted to `updatedAt: 0` and cannot replace an admitted head.
+- Index heads are unsigned wrappers: a head with records the gate does not admit is
+  held, not cached. The cache keeps the last verified head until the held one is
+  admitted or superseded.
 - The unsigned reaction cascade tombstones on channel/community deletion are gone;
   the node cannot sign on behalf of users.
 - Limits: device authorization is evaluated at the revision the proof claims
@@ -692,41 +692,133 @@ target.id, createdAt]))`, immutable (tombstones are always rejected; the
   permissions of these records (pin, reaction, moderation log, request,
   poll, channel message) are still evaluated against the community state folded
   at admission, not at a causal frontier, so records of a member who later lost
-  the permission stop being admitted. A head rejected
+  the permission stop being admitted. A head held
   because the community has not replicated yet is re-admitted when it does
   (see below). Authorization lookups are coalesced for 1 s per batch.
 
-#### Readmission of rejected records
+#### Readmission of pending records
 
-A replicated document the gate rejects, and a head demoted because some of its
-records were rejected, are offered to the gate again: 2 s, 10 s and 60 s after the
-rejection, and in between, at most once every 2 s, whenever the node admits new
-replicated state (an admitted document or a newly cached head, including a local
-projection such as the identity metadata of an admitted identity). The second
-trigger matters because the record usually rests on exactly that state: on a
-slow node a joiner's identity can replicate after the community head that lists
-its join, and the head would otherwise stay demoted until the 60 s retry.
+A replicated document the gate leaves pending is offered to the gate again: 2 s, 10 s and
+60 s after it was first held, and in between, at most once every 2 s, whenever the node
+admits new replicated state (an admitted document or a newly cached head, including a
+local projection such as the identity metadata of an admitted identity). The second
+trigger matters because the record usually rests on exactly that state: on a slow node
+a joiner's identity can replicate after the community head that lists its join, and
+the head would otherwise wait for the next retry.
 
-- The gate decides every offer in full; a readmitted record is one the gate
-  accepts now. Readmission never widens what is admitted.
-- A demoted head that admits more records than before is delivered again, still
-  demoted, until every record is admitted.
-- At most 256 rejected documents per store and 256 demoted heads per network
-  wait at once; past that a rejection of that store or network is final. A flood
-  in one network never takes the place of the records of another; communities
-  that share a network (and its stores) share its places.
-- A demoted head waits under its key and its value. A copy received again does
-  not wait twice and keeps its first wait; a different value under the same key,
-  from any peer, waits beside it and never takes the place of the pending one.
-- A wake offers the pending records one after the other, and at most one wake
-  runs at a time; one offer per record runs at a time. Neither a wake nor the
-  backoff waits more than 5 s for an offer it started, nor at all for one
-  already running, so an offer that never resolves stalls neither the later
-  wakes nor the retirement of its record.
-- New state never extends the wait: wake offers fall inside the same window of
-  72 s (at most 87 s when offers stall), after the 60 s attempt the rejection is
-  final, and a record of a store or network that is no longer registered is
-  dropped.
+A refusal is intrinsic: the record can never be valid whatever this node learns later.
+A failure that depends on state the node does not hold yet is pending, never refused.
+That covers a community or conversation that is not local yet, a frontier whose
+operations have not arrived, an identity or device revision that has not replicated,
+and a node that is not ready. It applies to community operations, pins, reactions,
+channel messages, membership requests, invitation claims, moderation log records, MLS
+records, poll scopes and call records (start and participant) alike. A pending record
+of a subject that never arrives is dropped with its held copy after 15 minutes.
+
+A head with a pending record is held, not cached. It is offered again the same way.
+A held copy is a candidate a peer offered; it never makes a subject unavailable while
+a verified head exists for it. A key is verified, per network, by a head that was
+admitted in full with gated records kept under a key its gate accepts (or by the
+node writing it itself, which settles it in every hosted network); a trivial, empty,
+refused or ungoverned head never verifies a key. Reads, the community list and saves
+use that head and ignore the held candidates. Error code 503020 answers only for a
+subject with no verified head and a held copy: the node has not proven any head of
+it yet, for instance a stored head right after a restart. A read of such a subject
+never serves the admitted part of a held head. A key restored from the node's own
+head cache ends its wait only when that own copy is admitted, expires, or a full
+rescan of its network clears it: a head a peer offers under the key, in the same
+network or in another, neither verifies it nor supersedes the copy.
+
+A record the gate refuses never becomes valid, so it is dropped and never offered again.
+A head that carries one is delivered demoted, with `updatedAt` 0, and is not held.
+
+- The gate decides every offer in full; a readmitted record is one the gate accepts
+  now. Readmission never widens what is admitted.
+- A held head is delivered only once every record in it is admitted: a partial head is
+  never delivered. Delivering an admitted head drops the held copies of its key that it
+  supersedes (those not newer than it); a newer copy stays held.
+- At most 256 pending documents per store wait in its readmission at once, and 256
+  more queue behind them in arrival order. A pending document past both bounds is
+  dropped and the store is overflowed: until its queue drains and its documents are
+  projected again in full, `isDocumentPendingAdmission` answers `503020` for the
+  documents the store dropped and remembers (up to 1024 subjects per store). A
+  document dropped past that bound is not remembered: it waits for nothing and is
+  offered again by the rescan, so a flood never makes a document it did not drop
+  wait. A failed rescan is retried every 60 s. A head with a pending record is held
+  under its network's bounds: at most 256 held head keys per network are offered at
+  once, and 256 more queue behind them in arrival order. A head past both bounds, or
+  a copy past the 8 a key holds, is dropped and the network is overflowed. The flag
+  is per network, gates no read by itself, and clears as soon as the network's held
+  heads fit again (fewer than 256 keys, no key at its 8 copies) and its heads were
+  rescanned without dropping again; it does not wait for the network to drain. What
+  a read waits on is the key: a read of a head key that the overflowed network
+  dropped answers `503020` (never missing, never partial) while it has no verified
+  head. A key this node restored from its own head cache is always remembered (it is
+  bounded by the persisted heads); any other key up to 1024 per network, and past
+  that it is not remembered, so a peer that plants more keys than that delays no
+  read of any other key. A key nobody dropped or holds, and a key with a verified
+  head, are read as usual. Holds, drops, cool-downs and the verified and restored
+  keys are kept per network and key. A read takes the key alone and sums the
+  networks: a key restored from the own cache waits on its own network alone, and
+  nothing another network offers ends that wait; any other key waits while a
+  network holds or dropped a copy of it unsettled and no network has verified it.
+  So a genuinely admitted head with gated records under such a key in network B
+  ungates a key that network A only holds from a peer (it never gates a key with a
+  verified head, and never a restored one). The verified keys are peer-driven, so
+  they are bounded to 8192 per network and evicted oldest first, never a restored
+  own key; a peer that admits more distinct keys than that can evict an honest
+  verified key, which then waits again only if a copy of it is held. Unregistering a
+  network clears its verified and restored keys and its expiries. Only the count of
+  dropped heads is logged. A held head is
+  offered again on every 60 s retry, with one retry timer for the node, so offers
+  never stack. A flood in one store never takes the place of another store's
+  records, and one network's held heads never take another's places.
+- A held head waits under its key and its value. A copy received again is not held
+  twice; a different value under the same key waits beside it, and at most 8 copies
+  per key wait. A key that is full keeps the copies it holds, so junk copies cannot
+  evict a copy held earlier; a copy past the 8 overflows the network (see above) and is
+  offered again from the store when room is back. Copies are not ranked by the
+  `updatedAt` they claim before they are admitted.
+- A wake offers the pending records one after the other, and at most one wake runs at a
+  time; one offer per record runs at a time. Neither a wake nor the backoff waits more
+  than 5 s for an offer it started, nor at all for one already running, so an offer that
+  never resolves stalls neither the later wakes nor the retirement of its record.
+- New state never extends a record's wait: its offers fall inside the same window of
+  72 s (at most 87 s when offers stall), and then the rejection is final. A held head
+  has no final rejection: once its backoff retires it is offered again every 60 s, for
+  as long as the node runs.
+- A held copy has one offer chain: its backoff, then the 60 s retry once the backoff
+  retires. The retry adds a copy only while no copy of its head key has an offer pending,
+  so it never starts a second chain beside one that waits. A copy received again is not
+  held twice when its value has a digest; a value without one is held as a new copy on
+  each receipt, at most 8 per key, each with its own chain.
+- A held copy that never proves out is held for 15 minutes and then dropped. The
+  expiry is remembered per network and head key (up to 1024 pairs), not per copy: the
+  key is not held again in that network for 15 minutes whatever digests arrive, and
+  after 3 expiries it is never held again while remembered, so a peer cannot keep a
+  subject waiting by renewing the hold with fresh copies; the same key in another
+  network has its own record. Consequence: after the third expiry a genuine head
+  offered later under that key in that network is not held either, so a read of it
+  no longer answers `503020` while it proves out: it reads as missing until it is
+  admitted, or until the key is forgotten (LRU of 1024) or the node restarts.
+  Until then a held copy makes only a subject with no
+  verified head answer `503020` on a read of that subject. It never delays the
+  community list: the list (`GET /communities`, and the discoverable list) waits only
+  for a head this node restored from its own persisted head cache at start and has not
+  verified yet, whether it is held or was dropped for want of room; no state a peer
+  can drive (planted keys, held copies, the overflow of a network) gates a list, so a
+  flood of planted keys leaves it served. A community the node learns from a peer
+  while running is listed once its head is admitted. Residual: a planted key that was
+  also persisted (it needed a head the gate admitted) gates the list for at most 15
+  minutes after a restart; a genuine head that needs more than 15 minutes of
+  replication reads as missing until a peer offers it again after the cool-down. Held
+  and dropped copies are logged as counts with the prefix `Peer-induced hold`; a
+  pending record is logged as a count, at most once a minute, and a node that is still
+  opening answers `503020` and logs `node starting` instead. A head whose evidence
+  check fails on an IPFS error is not cached, held or retried: the key is dropped with
+  a warning until a peer offers it again. A key is not marked verified by a head the
+  gate refused, by one that carried nothing to check, or by one under a key its gate
+  rejects.
 - A wake is not scoped to the network or store that admitted the state: the
   state a record rests on often lives elsewhere (a community operation rests on
   an identity and a device authorization).
@@ -734,6 +826,10 @@ its join, and the head would otherwise stay demoted until the 60 s retry.
   the state that woke it. Worst case per scope: 256 records offered about 39
   times each (3 retries and a wake every 2 s for 72 s); a head offer runs the
   gate once per gated record it carries.
+- A membership-request lookup by identity answers `503020` while a request head under
+  that identity's index that this node restored from its own head cache is held, as
+  the community list does, so a request is not reported missing while it waits. A
+  head a peer plants under the identity's key never makes it wait.
 - A read can ask whether a document waits for readmission, by store and id
   (`isDocumentPendingAdmission`), to tell "not admitted yet" from "missing". A
   call endpoint answers a call whose start waits as `503020` not ready instead
@@ -810,8 +906,9 @@ head cache and reads. `PublicMutationGate` returns `false` from `governsHead`
 because its heads are index wrappers checked per record.
 Gates accumulate with `OrbitDBReplicatedStateRegistry.addMutationGate`: the
 registry composes them in `CompositeOrbitDBMutationGate`, and a record is admitted
-only when every gate that governs it accepts. `PublicMutationGateInitializer` and
-`KeychainMutationGateInitializer` each register their own gate.
+only when every gate that governs it returns `accepted`: `refused` drops it, `pending`
+holds it. `PublicMutationGateInitializer` and `KeychainMutationGateInitializer` each
+register their own gate.
 
 No request contract changes: the keychain endpoints already carry the signature.
 A malicious peer can still flood the store with validly signed junk of its own

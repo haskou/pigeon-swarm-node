@@ -1,3 +1,5 @@
+import Kernel from '@haskou/ddd-kernel';
+
 import { OrbitDBPendingRecordReadmission } from './OrbitDBPendingRecordReadmission';
 
 /**
@@ -9,9 +11,47 @@ import { OrbitDBPendingRecordReadmission } from './OrbitDBPendingRecordReadmissi
  * only while its store is still registered, and every time the node admits
  * new replicated state in between: the state it rests on may be what just
  * arrived. Past the last backoff delay the rejection is final.
+ *
+ * A scope that outgrows both its active bound and its queue drops the record
+ * and is marked overflowed. Only a read about a subject it dropped waits (see
+ * `isOverflowedFor`), until its offers have drained and its rescan has
+ * completed without dropping anything; the rescan offers the drops again.
  */
+type QueuedRecord = {
+  isCurrent: () => boolean;
+  offer: () => Promise<boolean>;
+  subject?: string;
+};
+
+/** The offers of one scope: the active ones, and the queue behind them. */
+type ScopeReadmissions = {
+  active: Map<unknown, OrbitDBPendingRecordReadmission>;
+  queued: Map<unknown, QueuedRecord>;
+  reconcile?: () => Promise<void>;
+  /** Records dropped since the scope was last readmitted in full. */
+  dropped: number;
+  /**
+   * The subjects of the dropped records, up to a bound. A record dropped past
+   * the bound, or without a subject, is not remembered: it gates no read, and
+   * the rescan offers it again.
+   */
+  droppedSubjects: Set<string>;
+  overflowed: boolean;
+  reconciling: boolean;
+  retry?: NodeJS.Timeout;
+};
+
 export class OrbitDBRecordReadmission {
   private static readonly MAX_PENDING_PER_SCOPE = 256;
+
+  /** Dropped subjects remembered per scope; past it a drop is not remembered. */
+  private static readonly MAX_DROPPED_SUBJECTS = 1024;
+
+  /** Records past the active bound wait here, in arrival order, for a slot. */
+  private static readonly MAX_QUEUED_PER_SCOPE = 256;
+
+  /** A rescan that failed, or dropped records meanwhile, is retried after this. */
+  private static readonly RESCAN_RETRY_MS = 60_000;
 
   public static readonly DELAYS_MS = [2_000, 10_000, 60_000];
 
@@ -30,12 +70,9 @@ export class OrbitDBRecordReadmission {
    */
   public static readonly OFFER_WAIT_MS = 5_000;
 
-  private readonly pendingByScope = new Map<
-    string | object,
-    Map<unknown, OrbitDBPendingRecordReadmission>
-  >();
+  private readonly scopes = new Map<string | object, ScopeReadmissions>();
 
-  /** How many pending records name each subject. */
+  /** How many pending records name each subject, queued ones included. */
   private readonly pendingCountBySubject = new Map<string, number>();
 
   private wakeTimer?: NodeJS.Timeout;
@@ -48,9 +85,9 @@ export class OrbitDBRecordReadmission {
     this.draining = true;
 
     try {
-      const readmissions = [...this.pendingByScope.values()].flatMap(
-        (pending) => [...pending.values()],
-      );
+      const readmissions = [...this.scopes.values()].flatMap((scope) => [
+        ...scope.active.values(),
+      ]);
 
       for (const readmission of readmissions) await readmission.offer();
     } finally {
@@ -63,6 +100,140 @@ export class OrbitDBRecordReadmission {
     }
   }
 
+  private countSubject(subject: string | undefined, delta: 1 | -1): void {
+    if (subject === undefined) return;
+
+    const count = (this.pendingCountBySubject.get(subject) ?? 0) + delta;
+
+    if (count === 0) this.pendingCountBySubject.delete(subject);
+    else this.pendingCountBySubject.set(subject, count);
+  }
+
+  private start(
+    scope: string | object,
+    state: ScopeReadmissions,
+    entryKey: unknown,
+    record: QueuedRecord,
+  ): void {
+    const readmission = new OrbitDBPendingRecordReadmission(
+      OrbitDBRecordReadmission.DELAYS_MS,
+      OrbitDBRecordReadmission.OFFER_WAIT_MS,
+      record.offer,
+      record.isCurrent,
+      () => this.settle(scope, state, entryKey, record.subject),
+    );
+
+    state.active.set(entryKey, readmission);
+    readmission.start();
+  }
+
+  private settle(
+    scope: string | object,
+    state: ScopeReadmissions,
+    entryKey: unknown,
+    subject: string | undefined,
+  ): void {
+    state.active.delete(entryKey);
+    this.countSubject(subject, -1);
+
+    const next = state.queued.entries().next();
+
+    if (!next.done) {
+      const [queuedKey, record] = next.value;
+
+      state.queued.delete(queuedKey);
+      this.start(scope, state, queuedKey, record);
+
+      return;
+    }
+
+    this.checkDrained(scope, state);
+  }
+
+  private checkDrained(scope: string | object, state: ScopeReadmissions): void {
+    if (
+      state.active.size > 0 ||
+      state.queued.size > 0 ||
+      state.reconciling ||
+      state.retry
+    )
+      return;
+
+    if (state.overflowed && state.reconcile) {
+      void this.rescan(scope, state, state.reconcile);
+
+      return;
+    }
+
+    if (state.overflowed) this.clearOverflow(state);
+
+    this.scopes.delete(scope);
+  }
+
+  private async rescan(
+    scope: string | object,
+    state: ScopeReadmissions,
+    reconcile: () => Promise<void>,
+  ): Promise<void> {
+    const droppedBefore = state.dropped;
+    let complete = true;
+
+    state.reconciling = true;
+
+    try {
+      await reconcile();
+    } catch {
+      complete = false;
+      Kernel.logger.warn?.('OrbitDB record re-admission rescan failed');
+    } finally {
+      state.reconciling = false;
+    }
+
+    if (complete && state.dropped === droppedBefore) {
+      this.clearOverflow(state);
+      this.checkDrained(scope, state);
+
+      return;
+    }
+
+    if (state.active.size === 0 && state.queued.size === 0)
+      this.retryRescan(scope, state);
+  }
+
+  private retryRescan(scope: string | object, state: ScopeReadmissions): void {
+    state.retry = setTimeout(() => {
+      state.retry = undefined;
+      this.checkDrained(scope, state);
+    }, OrbitDBRecordReadmission.RESCAN_RETRY_MS);
+    state.retry.unref();
+  }
+
+  private overflow(state: ScopeReadmissions, subject?: string): void {
+    if (!state.overflowed)
+      Kernel.logger.warn?.(
+        'OrbitDB record re-admission overflowed: dropped records are offered again once the scope is readmitted',
+      );
+
+    state.overflowed = true;
+    state.dropped += 1;
+
+    if (
+      subject !== undefined &&
+      state.droppedSubjects.size < OrbitDBRecordReadmission.MAX_DROPPED_SUBJECTS
+    ) {
+      state.droppedSubjects.add(subject);
+    }
+  }
+
+  private clearOverflow(state: ScopeReadmissions): void {
+    Kernel.logger.debug?.(
+      `OrbitDB record re-admission overflow cleared: dropped=${state.dropped}`,
+    );
+    state.overflowed = false;
+    state.dropped = 0;
+    state.droppedSubjects.clear();
+  }
+
   /**
    * Whether a record scheduled under the subject still waits to be offered
    * again: the node holds it but has not admitted it yet, and may still.
@@ -72,66 +243,83 @@ export class OrbitDBRecordReadmission {
   }
 
   /**
-   * The pending offers are bounded per scope (a network or a store), so a
-   * flood of rejected records cannot pin them in memory, multiply the work
-   * of a wake, or take the place of the records of another scope; past the
-   * bound a rejection is final. A record whose key is already pending is
-   * not scheduled again, so a record received many times waits once and
-   * keeps its first wait. `subject` names what the record is about, for
-   * `isPending`; unlike the key it never merges records, so a forged record
-   * about a subject cannot take the place of a legitimate one. `offer`
-   * admits and delivers the record, and resolves whether it is settled.
+   * Whether the scope dropped records it had no room for and has not
+   * readmitted them since. The flag clears once the scope's offers have
+   * drained and its rescan completed without dropping anything.
+   */
+  public isOverflowed(scope: string | object): boolean {
+    return this.scopes.get(scope)?.overflowed === true;
+  }
+
+  /**
+   * Whether a read about `subject` must wait on the overflow of the scope:
+   * the subject is among the records it dropped. Nothing else waits, however
+   * many records a peer makes the scope drop: past the bound a drop is simply
+   * not remembered.
+   */
+  public isOverflowedFor(scope: string | object, subject: string): boolean {
+    return this.scopes.get(scope)?.droppedSubjects.has(subject) === true;
+  }
+
+  /**
+   * The offers are bounded per scope (a network or a store): past the active
+   * bound a record waits in a FIFO queue of the same size, and past both it
+   * is dropped and the scope is overflowed. So a flood of pending records
+   * cannot pin them in memory, multiply the work of a wake, or take the place
+   * of the records of another scope. A record whose key is already pending is
+   * not scheduled again, so a record received many times waits once and keeps
+   * its first wait. `subject` names what the record is about, for `isPending`;
+   * unlike the key it never merges records, so a forged record about a subject
+   * cannot take the place of a legitimate one. `offer` admits and delivers the
+   * record, and resolves whether it is settled. `reconcile` readmits what the
+   * scope holds, once its offers have drained; the overflow clears only after
+   * it completes. A scope without one has nothing to readmit.
    */
   public schedule({
     isCurrent,
     key,
     offer,
+    reconcile,
     scope,
     subject,
   }: {
     isCurrent: () => boolean;
     key?: string;
     offer: () => Promise<boolean>;
+    reconcile?: () => Promise<void>;
     scope: string | object;
     subject?: string;
   }): void {
-    const pending =
-      this.pendingByScope.get(scope) ??
-      new Map<unknown, OrbitDBPendingRecordReadmission>();
+    const state = this.scopes.get(scope) ?? {
+      active: new Map<unknown, OrbitDBPendingRecordReadmission>(),
+      dropped: 0,
+      droppedSubjects: new Set<string>(),
+      overflowed: false,
+      queued: new Map<unknown, QueuedRecord>(),
+      reconcile,
+      reconciling: false,
+    };
     const entryKey = key ?? Symbol('record');
 
-    if (pending.has(entryKey)) return;
+    this.scopes.set(scope, state);
 
-    if (pending.size >= OrbitDBRecordReadmission.MAX_PENDING_PER_SCOPE) return;
-    const readmission = new OrbitDBPendingRecordReadmission(
-      OrbitDBRecordReadmission.DELAYS_MS,
-      OrbitDBRecordReadmission.OFFER_WAIT_MS,
-      offer,
-      isCurrent,
-      () => {
-        pending.delete(entryKey);
+    if (state.active.has(entryKey) || state.queued.has(entryKey)) return;
 
-        if (pending.size === 0) this.pendingByScope.delete(scope);
+    if (
+      state.active.size >= OrbitDBRecordReadmission.MAX_PENDING_PER_SCOPE &&
+      state.queued.size >= OrbitDBRecordReadmission.MAX_QUEUED_PER_SCOPE
+    ) {
+      this.overflow(state, subject);
 
-        if (subject === undefined) return;
-        const remaining = (this.pendingCountBySubject.get(subject) ?? 1) - 1;
-
-        if (remaining === 0) this.pendingCountBySubject.delete(subject);
-        else this.pendingCountBySubject.set(subject, remaining);
-      },
-    );
-
-    pending.set(entryKey, readmission);
-    this.pendingByScope.set(scope, pending);
-
-    if (subject !== undefined) {
-      this.pendingCountBySubject.set(
-        subject,
-        (this.pendingCountBySubject.get(subject) ?? 0) + 1,
-      );
+      return;
     }
 
-    readmission.start();
+    this.countSubject(subject, 1);
+    const record = { isCurrent, offer, subject };
+
+    if (state.active.size < OrbitDBRecordReadmission.MAX_PENDING_PER_SCOPE)
+      this.start(scope, state, entryKey, record);
+    else state.queued.set(entryKey, record);
   }
 
   /**
@@ -147,7 +335,7 @@ export class OrbitDBRecordReadmission {
       return;
     }
 
-    if (this.wakeTimer || this.pendingByScope.size === 0) return;
+    if (this.wakeTimer || this.scopes.size === 0) return;
 
     this.wakeTimer = setTimeout(() => {
       this.wakeTimer = undefined;

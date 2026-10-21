@@ -3,10 +3,13 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { Community } from '../../domain/Community';
 import { CommunityInvitations } from '../../domain/entities/invitations/CommunityInvitations';
 import { CommunityNotFoundError } from '../../domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '../../domain/errors/CommunityOperationParentsMissingError';
+import { InvalidCommunityOperationError } from '../../domain/errors/InvalidCommunityOperationError';
 import { CommunityOperation } from '../../domain/operations/CommunityOperation';
 import { CommunityOperationLimits } from '../../domain/operations/CommunityOperationLimits';
 import { CommunityState } from '../../domain/operations/CommunityState';
@@ -176,6 +179,30 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
+  /**
+   * The fold of the causal past of `frontier`. Only a frontier hash not held
+   * yet is missing parents (pending); an operation the fold refuses stays
+   * refused.
+   */
+  private foldAtFrontier(
+    operations: CommunityOperation[],
+    frontier: string[],
+  ): CommunityState {
+    let closure: CommunityOperation[];
+
+    try {
+      closure = CommunityStateFold.closureOf(operations, frontier);
+    } catch (error) {
+      if (error instanceof InvalidCommunityOperationError) {
+        throw new CommunityOperationParentsMissingError();
+      }
+
+      throw error;
+    }
+
+    return CommunityStateFold.fold(closure);
+  }
+
   /** Every community whose operations are cached locally, newest first. */
   private cachedCommunities(): Community[] {
     return this.registry
@@ -202,6 +229,26 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
         );
       })
       .map((community) => this.copyOf(community));
+  }
+
+  /**
+   * The cached communities once every community head this node already knew
+   * (restored from its own head cache) and held back by the gate is admitted,
+   * and no community head was dropped for want of room. Until then a held head
+   * is missing from the cache, so the list is not ready: it must not answer a
+   * partial or an empty list. A head a peer plants under a key this node never
+   * had does not count: it is not part of the node's own list.
+   */
+  private caughtUpCachedCommunities(): Promise<Community[]> {
+    if (
+      this.registry.hasPendingRestoredHeadAdmissions(
+        OrbitDBCommunityRepository.HEAD_PREFIX,
+      )
+    ) {
+      return Promise.reject(new ReplicatedStateNotReadyError());
+    }
+
+    return Promise.resolve(this.cachedCommunities());
   }
 
   private copyOf(community: Community): Community {
@@ -236,11 +283,9 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     frontier: string[],
   ): Promise<{ community: Community; invitations: CommunityInvitations }> {
     const records = await this.operationIndex.findRecords(this.headKey(id));
-    const state = CommunityStateFold.fold(
-      CommunityStateFold.closureOf(
-        this.operationsOf(id.valueOf(), records),
-        frontier,
-      ),
+    const state = this.foldAtFrontier(
+      this.operationsOf(id.valueOf(), records),
+      frontier,
     );
     const community = this.activeCommunityOf(state);
 
@@ -344,7 +389,7 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     );
   }
 
-  public findDiscoverable(
+  public async findDiscoverable(
     options: {
       networkId?: string;
       query?: string;
@@ -355,27 +400,25 @@ export default class OrbitDBCommunityRepository extends CommunityRepository {
     const regex = query ? new RegExp(this.escapeRegex(query), 'i') : undefined;
     const excluded = new Set(excludedIds.map((id) => id.valueOf()));
 
-    return Promise.resolve(
-      this.cachedCommunities().filter((community) => {
-        const { description, discoverable, id, name, networkId } =
-          community.toPrimitives();
+    const communities = await this.caughtUpCachedCommunities();
 
-        return (
-          discoverable &&
-          !excluded.has(id) &&
-          (!options.networkId || networkId === options.networkId) &&
-          (!regex || regex.test(name) || regex.test(description))
-        );
-      }),
-    );
+    return communities.filter((community) => {
+      const { description, discoverable, id, name, networkId } =
+        community.toPrimitives();
+
+      return (
+        discoverable &&
+        !excluded.has(id) &&
+        (!options.networkId || networkId === options.networkId) &&
+        (!regex || regex.test(name) || regex.test(description))
+      );
+    });
   }
 
-  public findByMember(identityId: IdentityId): Promise<Community[]> {
-    return Promise.resolve(
-      this.cachedCommunities().filter((community) =>
-        community.isMember(identityId),
-      ),
-    );
+  public async findByMember(identityId: IdentityId): Promise<Community[]> {
+    const communities = await this.caughtUpCachedCommunities();
+
+    return communities.filter((community) => community.isMember(identityId));
   }
 
   public async save(

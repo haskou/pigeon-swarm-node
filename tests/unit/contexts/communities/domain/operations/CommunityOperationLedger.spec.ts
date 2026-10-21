@@ -1,5 +1,6 @@
 import { CommunityInvitationNotFoundError } from '@app/contexts/communities/domain/errors/CommunityInvitationNotFoundError';
 import { CommunityInvitationUnusableError } from '@app/contexts/communities/domain/errors/CommunityInvitationUnusableError';
+import { CommunityOperationParentsMissingError } from '@app/contexts/communities/domain/errors/CommunityOperationParentsMissingError';
 import { InvalidCommunityOperationError } from '@app/contexts/communities/domain/errors/InvalidCommunityOperationError';
 import { CommunityOperation } from '@app/contexts/communities/domain/operations/CommunityOperation';
 import { CommunityOperationLedger } from '@app/contexts/communities/domain/operations/CommunityOperationLedger';
@@ -50,14 +51,14 @@ describe('CommunityOperationLedger', () => {
     expect(() => ledger.admit(join([created], mallory, mallory))).toThrow();
   });
 
-  it('refuses an operation whose parents are unknown', () => {
+  it('holds an operation whose parents are unknown until they arrive', () => {
     const ledger = new CommunityOperationLedger();
     const created = genesis();
     const orphan = join([join([created], alice)], mallory);
 
     ledger.admit(created);
 
-    expect(() => ledger.admit(orphan)).toThrow();
+    expect(() => ledger.admit(orphan)).toThrow(CommunityOperationParentsMissingError);
   });
 
   it('admits an operation after its missing parent arrives', () => {
@@ -67,7 +68,7 @@ describe('CommunityOperationLedger', () => {
     const next = join([joined], mallory);
 
     ledger.admit(created);
-    expect(() => ledger.admit(next)).toThrow();
+    expect(() => ledger.admit(next)).toThrow(CommunityOperationParentsMissingError);
 
     ledger.admit(joined);
 

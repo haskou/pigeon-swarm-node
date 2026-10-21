@@ -7,6 +7,10 @@ import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authoriz
 import PrivateAuthorizationStorageCoordinator from '@app/contexts/private-authorization/infrastructure/PrivateAuthorizationStorageCoordinator';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import { CommunityStateFold } from '@app/contexts/communities/domain/operations/CommunityStateFold';
+import { InvalidCommunityOperationError } from '@app/contexts/communities/domain/errors/InvalidCommunityOperationError';
+import { CommunityOperationParentsMissingError } from '@app/contexts/communities/domain/errors/CommunityOperationParentsMissingError';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import { signedMutation } from '../../../public-mutations/support/signedMutation';
 import {
@@ -308,7 +312,32 @@ describe('OrbitDBCommunityRepository', () => {
 
       await expect(
         repository.requireAtFrontier(communityId, ['B'.repeat(43)]),
-      ).rejects.toThrow();
+      ).rejects.toThrow(CommunityOperationParentsMissingError);
+    });
+
+    it('keeps refusing, not pending, an operation the fold refuses with all its parents held', async () => {
+      const created = genesis();
+      const fold = jest
+        .spyOn(CommunityStateFold, 'fold')
+        .mockImplementation(() => {
+          throw new InvalidCommunityOperationError();
+        });
+
+      try {
+        await save(created);
+        await flushBackgroundTasks();
+
+        const outcome = await repository
+          .requireAtFrontier(communityId, [created.getHash()])
+          .catch((error: unknown) => error);
+
+        expect(outcome).toBeInstanceOf(InvalidCommunityOperationError);
+        expect(outcome).not.toBeInstanceOf(
+          CommunityOperationParentsMissingError,
+        );
+      } finally {
+        fold.mockRestore();
+      }
     });
 
     it('states the invitations as they were at the frontier', async () => {
@@ -392,6 +421,37 @@ describe('OrbitDBCommunityRepository', () => {
     await expect(
       repository.findDiscoverable({}, [communityId]),
     ).resolves.toEqual([]);
+  });
+
+  it('answers not ready instead of a partial list while a community head is held', async () => {
+    const created = genesis();
+
+    await save(created);
+    await save(join([created], alice));
+    await flushBackgroundTasks();
+
+    const pending = jest
+      .spyOn(registry, 'hasPendingRestoredHeadAdmissions')
+      .mockReturnValue(true);
+
+    await expect(repository.findByMember(alice)).rejects.toBeInstanceOf(
+      ReplicatedStateNotReadyError,
+    );
+    await expect(
+      repository.findDiscoverable({ networkId }),
+    ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+
+    pending.mockReturnValue(false);
+
+    const byMember = await repository.findByMember(alice);
+    const discoverable = await repository.findDiscoverable({ networkId });
+
+    expect(byMember.map((community) => community.getId().valueOf())).toEqual([
+      communityId.valueOf(),
+    ]);
+    expect(
+      discoverable.map((community) => community.getId().valueOf()),
+    ).toEqual([communityId.valueOf()]);
   });
 
   it('forgets a community once its last member left', async () => {

@@ -1,7 +1,10 @@
 import { Keychain } from '@app/contexts/keychains/domain/Keychain';
 import KeychainSignatureDomainService from '@app/contexts/keychains/domain/services/KeychainSignatureDomainService';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 
 import IpfsKeychainMapper from '../ipfs/mappers/IpfsKeychainMapper';
 
@@ -63,6 +66,33 @@ export class OrbitDBKeychainMutationGate extends OrbitDBMutationGate {
     });
   }
 
+  /** Intrinsic checks: a record that fails them can never become an authentic keychain. */
+  private authenticKeychain(
+    record: Record<string, unknown>,
+  ): Keychain | undefined {
+    try {
+      const keychain = this.keychainFrom(record);
+
+      if (!keychain || !this.signatures.isValidSignature(keychain)) {
+        return undefined;
+      }
+
+      const hasPrevious = keychain.getPreviousKeychainExternalIdentifier();
+
+      if (keychain.isFirstVersion() === Boolean(hasPrevious)) {
+        return undefined;
+      }
+
+      return keychain;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Content-addresses the keychain. An IPFS failure propagates: it says nothing
+   * about the record, so the caller holds it instead of refusing it.
+   */
   private async isCanonical(
     keychain: Keychain,
     cid: string | undefined,
@@ -75,40 +105,30 @@ export class OrbitDBKeychainMutationGate extends OrbitDBMutationGate {
   }
 
   private async isAuthentic(record: Record<string, unknown>): Promise<boolean> {
-    try {
-      const keychain = this.keychainFrom(record);
+    const keychain = this.authenticKeychain(record);
 
-      if (!keychain || !this.signatures.isValidSignature(keychain)) {
-        return false;
-      }
-
-      const hasPrevious = keychain.getPreviousKeychainExternalIdentifier();
-
-      if (keychain.isFirstVersion() === Boolean(hasPrevious)) {
-        return false;
-      }
-
-      return await this.isCanonical(keychain, this.stringValue(record, 'cid'));
-    } catch {
-      return false;
-    }
+    return (
+      keychain !== undefined &&
+      (await this.isCanonical(keychain, this.stringValue(record, 'cid')))
+    );
   }
 
   public governs(collection: string): boolean {
     return collection === OrbitDBKeychainMutationGate.COLLECTION;
   }
 
-  public async accepts(
+  public async verdictOf(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
-    if (!this.governs(collection)) return true;
+  ): Promise<OrbitDBMutationVerdict> {
+    if (!this.governs(collection)) return 'accepted';
 
-    return (
+    const authentic =
       record.id === record.cid &&
       record.deleted === undefined &&
-      (await this.isAuthentic(record))
-    );
+      (await this.isAuthentic(record));
+
+    return authentic ? 'accepted' : 'refused';
   }
 
   public governsHead(key: string): boolean {

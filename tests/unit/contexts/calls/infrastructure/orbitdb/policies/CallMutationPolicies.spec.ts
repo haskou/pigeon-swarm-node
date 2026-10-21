@@ -2,7 +2,9 @@ import CallEndMutationPolicy from '@app/contexts/calls/infrastructure/orbitdb/po
 import CallParticipantMutationPolicy from '@app/contexts/calls/infrastructure/orbitdb/policies/CallParticipantMutationPolicy';
 import CallStartMutationPolicy from '@app/contexts/calls/infrastructure/orbitdb/policies/CallStartMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import {
   CallRecordPayload,
@@ -25,6 +27,7 @@ describe('call mutation policies', () => {
   let registry: OrbitDBReplicatedStateRegistry;
   let conversation: Record<string, unknown>;
   let voiceAllowed: boolean;
+  let communityPresent: boolean;
   let identityNetworks: Record<string, string[]>;
   let startPolicy: CallStartMutationPolicy;
   let participantPolicy: CallParticipantMutationPolicy;
@@ -45,6 +48,7 @@ describe('call mutation policies', () => {
   beforeEach(() => {
     docs = [];
     voiceAllowed = true;
+    communityPresent = true;
     identityNetworks = { [alice]: [NETWORK], [bob]: [NETWORK] };
     conversation = {
       getNetworkId: () => ({ valueOf: () => NETWORK }),
@@ -70,7 +74,7 @@ describe('call mutation policies', () => {
       findById: jest.fn(async (id: { valueOf: () => string }) => {
         const networks = identityNetworks[id.valueOf()];
 
-        if (!networks) throw new Error('unknown identity');
+        if (!networks) return undefined;
 
         return {
           getNetworkIds: () =>
@@ -79,7 +83,7 @@ describe('call mutation policies', () => {
       }),
     } as never;
     const communities = {
-      hasById: jest.fn(async () => true),
+      hasById: jest.fn(async () => communityPresent),
       requireById: jest.fn(async () => community),
     } as never;
 
@@ -232,12 +236,29 @@ describe('call mutation policies', () => {
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
-    it('rejects a start in an unknown conversation', async () => {
+    it('holds a start until its conversation is admitted', async () => {
       conversation = undefined as never;
 
       await expect(
         startPolicy.assertPermitted(conversationStart(), alice, false),
-      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
+    });
+
+    it('holds a start while its conversation head is held', async () => {
+      const held = new CallStartMutationPolicy(
+        registry,
+        {
+          hasById: jest.fn(async () => {
+            throw new ReplicatedStateNotReadyError();
+          }),
+        } as never,
+        {} as never,
+        {} as never,
+      );
+
+      await expect(
+        held.assertPermitted(conversationStart(), alice, false),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
     });
 
     it('rejects a conversation start of a conversation that is not 1:1, whatever the record claims', async () => {
@@ -304,7 +325,6 @@ describe('call mutation policies', () => {
 
     it.each([
       ['another network', () => groupStart({ networkId: 'other-network' })],
-      ['an unknown creator', () => groupStart({}, carol)],
     ])('rejects a group-capability start on %s', async (_name, record) => {
       const start = record();
 
@@ -317,6 +337,18 @@ describe('call mutation policies', () => {
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
+    it('holds a group-capability start whose creator identity is not yet known', async () => {
+      const start = groupStart({}, carol);
+
+      await expect(
+        startPolicy.assertPermitted(
+          start,
+          start.creatorIdentityId as string,
+          false,
+        ),
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
+    });
+
     it('rejects a group-capability start authored by someone else', async () => {
       await expect(
         startPolicy.assertPermitted(groupStart(), bob, false),
@@ -327,6 +359,14 @@ describe('call mutation policies', () => {
       await expect(
         startPolicy.assertPermitted(communityStart(1), alice, false),
       ).resolves.toBeUndefined();
+    });
+
+    it('holds a community start while the community is not local yet', async () => {
+      communityPresent = false;
+
+      await expect(
+        startPolicy.assertPermitted(communityStart(1), alice, false),
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
     });
 
     it('rejects a community start the creator may not connect to', async () => {
@@ -412,10 +452,10 @@ describe('call mutation policies', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('rejects a participant record without an admitted start', async () => {
+    it('holds a participant record until its start is admitted', async () => {
       await expect(
         participantPolicy.assertPermitted(joined(), bob, false),
-      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
     });
 
     it('rejects an author who is not the identity, and deletions', async () => {
@@ -435,6 +475,24 @@ describe('call mutation policies', () => {
       await expect(
         participantPolicy.assertPermitted(joined(carol), carol, false),
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+    });
+
+    it('holds a community join while the community is not local yet', async () => {
+      const community = communityStart(1);
+      docs.push(community);
+      const record = clone(
+        participantPayload({
+          at: now(),
+          callId: community.callId as string,
+          identityId: carol,
+          state: 'joined',
+        }),
+      );
+
+      communityPresent = false;
+      await expect(
+        participantPolicy.assertPermitted(record, carol, false),
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
     });
 
     it('applies the community voice rule to community calls', async () => {
@@ -458,6 +516,32 @@ describe('call mutation policies', () => {
       ).rejects.toBeInstanceOf(InvalidPublicMutationError);
     });
 
+    it('holds a community join while the community head is held', async () => {
+      const community = communityStart(1);
+      docs.push(community);
+      const record = clone(
+        participantPayload({
+          at: now(),
+          callId: community.callId as string,
+          identityId: carol,
+          state: 'joined',
+        }),
+      );
+      const held = new CallParticipantMutationPolicy(
+        registry,
+        {
+          hasById: jest.fn(async () => {
+            throw new ReplicatedStateNotReadyError();
+          }),
+        } as never,
+        {} as never,
+      );
+
+      await expect(
+        held.assertPermitted(record, carol, false),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    });
+
     const groupJoin = (identity: string) => {
       const group = groupStart();
       docs.push(group);
@@ -479,7 +563,6 @@ describe('call mutation policies', () => {
     });
 
     it.each([
-      ['an unknown identity', () => carol],
       [
         'an identity of another network',
         () => {
@@ -498,6 +581,12 @@ describe('call mutation policies', () => {
         ).rejects.toBeInstanceOf(InvalidPublicMutationError);
       },
     );
+
+    it('holds a group-capability join whose identity is not yet known', async () => {
+      await expect(
+        participantPolicy.assertPermitted(groupJoin(carol), carol, false),
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
+    });
   });
 
   describe('CallEndMutationPolicy', () => {
@@ -542,17 +631,20 @@ describe('call mutation policies', () => {
       ).resolves.toBeUndefined();
     });
 
-    it('rejects an outsider, a spoofed author, a deletion and a missing start', async () => {
-      const start = conversationStart();
-
+    it('holds an end until its start is admitted', async () => {
       await expect(
         endPolicy.assertPermitted(
-          end(alice, start.callId as string),
+          end(alice, conversationStart().callId as string),
           alice,
           false,
         ),
-      ).rejects.toBeInstanceOf(InvalidPublicMutationError);
+      ).rejects.toBeInstanceOf(PublicMutationPendingError);
+    });
+
+    it('rejects an outsider, a spoofed author and a deletion', async () => {
+      const start = conversationStart();
       docs.push(start);
+
       await expect(
         endPolicy.assertPermitted(
           end(carol, start.callId as string),

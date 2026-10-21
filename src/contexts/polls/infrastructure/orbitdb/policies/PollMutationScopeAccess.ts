@@ -1,8 +1,9 @@
 import { Community } from '@app/contexts/communities/domain/Community';
 import { CommunityNotFoundError } from '@app/contexts/communities/domain/errors/CommunityNotFoundError';
+import { CommunityOperationParentsMissingError } from '@app/contexts/communities/domain/errors/CommunityOperationParentsMissingError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
-import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationFrontier } from '@app/contexts/public-mutations/domain/PublicMutationFrontier';
 import { ShortLivedLookup } from '@app/contexts/public-mutations/infrastructure/ShortLivedLookup';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -25,7 +26,12 @@ export default class PollMutationScopeAccess {
         frontier,
       );
     } catch (error) {
-      if (error instanceof CommunityNotFoundError) return undefined;
+      if (
+        error instanceof CommunityNotFoundError ||
+        error instanceof CommunityOperationParentsMissingError
+      ) {
+        return undefined;
+      }
 
       throw error;
     }
@@ -45,7 +51,7 @@ export default class PollMutationScopeAccess {
       () => this.loadCommunityAtFrontier(communityId, frontier),
     );
 
-    if (!community) throw new InvalidPublicMutationError();
+    if (!community) throw new PublicMutationPendingError();
 
     if (action === 'manage') {
       community.authorizeTextChannelPollCreation(actor, channelId);

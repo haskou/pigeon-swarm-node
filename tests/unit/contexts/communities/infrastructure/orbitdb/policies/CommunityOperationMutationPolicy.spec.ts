@@ -4,6 +4,7 @@ import { CommunityOperationAction } from '@app/contexts/communities/domain/value
 import { CommunityRoleId } from '@app/contexts/communities/domain/value-objects/CommunityRoleId';
 import CommunityOperationMutationPolicy from '@app/contexts/communities/infrastructure/orbitdb/policies/CommunityOperationMutationPolicy';
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 
 import {
   admission,
@@ -139,11 +140,11 @@ describe('CommunityOperationMutationPolicy', () => {
       await expect(admit(created)).resolves.toBeUndefined();
     });
 
-    it('refuses an operation whose parent has not been admitted, then admits it once the parent arrives', async () => {
+    it('holds an operation whose parent has not been admitted, then admits it once the parent arrives', async () => {
       const created = genesis();
       const joined = join([created], alice);
 
-      await expect(admit(joined)).rejects.toThrow();
+      await expect(admit(joined)).rejects.toBeInstanceOf(PublicMutationPendingError);
 
       await admit(created);
 
@@ -167,7 +168,7 @@ describe('CommunityOperationMutationPolicy', () => {
 
       await admit(created);
 
-      await expect(admit(forgedRole)).rejects.toThrow();
+      await expect(admit(forgedRole)).rejects.not.toBeInstanceOf(PublicMutationPendingError);
     });
 
     it('refuses a ban of the owner signed by a plain member', async () => {
@@ -178,7 +179,7 @@ describe('CommunityOperationMutationPolicy', () => {
       await admit(created);
       await admit(joined);
 
-      await expect(admit(forgedBan)).rejects.toThrow();
+      await expect(admit(forgedBan)).rejects.not.toBeInstanceOf(PublicMutationPendingError);
     });
 
     it('refuses a membership that the author cannot grant', async () => {
@@ -187,7 +188,7 @@ describe('CommunityOperationMutationPolicy', () => {
 
       await admit(created);
 
-      await expect(admit(forgedJoin)).rejects.toThrow();
+      await expect(admit(forgedJoin)).rejects.not.toBeInstanceOf(PublicMutationPendingError);
     });
 
     describe('joins', () => {
@@ -256,7 +257,7 @@ describe('CommunityOperationMutationPolicy', () => {
 
         await admit(created);
 
-        await expect(admit(removed)).rejects.toThrow();
+        await expect(admit(removed)).rejects.not.toBeInstanceOf(PublicMutationPendingError);
       });
 
       it('refuses a join that skips the reference its method requires', async () => {
@@ -264,7 +265,7 @@ describe('CommunityOperationMutationPolicy', () => {
 
         await admit(created);
 
-        await expect(admit(approval)).rejects.toThrow();
+        await expect(admit(approval)).rejects.not.toBeInstanceOf(PublicMutationPendingError);
       });
 
       it('refuses a reference on a method that must not carry one', async () => {
@@ -272,7 +273,7 @@ describe('CommunityOperationMutationPolicy', () => {
 
         await admit(created);
 
-        await expect(admit(added)).rejects.toThrow();
+        await expect(admit(added)).rejects.not.toBeInstanceOf(PublicMutationPendingError);
       });
     });
   });

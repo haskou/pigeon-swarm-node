@@ -8,6 +8,7 @@ import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/Publ
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { OrbitDBHeadIndex } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBHeadIndex';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 
 import PrivateCommunityPublicStorageGuard from '../PrivateCommunityPublicStorageGuard';
 import { OrbitDBCommunityMembershipRequestDocument } from './documents/OrbitDBCommunityMembershipRequestDocument';
@@ -142,6 +143,16 @@ export default class OrbitDBCommunityMembershipRequestRepository extends Communi
   public async findByIdentity(
     identityId: IdentityId,
   ): Promise<CommunityMembershipRequest[]> {
+    // A request head of this identity that this node restored is not admitted
+    // yet, so the list would leave it out: it waits until the head is
+    // admitted. A head a peer plants under the identity's key never waits it.
+    if (
+      this.registry.hasPendingRestoredHeadAdmissions(
+        this.identityIndexHeadKey(identityId),
+      )
+    ) {
+      throw new ReplicatedStateNotReadyError();
+    }
     const requests = this.newestFirst(
       this.requestIndex.cachedByPrefix(this.identityIndexHeadKey(identityId)),
     ).map((document) => this.mapper.toDomain(document));

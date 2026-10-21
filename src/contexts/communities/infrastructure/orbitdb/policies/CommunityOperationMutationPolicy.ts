@@ -1,18 +1,19 @@
 import { InvalidPublicMutationError } from '@app/contexts/public-mutations/domain/errors/InvalidPublicMutationError';
+import { PublicMutationPendingError } from '@app/contexts/public-mutations/domain/errors/PublicMutationPendingError';
 import { PublicMutationRecordShape } from '@app/contexts/public-mutations/domain/PublicMutationRecordShape';
 import { PublicMutationPolicy } from '@app/contexts/public-mutations/domain/services/PublicMutationPolicy';
 import { PublicMutationExpectation } from '@app/contexts/public-mutations/domain/services/PublicMutationVerifier';
 
+import { CommunityOperationParentsMissingError } from '../../../domain/errors/CommunityOperationParentsMissingError';
 import { CommunityOperation } from '../../../domain/operations/CommunityOperation';
 import { CommunityOperationLedger } from '../../../domain/operations/CommunityOperationLedger';
 
 /**
  * Admits a signed community operation only when its author's identity key
- * signed it and the author was permitted to perform it in the history the
- * operation builds on. Every admitted operation is remembered here, so the
- * parents of a replicated batch are found whatever the order it arrives in; an
- * operation whose parents have not replicated yet is refused and retried by
- * the registry.
+ * signed it and the ledger judges it permitted in the history it builds on.
+ * Every admitted operation is remembered here, so a replicated batch is
+ * admitted in any arrival order. An operation whose parent has not replicated
+ * yet is pending and retried by the registry; every other refusal is final.
  */
 export default class CommunityOperationMutationPolicy extends PublicMutationPolicy {
   private readonly shape = new PublicMutationRecordShape(
@@ -79,7 +80,10 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
     };
   }
 
-  /** Admission needs no lookup: the ledger holds every operation it judges. */
+  /**
+   * Admits an operation the ledger judges in its causal past. An operation whose
+   * parent has not arrived yet is pending; every other refusal is final.
+   */
   public assertPermitted(
     record: Record<string, unknown>,
     _authorIdentityId: string,
@@ -94,7 +98,11 @@ export default class CommunityOperationMutationPolicy extends PublicMutationPoli
 
       return Promise.resolve();
     } catch (error) {
-      return Promise.reject(error);
+      return Promise.reject(
+        error instanceof CommunityOperationParentsMissingError
+          ? new PublicMutationPendingError()
+          : error,
+      );
     }
   }
 }

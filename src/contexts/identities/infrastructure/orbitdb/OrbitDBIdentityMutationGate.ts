@@ -3,7 +3,10 @@ import { IdentityPrimitivesShape } from '@app/contexts/identities/domain/Identit
 import IdentityRecordAdmissionDomainService from '@app/contexts/identities/domain/services/IdentityRecordAdmissionDomainService';
 import IpfsIdentityMapper from '@app/contexts/identities/infrastructure/ipfs/mappers/IpfsIdentityMapper';
 import IPFS from '@app/contexts/shared/infrastructure/ipfs/IPFS';
-import { OrbitDBMutationGate } from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
+import {
+  OrbitDBMutationGate,
+  OrbitDBMutationVerdict,
+} from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBMutationGate';
 
 /**
  * Gates replicated identity records and identity head keys. Admission rules
@@ -33,9 +36,10 @@ export class OrbitDBIdentityMutationGate extends OrbitDBMutationGate {
     return Identity.fromPrimitives(identity);
   }
 
-  private async authenticIdentity(
+  /** Intrinsic checks: a record that fails them can never become a valid identity. */
+  private admittedIdentity(
     record: Record<string, unknown>,
-  ): Promise<Identity | undefined> {
+  ): Identity | undefined {
     try {
       const serializedBytes = Buffer.byteLength(JSON.stringify(record));
 
@@ -45,15 +49,7 @@ export class OrbitDBIdentityMutationGate extends OrbitDBMutationGate {
 
       const identity = this.identityFrom(record);
 
-      if (!identity || !this.admission.admitsIdentity(identity, record)) {
-        return undefined;
-      }
-
-      const calculated = await this.ipfsManager.calculateJSONId(
-        this.mapper.toDocument(identity),
-      );
-
-      return this.admission.admitsCanonicalCid(record.cid, calculated.valueOf())
+      return identity && this.admission.admitsIdentity(identity, record)
         ? identity
         : undefined;
     } catch {
@@ -61,17 +57,38 @@ export class OrbitDBIdentityMutationGate extends OrbitDBMutationGate {
     }
   }
 
+  /**
+   * Content-addresses the identity. An IPFS failure propagates: it says nothing
+   * about the record, so the caller holds it instead of refusing it.
+   */
+  private async isCanonical(
+    identity: Identity,
+    cid: unknown,
+  ): Promise<boolean> {
+    const calculated = await this.ipfsManager.calculateJSONId(
+      this.mapper.toDocument(identity),
+    );
+
+    return this.admission.admitsCanonicalCid(cid, calculated.valueOf());
+  }
+
   public governs(collection: string): boolean {
     return collection === OrbitDBIdentityMutationGate.COLLECTION;
   }
 
-  public async accepts(
+  public async verdictOf(
     collection: string,
     record: Record<string, unknown>,
-  ): Promise<boolean> {
-    if (!this.governs(collection)) return true;
+  ): Promise<OrbitDBMutationVerdict> {
+    if (!this.governs(collection)) return 'accepted';
 
-    return (await this.authenticIdentity(record)) !== undefined;
+    const identity = this.admittedIdentity(record);
+
+    if (!identity) return 'refused';
+
+    return (await this.isCanonical(identity, record.cid))
+      ? 'accepted'
+      : 'refused';
   }
 
   public governsHead(key: string): boolean {
@@ -87,9 +104,11 @@ export class OrbitDBIdentityMutationGate extends OrbitDBMutationGate {
   ): Promise<boolean> {
     if (!this.governsHead(key)) return true;
 
-    const identity = await this.authenticIdentity(record);
+    const identity = this.admittedIdentity(record);
 
-    if (!identity) return false;
+    if (!identity || !(await this.isCanonical(identity, record.cid))) {
+      return false;
+    }
 
     const signed = identity.toPrimitives();
     const bound = key.startsWith(

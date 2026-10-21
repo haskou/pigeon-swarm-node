@@ -209,6 +209,7 @@ package "identities.infrastructure" {
 
   class OrbitDBIdentityMutationGate {
     +governs(collection): boolean
+    +verdictOf(collection, record): Promise<OrbitDBMutationVerdict>
     +accepts(collection, record): Promise<boolean>
     +governsHead(key): boolean
     +acceptsHead(key, record): Promise<boolean>
