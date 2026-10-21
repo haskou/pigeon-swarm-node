@@ -172,7 +172,9 @@ describe('Device sealing routes', () => {
   };
 
   const getSigned = (target: string, signer?: KeyPair) =>
-    fetch(`${baseUrl}${target}`, { headers: signed('GET', target, {}, signer) });
+    fetch(`${baseUrl}${target}`, {
+      headers: signed('GET', target, {}, signer),
+    });
 
   beforeAll(async () => {
     owner = await KeyPair.generate();
@@ -222,7 +224,12 @@ describe('Device sealing routes', () => {
           throw new DeviceAuthorizationNotFoundError();
         }
 
-        return new DeviceAuthorizationTransitionLog([], [], transitions, states);
+        return new DeviceAuthorizationTransitionLog(
+          [],
+          [],
+          transitions,
+          states,
+        );
       },
     );
 
@@ -237,7 +244,10 @@ describe('Device sealing routes', () => {
           mock<NodeRepository>(),
         ),
       ],
-      [DeviceAuthorizationFinder, new DeviceAuthorizationFinder(authorizationRepository)],
+      [
+        DeviceAuthorizationFinder,
+        new DeviceAuthorizationFinder(authorizationRepository),
+      ],
       [
         DeviceSealingRecordPublisher,
         new DeviceSealingRecordPublisher(
@@ -259,7 +269,8 @@ describe('Device sealing routes', () => {
     ]);
     jest
       .spyOn(Route.prototype, 'get')
-      .mockImplementation(((service: unknown) => services.get(service)) as never);
+      .mockImplementation(((service: unknown) =>
+        services.get(service)) as never);
 
     const app = createExpressServer({
       controllers: [
@@ -338,7 +349,10 @@ describe('Device sealing routes', () => {
     });
 
     it.each([
-      ['a credential the head does not authorize', () => recordBody({ signer: stranger })],
+      [
+        'a credential the head does not authorize',
+        () => recordBody({ signer: stranger }),
+      ],
       ['a day older than yesterday', () => recordBody({ utcDay: dayOf(-3) })],
       ['a day after today', () => recordBody({ utcDay: dayOf(2) })],
       [
@@ -390,8 +404,9 @@ describe('Device sealing routes', () => {
     it('serves the public view of today and yesterday without authentication', async () => {
       await putRecord(
         recordBody({
+          deviceCredential: wire(phone),
           sealingPublicKey: sealingPublicKeyOf(21),
-          signer: owner,
+          signer: phone,
           utcDay: dayOf(-1),
         }),
       );
@@ -413,9 +428,9 @@ describe('Device sealing routes', () => {
       ]);
       expect(view.identityId).toBe(identityId.valueOf());
       expect(view.revision).toBe(authorization.getRevision().valueOf());
-      expect(view.devices.map(({ deviceCredential }) => deviceCredential)).toEqual(
-        [wire(owner), wire(phone)].sort(),
-      );
+      expect(
+        view.devices.map(({ deviceCredential }) => deviceCredential),
+      ).toEqual([wire(owner), wire(phone)].sort());
       view.devices.forEach((device) => {
         expect(Object.keys(device).sort()).toEqual([
           'deviceCredential',
@@ -430,7 +445,7 @@ describe('Device sealing routes', () => {
         });
       });
       expect(
-        view.devices.find((device) => device.deviceCredential === wire(owner))
+        view.devices.find((device) => device.deviceCredential === wire(phone))
           ?.sealingKeys,
       ).toContainEqual({
         sealingPublicKey: sealingPublicKeyOf(21),
@@ -439,9 +454,7 @@ describe('Device sealing routes', () => {
     });
 
     it('answers 404 for an identity this node does not hold', async () => {
-      const response = await fetch(
-        `${baseUrl}${viewPath(wire(stranger))}`,
-      );
+      const response = await fetch(`${baseUrl}${viewPath(wire(stranger))}`);
       const payload = (await response.json()) as { code: number };
 
       expect(response.status).toBe(404);
@@ -535,9 +548,11 @@ describe('Device sealing routes', () => {
 
       expect(last).toBe(429);
       expect(
-        ((await (await getSigned(transitionsPath(), reader)).json()) as {
-          code: number;
-        }).code,
+        (
+          (await (await getSigned(transitionsPath(), reader)).json()) as {
+            code: number;
+          }
+        ).code,
       ).toBe(RATE_LIMITED);
       expect((await getSigned(transitionsPath(), stranger)).status).toBe(200);
     });

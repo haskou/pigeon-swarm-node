@@ -24,7 +24,7 @@ no endpoint served them.
 ### Endpoint
 
 ```http
-GET /identity-devices/{percent-encoded identityId}/transitions?after=<revision>
+GET /identity-devices/{percent-encoded identityId}/transitions?cursor=<revision>&limit=<n>
 ```
 
 `200` returns:
@@ -58,10 +58,10 @@ primitives equal the stored signed record field for field.
   order: revision groups ascending, each group in the shared tie-break order,
   equivalent duplicates compacted. Records the replay rejected are never
   served.
-- `after` (optional, default `0`) keeps only entries whose `revision` is
-  greater than it, in all three lists. It must be a non-negative decimal safe
-  integer without leading zeros; anything else returns `400` with code
-  `400050`.
+- `cursor` (optional, default `0`) keeps only entries whose `revision` is
+  greater than it. It must be a non-negative decimal safe integer without
+  leading zeros; `limit` is an integer from 1 to 100. Anything else returns
+  `400` with code `400050`. `nextCursor` (string or `null`) pages the log.
 
 An overflowed (suspended) document serves its frontier, the highest witness
 source. The suspension itself is a node-local state that no key signed, so it
@@ -73,51 +73,33 @@ stays behind `/devices`.
 
 ### Authentication
 
-Authentication runs before the query is parsed, so a caller that fails it
-always gets the generic `401` (`401020`):
+Any signed caller. The normal signed HTTP headers (`X-Identity-Id`,
+`X-Timestamp`, `X-Signature`), fresh, signed by any identity; the signer does
+not have to be the path identity, and no device or recovery proof header is
+read. An anonymous request gets the generic `401`. The read is rate limited
+per signing identity (60 per minute) and per node (600 per minute), code
+`429030`.
 
-1. The normal signed HTTP headers (`X-Identity-Id`, `X-Timestamp`,
-   `X-Signature`), fresh, signed by the identity named in the path.
-2. Exactly one complete proof over the same canonical payload:
-   `X-Device-Credential` + `X-Device-Signature`, or `X-Recovery-Signature`
-   checked against the identity's recovery authority.
-
-Unlike the checkpoint read, the device credential does **not** have to be
-authorized at the head. A device that was just removed must be able to read
-its removal. The device signature still proves possession of the key, so the
-node discloses to that key and nothing else.
-
-Every proof must be fresh, but only the recovery authority and a device some
-replayed state authorized (`log.records(reader)`) take a slot in the replay
-guard, so a replayed proof of theirs is refused. A key in no replayed state
-takes no slot and reads only the public recovery lineage, so a key that was
-never authorized cannot fill the guard.
+This is the only authorization change of #698 stage 2: `GET
+/identity-devices/{identityId}` and `/devices` stay owner-only with a device or
+recovery proof.
 
 ### Disclosure
 
-The node builds a `DeviceAuthorizationTransitionLog` (the lists above plus
-every replayed state from the base to the head) and serves only
-`log.disclosedTo(reader).after(after)`:
+The node serves `log.disclose().page(cursor, limit)`: the whole log, paged by
+whole revision groups ascending (at most `limit` transitions, the first group
+always included). `recoveries` and `concurrentRecoveries` are served on every
+page. `nextCursor` is the revision of the last served group, or `null` when
+the log is exhausted. `cursor` (default `0`) and `limit` (default 50, maximum 100) are part of the signed request target, so a relay cannot change them.
+Any other query key, including the retired `after`, returns `400` (`400050`).
 
-| Reader | Disclosed |
-| --- | --- |
-| Recovery authority of the identity | every list |
-| Device `C` authorized in some replayed state | `recoveries`, `concurrentRecoveries` and the transitions whose `previousRevision` is at most `R_C`, the revision of the last state that authorizes `C` |
-| Device in no replayed state | `recoveries` and `concurrentRecoveries` only |
-
-So a device authorized at the head reads everything, a revoked device reads up
-to and including the revision group that removed it and nothing signed after
-it, and a device that was enrolled before the latest recovery (whose states the
-checkpoint discarded) reads the recovery that ended its epoch. The node cannot
-tell such a device from a key it never saw, so both get the recovery lineage.
-
-Unauthenticated callers and other identities get the generic `401` and learn
-nothing; the existing catalog already requires the identity signature plus an
-authorized device proof.
-
-`after` is part of the signed request target (path and query), so a relay cannot
-change it without invalidating the signature. The node still only narrows what the
-authenticated reader is entitled to; it never widens a disclosure.
+Transition-history disclosure waiver: any signed identity on a node learns the
+add and remove history (the count and order of enrollments, revocations and
+recoveries) of any identity it asks about. This is an explicit design
+position: a sender must replay the log to verify the sealing view of a
+recipient it has never met. Scope is private networks only; security review
+must assess it. The entries carry no `sealedSecrets` and no head revision
+beyond what they state.
 
 ## Client verification algorithm
 
@@ -125,7 +107,7 @@ Trusted inputs, all held by the device:
 
 - the genesis: identity version 1 binds the initial device credential and the
   recovery authority (`DeviceAuthorization.genesis(identityId, networkIds,
-  initialCredential, recoveryAuthority)`);
+initialCredential, recoveryAuthority)`);
 - its own credential `C`;
 - its local epoch `E` and verified revision `L`: the `epoch` and `revision` of
   the transition that enrolled it (or `fromRecovery(operationId)` and the
@@ -134,7 +116,7 @@ Trusted inputs, all held by the device:
 
 To decide whether it was removed:
 
-1. Fetch without `after`. `after` is for incremental sync from a locally
+1. Fetch from cursor `0` and follow `nextCursor`. A cursor is for incremental sync from a locally
    verified state; it must never be the basis of a wipe.
 2. Replay `recoveries` and `concurrentRecoveries` from the genesis with the
    shared lineage rules: each recovery verifies its proof of possession and the
@@ -212,10 +194,10 @@ In every case a wipe needs a signature from a key that had the power to remove
 
 ## Residuals
 
-- A caller holding the identity key and any self-generated key learns the
-  recovery lineage: target credentials, operation ids, revisions and carried
-  caps. Recoveries carry no secrets or network ids, and that caller already
-  holds the identity key.
+- Any signed identity learns the whole transition history of any identity
+  (target credentials, operation ids, revisions, carried caps, the count and
+  order of device additions and removals). Entries carry no secrets or network
+  ids. This waiver is private-network only and is flagged for security review.
 - A stolen authorized device key can sign a genuine revocation of `C` and make
   it wipe. That is within the power the key already has: it could revoke `C`
   on every node.
@@ -229,19 +211,18 @@ In every case a wipe needs a signature from a key that had the power to remove
 
 ## Verification
 
-- `DeviceAuthorizationTransitionLog` unit spec: full disclosure to the recovery
-  authority, the cut at a revoked device's removal group, the recovery lineage
-  for an unknown device, nothing to an unrelated authority, and `after`.
+- `DeviceAuthorizationTransitionLog` unit spec: the whole log and the paging
+  by whole revision groups with `nextCursor`.
 - `OrbitDBDeviceAuthorizationReplayer` unit spec: the accepted history in
   replay order without rejected records, the checkpoint lineage and concurrent
   recoveries, and the frontier of an overflowed document.
 - Repository, finder and request authenticator unit specs, including a valid
   but unauthorized device proof, and the `GetDeviceAuthorizationTransitionLogRequest`
-  spec for every refused `after` shape (leading zeros, signs, exponents,
+  spec for every refused `cursor`, `limit` and `after` shape (leading zeros, signs, exponents,
   unsafe integers, repeated or nested query values).
 - `DeviceAuthorizationTransitionLogVectors` unit spec: every read and verdict
   of the shared vectors, signatures verified.
-- `DeviceAuthorizationRoute.feature`: the owner and the recovery authority read
-  the whole log, a revoked device reads up to its removal, `after` narrows, an
-  invalid `after` returns `400050`, and unsigned or foreign requests return
-  `401020`.
+- `DeviceAuthorizationRoute.feature`: a signed identity reads
+  the log, `cursor` and `limit`
+  page, an invalid `cursor`, `limit` or `after` returns `400050`, any signed identity reads and
+  an anonymous request returns `401`.

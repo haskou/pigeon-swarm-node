@@ -303,7 +303,12 @@ Signal event attributes are:
   "participantIds": ["<senderIdentityId>", "<recipientIdentityId>"],
   "recipientIdentityId": "<recipientIdentityId>",
   "scopeType": "conversation",
-  "sealedEntries": [{"envelope": "<envelope>", "recipientDeviceCredential": "<deviceCredential>"}],
+  "sealedEntries": [
+    {
+      "envelope": "<envelope>",
+      "recipientDeviceCredential": "<deviceCredential>"
+    }
+  ],
   "senderDeviceCredential": "<deviceCredential>",
   "senderIdentityId": "<senderIdentityId>",
   "sentAt": 1770000000000,
@@ -1131,6 +1136,24 @@ highest revision (the lowest canonical form among equals) and keeps every lost
 recovery, at any revision, that carries a compromise cap the kept one lacks, with
 the lost recoveries it recovered from, in `checkpoint.concurrent` (at most 128).
 A heal therefore never drops a cap that only a losing partition's recovery carried.
+
+## Device sealing records
+
+A device publishes one daily sealing record per UTC day through `PUT
+/identity-devices/{identityId}/sealing-records`. The signed record
+`{deviceCredential, identityId, sealingPublicKey, utcDay}` (signing prefix
+`pigeon:device-sealing-record:v1`, at most 1024 bytes) is stored as a head under
+the `device-sealing-record:` registry prefix and replicated like other heads.
+Every node admits it only when the credential is authorized at the
+authorization head, the day is today or yesterday in UTC and the device
+signature verifies; the merger keeps one key per (identity, device, day) and
+refuses a different key for the same triple. The public `GET
+/identity-devices/{identityId}/sealing-view` serves the keys for UTC days D and
+D-1 only. Senders verify it against the signed transitions read from `GET
+/identity-devices/{identityId}/transitions`, which any signed identity may
+read: the add and remove history of an identity is therefore disclosed to every
+signed identity of the node (private-network scope, flagged for security
+review). Pruning of old records is not reported.
 
 ## Live call projection boundary
 

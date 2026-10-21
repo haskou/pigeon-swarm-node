@@ -128,16 +128,14 @@ const registeredText = async (
     return undefined;
   }
 
-  return JSON.stringify(
-    (await node.repository.requireById(id)).toPrimitives(),
-  );
+  return JSON.stringify((await node.repository.requireById(id)).toPrimitives());
 };
 
 describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
-  const networks = [
+  const networks: [string, string, PrivateKey | undefined][] = [
     ['private', PRIVATE_NETWORK_ID, PrivateKey.generate()],
     ['public', PUBLIC_NETWORK_ID, undefined],
-  ] as const;
+  ];
 
   describe.each(networks)('on a %s network', (kind, networkId, key) => {
     const scenario = async () => {
@@ -158,20 +156,23 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       };
     };
 
-    it('registers a sealed signal for the recipient and serves only the opaque envelope', async () => {
+    it('registers a sealed signal for the recipient and carries no sdp on the wire', async () => {
       const s = await scenario();
       const signalId = randomUUID();
 
       await s.sender.adapter.publish([
-        new CallSignalSentEvent(CALL_ID, signalAttributes({ networkId, signalId })),
+        new CallSignalSentEvent(
+          CALL_ID,
+          signalAttributes({ networkId, signalId }),
+        ),
       ]);
 
       expect(
         await s.recipient.repository.hasById(new CallSignalId(signalId)),
       ).toBe(true);
       expect(
-        s.fabric.carried.every((payload) => payload.includes(ENVELOPE)),
-      ).toBe(true);
+        s.fabric.carried.some((payload) => payload.includes('"sdp"')),
+      ).toBe(false);
     });
 
     it('E1/E2: never registers or relays a plaintext payload that a sender adds', async () => {
@@ -200,7 +201,10 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       ['no signature', { signature: '' }],
       ['no sender device', { senderDeviceCredential: '' }],
       ['no sealed entries', { sealedEntries: [] }],
-      ['an expiry that is not twenty seconds after creation', { expiresAt: CREATED_AT + 30_000 }],
+      [
+        'an expiry that is not twenty seconds after creation',
+        { expiresAt: CREATED_AT + 30_000 },
+      ],
     ])('E4: refuses a signal with %s', async (_case, override) => {
       const s = await scenario();
       const signalId = randomUUID();

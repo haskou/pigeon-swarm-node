@@ -6705,58 +6705,82 @@ current head. It carries no labels, commitments, revoked credentials or
 revocation history; a client keeps its own device names. Failures are the same
 generic `401`, and `409` when the checkpoint is not available on this node.
 
-Read the signed transitions the requesting key may verify with:
+Read a page of the signed transitions of an identity with:
 
 ```http
-GET /identity-devices/{percent-encoded identityId}/transitions?after=<revision>
+GET /identity-devices/{percent-encoded identityId}/transitions?cursor=<revision>&limit=<n>
 ```
 
-Authentication matches the checkpoint read (the stable identity signing key
-must match the requested identity and exactly one complete device or recovery
-proof is required) with one difference: the device credential does not have to
-be authorized at the head. A device that was just removed proves possession of
-its key and reads the transitions up to its removal, so it can verify the
-removal itself instead of trusting a node's `401`. The recovery authority and
-a device some replayed state authorized take a replay slot, so a replayed read
-of theirs is refused. Any other key is still checked for its signature and
-freshness but takes no slot: it only reads the public recovery lineage
-described below, so a key that was never authorized cannot fill the guard.
-Authentication runs before the query is parsed, and every authentication
-failure is the same generic `401` (`401020`).
+Any signed caller may read it: the signer may be any identity, not the path
+identity, and no device or recovery proof header is read. An anonymous request
+returns `401`. This is the only read whose authorization #698 stage 2 widened;
+`GET /identity-devices/{identityId}` and `/devices` stay owner-only.
 
-The response is `{ concurrentRecoveries, identityId, recoveries, transitions }`.
-Every entry is a stored transition in exactly the primitives
-`POST /identity-devices/{identityId}/transitions` accepted, including `proofOfPossession`
-and `signature`; the node never re-signs or rewrites one and serves only
-records its replay accepted. `recoveries` is the recovery lineage of the
-replay base (oldest first, empty before the first recovery),
-`concurrentRecoveries` holds the recoveries that lost that checkpoint, at its
-revision or an earlier one, and still carry a cap it lacks (with the lost
-recoveries they recovered from), and
-`transitions` is the accepted history from that base in replay order. The
-recovery authority reads all three lists. A device authorized in some replayed
-state reads both recovery lists and the transitions whose `previousRevision` is
-at most the revision of the last state that authorizes it, so a revoked device
-sees the group that removed it and nothing signed afterwards. Any other device
-reads the two recovery lists only. No head revision, epoch, network id or
-device list is returned; the client derives them by replaying what it verifies
-from the genesis.
+Transition-history disclosure waiver: any signed identity on a node can learn
+the add and remove history (the count and order of enrollments, revocations and
+recoveries) of any identity it asks about. This is an explicit design position
+so that a sender can replay the log and verify a recipient's sealing view. It
+is scoped to private networks and is flagged for security review.
 
-`after` (optional, default `0`) keeps only entries whose `revision` is greater
-than it. It must be a non-negative decimal safe integer without leading zeros;
-anything else returns `400` (`400050`). It is part of the signed request target, so
-changing it invalidates the signature; it can only narrow the response, so it serves incremental sync only.
-A client deciding whether it was removed fetches without `after`, verifies
-every entry with the shared replay rules and wipes only on positive signed
-evidence: a recovery in its own epoch targeting another credential, or a
-replayed revision group above its verified revision that removes its
-credential. Absence, a `401`, a `409`, a timeout or a suspended document is
-never evidence of removal. `409` means the checkpoint is not available on this
-node. Byte-exact served bodies and removal verdicts are in
+The response is `{ concurrentRecoveries, identityId, nextCursor, recoveries,
+transitions }`. Every entry is a stored transition in exactly the primitives
+`POST /identity-devices/{identityId}/transitions` accepted, including
+`proofOfPossession` and `signature`; the node never re-signs or rewrites one,
+never serves `sealedSecrets`, and serves only records its replay accepted.
+`recoveries` and `concurrentRecoveries` are served on every page;
+`transitions` holds whole revision groups ascending after `cursor`, at most
+`limit` entries (the first group is always served). `nextCursor` is the
+revision to send as `cursor` next, or `null` once the log is exhausted. No head
+revision, epoch, network id or device list is returned; the client replays
+what it verifies from the genesis.
+
+`cursor` (default `0`) must be a non-negative decimal safe integer without
+leading zeros and `limit` an integer from 1 to 100 (default 50); any other
+value, or any other query key such as the retired `after`, returns `400`
+(`400050`). Both are part of the signed request target. The read is rate
+limited per signing identity (60 per minute) and per node (600 per minute):
+excess returns `429` (`429030`). A client deciding whether it was removed pages
+from `0`, verifies every entry with the shared replay rules and wipes only on
+positive signed evidence: a recovery in its own epoch targeting another
+credential, or a replayed revision group above its verified revision that
+removes its credential. Absence, a `401`, a `409`, a timeout or a suspended
+document is never evidence of removal. `409` means the checkpoint is not
+available on this node. Byte-exact served bodies and removal verdicts are in
 [`tests/fixtures/device-authorization-transition-log-vectors.json`](../tests/fixtures/device-authorization-transition-log-vectors.json),
 checked by the `DeviceAuthorizationTransitionLogVectors` unit spec. The design
-and its single-node threat model are in
+and its threat model are in
 [`docs/design/device-authorization-transition-log.md`](design/device-authorization-transition-log.md).
+
+Publish a device's daily sealing key with:
+
+```http
+PUT /identity-devices/{percent-encoded identityId}/sealing-records
+```
+
+The request is signed by the identity itself (the signer must equal the path
+identity, else `401`). The body is `{ deviceCredential, sealingPublicKey,
+signature, utcDay }` with `utcDay` as `YYYY-MM-DD`; `signature` is the
+device's signature over the record. `201` means the record was admitted and
+`200` that an identical record already was. `409` means a different
+`sealingPublicKey` is already admitted for the same identity, device and day.
+`422` (`422040`) means it was not admitted: the credential is not authorized at
+the head, the day is not today or yesterday in UTC, the signature is invalid
+or a field is malformed. A body over 8 KB returns `413`. No route-specific rate
+limit applies beyond the signed-request replay guard.
+
+Read the sealing keys a sender seals to with the public, unauthenticated:
+
+```http
+GET /identity-devices/{percent-encoded identityId}/sealing-view
+```
+
+The response is `{ identityId, revision, devices: [{ deviceCredential,
+sealingKeys: [{ utcDay, sealingPublicKey }] }] }` for the devices authorized
+at the head and UTC days D and D-1 only; it carries no labels, timestamps or
+`compromisedSince`. A sender verifies it by replaying the transitions above.
+An identity the node does not know returns `404` (`404050`); the read is rate
+limited per target identity (60 per minute) and per node (600 per minute),
+excess returns `429` (`429030`).
 
 Submit an enrollment, revocation or recovery operation to:
 
