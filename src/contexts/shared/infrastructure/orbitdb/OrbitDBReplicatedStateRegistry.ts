@@ -296,6 +296,9 @@ export default class OrbitDBReplicatedStateRegistry {
   /** Settles run one at a time, so each one sees what the previous left. */
   private headSettlement: Promise<boolean> = Promise.resolve(true);
 
+  /** A settle is queued that no settle has started yet. */
+  private deferredHeadSettleScheduled = false;
+
   private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
     string
@@ -1131,7 +1134,12 @@ export default class OrbitDBReplicatedStateRegistry {
 
     if (!heads) return;
 
-    if (heads.get(headKey)?.size === 0) heads.delete(headKey);
+    if (heads.get(headKey)?.size === 0) {
+      heads.delete(headKey);
+      // The key no longer waits: a merger that could not judge a head on it
+      // can now.
+      this.scheduleDeferredHeadSettle();
+    }
 
     if (heads.size === 0) {
       this.unverifiedHeads.delete(networkId);
@@ -1176,7 +1184,10 @@ export default class OrbitDBReplicatedStateRegistry {
       return;
     }
 
-    if (proves) this.markVerifiedHead(networkId, headKey);
+    if (proves) {
+      this.markVerifiedHead(networkId, headKey);
+      this.scheduleDeferredHeadSettle();
+    }
 
     this.supersedeUnverifiedCopies(networkId, headKey, delivered);
   }
@@ -2067,6 +2078,8 @@ export default class OrbitDBReplicatedStateRegistry {
    */
   private settleDeferredHeads(): Promise<boolean> {
     this.headSettlement = this.headSettlement.then(async () => {
+      this.deferredHeadSettleScheduled = false;
+
       if (!this.deferredHeadOverflow && this.deferredHeadKeys.size === 0) {
         return true;
       }
@@ -2109,6 +2122,23 @@ export default class OrbitDBReplicatedStateRegistry {
     });
 
     return this.headSettlement;
+  }
+
+  /**
+   * Queues one settle once a held key stops waiting while heads are
+   * deferred. While a network still reconciles, its end settles them instead;
+   * a settle already queued covers the change too.
+   */
+  private scheduleDeferredHeadSettle(): void {
+    if (
+      this.deferredHeadSettleScheduled ||
+      this.networksAwaitingHeadReconciliation.size > 0 ||
+      (!this.deferredHeadOverflow && this.deferredHeadKeys.size === 0)
+    ) {
+      return;
+    }
+    this.deferredHeadSettleScheduled = true;
+    void this.settleDeferredHeads();
   }
 
   /**
@@ -3349,6 +3379,7 @@ export default class OrbitDBReplicatedStateRegistry {
     this.settlingHeadKeys = new Set();
     this.settlingAllHeads = false;
     this.headSettlement = Promise.resolve(true);
+    this.deferredHeadSettleScheduled = false;
     this.stopHeadRetries();
   }
 
