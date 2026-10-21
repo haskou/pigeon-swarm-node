@@ -5,22 +5,41 @@ const ONE_DAY_MS = 86_400_000;
 
 export default class DeviceSealingRecordPolicy {
   /**
-   * The authorization is a provider, asked last: the day and the signature are
-   * cheap, the authorization head is parsed and verified, so a record that
-   * fails them never costs that work.
+   * Ingress: a record is admitted only when it is for a current day, carries a
+   * valid signature and is authorized. The authorization is a provider, asked
+   * last, so a record that fails the cheap checks never costs that work.
    */
   public admits(
     record: DeviceSealingRecord,
     authorizationOf: () => DeviceAuthorization | undefined,
     now: Date,
   ): boolean {
-    if (!this.isCurrentDay(record.getUtcDay(), now)) {
-      return false;
-    }
+    return (
+      this.isCurrentDay(record.getUtcDay(), now) &&
+      record.hasValidSignature() &&
+      this.isAuthorized(record, authorizationOf)
+    );
+  }
 
-    if (!record.hasValidSignature()) {
-      return false;
-    }
+  /**
+   * Read path: a stored record that passed ingress is served again without a
+   * second signature check, so a read costs no signature verification.
+   */
+  public serves(
+    record: DeviceSealingRecord,
+    authorizationOf: () => DeviceAuthorization | undefined,
+    now: Date,
+  ): boolean {
+    return (
+      this.isCurrentDay(record.getUtcDay(), now) &&
+      this.isAuthorized(record, authorizationOf)
+    );
+  }
+
+  private isAuthorized(
+    record: DeviceSealingRecord,
+    authorizationOf: () => DeviceAuthorization | undefined,
+  ): boolean {
     const authorization = authorizationOf();
 
     return (

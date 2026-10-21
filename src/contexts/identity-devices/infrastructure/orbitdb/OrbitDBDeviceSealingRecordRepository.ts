@@ -143,7 +143,7 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
       .filter(
         (record): record is DeviceSealingRecord =>
           record !== undefined &&
-          this.policy.admits(record, authorizationOf, now),
+          this.policy.serves(record, authorizationOf, now),
       );
   }
 
