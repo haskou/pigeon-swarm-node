@@ -17,20 +17,33 @@ const UNHANDLED_ERROR_MESSAGE = 'Internal server error.';
 const PLAIN_ERROR_NAME = /^[A-Za-z][A-Za-z0-9_$]{0,63}$/;
 
 interface StatusCarrier {
+  readonly expose?: unknown;
   readonly httpCode?: unknown;
   readonly status?: unknown;
   readonly statusCode?: unknown;
 }
 
-// The kernel answers any error that carries an HTTP status itself; everything
-// else is answered by this module, because the kernel's own unhandled branch
-// sends the error message to the caller.
+const FIRST_CLIENT_ERROR = 400;
+const LAST_CLIENT_ERROR = 499;
+
+// The kernel sends the message of any error that carries an HTTP status, and
+// http-errors (used by send and serve-static) stamps a status on the file
+// system error it wraps while keeping its path message. Only routing-controllers
+// errors and client errors that were not flagged as not exposable keep that
+// path; every other error, 5xx statuses included, is answered by this module.
 function carriesHttpStatus(error: Error): boolean {
+  if (error instanceof HttpError) {
+    return true;
+  }
+
   const carrier = error as Error & StatusCarrier;
+  const status = carrier.httpCode ?? carrier.statusCode ?? carrier.status;
 
   return (
-    error instanceof HttpError ||
-    Boolean(carrier.httpCode ?? carrier.statusCode ?? carrier.status)
+    carrier.expose !== false &&
+    Number.isInteger(status) &&
+    (status as number) >= FIRST_CLIENT_ERROR &&
+    (status as number) <= LAST_CLIENT_ERROR
   );
 }
 
