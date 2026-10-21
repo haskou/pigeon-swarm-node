@@ -494,9 +494,7 @@ describe('Device sealing routes', () => {
       expect(view.revision).toBe(authorization.getRevision().valueOf());
       expect(
         view.devices.map(({ deviceCredential }) => deviceCredential),
-      ).toEqual(
-        [wire(owner), wire(phone)].sort((a, b) => a.localeCompare(b)),
-      );
+      ).toEqual([wire(owner), wire(phone)].sort());
       view.devices.forEach((device) => {
         expect(Object.keys(device).sort()).toEqual([
           'deviceCredential',

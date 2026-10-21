@@ -11,6 +11,15 @@ import { DeviceAuthorizationRevision } from './value-objects/DeviceAuthorization
 export class DeviceSealingView {
   private readonly devices: DeviceSealingViewDevice[];
 
+  /** Code-unit order: locale collation would make the order node-dependent. */
+  private static compareCodeUnits(left: string, right: string): number {
+    if (left === right) {
+      return 0;
+    }
+
+    return left < right ? -1 : 1;
+  }
+
   public constructor(
     private readonly revision: DeviceAuthorizationRevision,
     authorization: DeviceAuthorization,
@@ -26,10 +35,15 @@ export class DeviceSealingView {
             sealingPublicKey: record.getSealingPublicKey(),
             utcDay: record.getUtcDay(),
           }))
-          .sort((a, b) => a.utcDay.localeCompare(b.utcDay)),
+          .sort((a, b) =>
+            DeviceSealingView.compareCodeUnits(a.utcDay, b.utcDay),
+          ),
       }))
       .sort((a, b) =>
-        a.credential.toWire().localeCompare(b.credential.toWire()),
+        DeviceSealingView.compareCodeUnits(
+          a.credential.toWire(),
+          b.credential.toWire(),
+        ),
       );
   }
 
