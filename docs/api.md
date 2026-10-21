@@ -2575,8 +2575,10 @@ everywhere. Retry.
 
 Identity and keychain record lookups follow the same rule. The Helia adapter
 reports a record as absent only when the local datastore or every DHT router
-answered not-found. A datastore error, a DHT timeout or abort, a router that
-failed while another answered not-found, or having no connected peers while the
+answered not-found. The filesystem datastore answers not-found only when the
+record file does not exist; any other local read failure (I/O error,
+permission, abort) is a datastore error. A datastore error, a DHT timeout or
+abort, a router that failed while another answered not-found, or having no connected peers while the
 DHT is enabled is a retrieval failure: the lookup answers `503` with code
 `503020`, never "no record", so an unreachable DHT cannot make an existing
 identity or keychain read as missing. Block `stat` over the public network
