@@ -32,6 +32,8 @@ import type { HeliaLibp2pConfig } from './types/HeliaLibp2pConfig';
 import type { HeliaUnixfsClient } from './types/HeliaUnixfsClient';
 import type { Libp2pDefaults } from './types/Libp2pDefaults';
 
+import createStrictFsDatastore from './createStrictFsDatastore';
+
 export type { DatastoreKeyLike } from './types/DatastoreKeyLike';
 export type { HeliaInstance } from './types/HeliaInstance';
 export type { HeliaJSONClient } from './types/HeliaJSONClient';
@@ -932,7 +934,7 @@ export class HeliaRuntimeAdapter {
   public async createFsDatastore(path: string): Promise<FsDatastore> {
     const datastoreFsModule = await this.loadDatastoreFsModule();
 
-    return new datastoreFsModule.FsDatastore(path);
+    return createStrictFsDatastore(datastoreFsModule, path);
   }
 }
 
