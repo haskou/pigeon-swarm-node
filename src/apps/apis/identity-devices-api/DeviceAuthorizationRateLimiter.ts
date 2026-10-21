@@ -19,7 +19,9 @@ export abstract class DeviceAuthorizationRateLimiter {
   private readonly identities = new Map<string, Window>();
   private nodeWindow: Window = { count: 0, resetAt: 0 };
 
-  protected constructor(private readonly limits: DeviceAuthorizationRateLimits) {}
+  protected constructor(
+    private readonly limits: DeviceAuthorizationRateLimits,
+  ) {}
 
   private advance(current: Window | undefined, now: number): Window {
     if (!current || current.resetAt <= now) {

@@ -17,10 +17,7 @@ import { SignatureMother } from '../../../mothers/SignatureMother';
 
 describe(DeviceAuthorizationRequestAuthenticator.name, () => {
   const STALE = SignedHttpRequestSignature.REPLAY_WINDOW_MS;
-  const ENTRY_POINTS = [
-    'authenticate',
-    'authenticateCurrentDevice',
-  ] as const;
+  const ENTRY_POINTS = ['authenticate', 'authenticateCurrentDevice'] as const;
   const RECOVERY_ENTRY_POINTS = ['authenticate'] as const;
   const AUTHORIZED_ENTRY_POINTS = [
     'authenticate',

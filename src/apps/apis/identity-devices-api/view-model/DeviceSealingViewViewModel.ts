@@ -13,9 +13,10 @@ export class DeviceSealingViewViewModel {
     return {
       devices: this.view.getDevices().map((device) => ({
         deviceCredential: device.credential.toWire(),
-        sealingKeys: device.sealingKeys.map(
-          ({ sealingPublicKey, utcDay }) => ({ sealingPublicKey, utcDay }),
-        ),
+        sealingKeys: device.sealingKeys.map(({ sealingPublicKey, utcDay }) => ({
+          sealingPublicKey,
+          utcDay,
+        })),
       })),
       identityId: this.identityId.valueOf(),
       revision: this.view.getRevision().valueOf(),

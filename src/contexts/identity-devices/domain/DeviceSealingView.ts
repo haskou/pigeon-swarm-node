@@ -21,16 +21,16 @@ export class DeviceSealingView {
       .map((credential) => ({
         credential,
         sealingKeys: records
-          .filter((record) =>
-            record.getDeviceCredential().isEqual(credential),
-          )
+          .filter((record) => record.getDeviceCredential().isEqual(credential))
           .map((record) => ({
             sealingPublicKey: record.getSealingPublicKey(),
             utcDay: record.getUtcDay(),
           }))
           .sort((a, b) => a.utcDay.localeCompare(b.utcDay)),
       }))
-      .sort((a, b) => a.credential.toWire().localeCompare(b.credential.toWire()));
+      .sort((a, b) =>
+        a.credential.toWire().localeCompare(b.credential.toWire()),
+      );
   }
 
   public getRevision(): DeviceAuthorizationRevision {

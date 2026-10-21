@@ -70,7 +70,8 @@ export class DeviceAuthorizationTransitionDisclosure {
       lastRevision !== undefined &&
       transition.getRevision().valueOf() <= lastRevision;
     const hasMore =
-      lastRevision !== undefined && revisions[revisions.length - 1] > lastRevision;
+      lastRevision !== undefined &&
+      revisions[revisions.length - 1] > lastRevision;
 
     return new DeviceAuthorizationTransitionDisclosure(
       this.identityId,
