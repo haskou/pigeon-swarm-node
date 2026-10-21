@@ -146,4 +146,15 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
           this.policy.admits(record, authorizationOf, now),
       );
   }
+
+  public async pruneExpired(now: Date): Promise<void> {
+    await this.registry.forgetCachedHeads(
+      DEVICE_SEALING_RECORD_HEAD_PREFIX,
+      (key) =>
+        !this.policy.isCurrentDay(
+          DeviceSealingRecord.utcDayOfHeadKey(key),
+          now,
+        ),
+    );
+  }
 }

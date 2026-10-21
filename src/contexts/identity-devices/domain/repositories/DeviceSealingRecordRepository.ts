@@ -12,4 +12,10 @@ export abstract class DeviceSealingRecordRepository {
 
   /** The admitted records of today and yesterday (UTC) for the identity. */
   public abstract findCurrent(identityId: string): DeviceSealingRecord[];
+
+  /**
+   * Forgets every record this node holds whose UTC day is neither today nor
+   * yesterday at `now`, so held records stay bounded to two days.
+   */
+  public abstract pruneExpired(now: Date): Promise<void>;
 }

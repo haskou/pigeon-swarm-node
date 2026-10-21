@@ -14,12 +14,7 @@ export default class DeviceSealingRecordPolicy {
     authorizationOf: () => DeviceAuthorization | undefined,
     now: Date,
   ): boolean {
-    const today = now.toISOString().slice(0, 10);
-    const yesterday = new Date(now.getTime() - ONE_DAY_MS)
-      .toISOString()
-      .slice(0, 10);
-
-    if (record.getUtcDay() !== today && record.getUtcDay() !== yesterday) {
+    if (!this.isCurrentDay(record.getUtcDay(), now)) {
       return false;
     }
 
@@ -34,5 +29,19 @@ export default class DeviceSealingRecordPolicy {
         authorization.getIdentityId().valueOf() &&
       authorization.isAuthorized(record.getDeviceCredential())
     );
+  }
+
+  /**
+   * Whether a UTC day is today or yesterday at `now`: the only days a record
+   * is admitted, served or kept for. Any other value, past, future or
+   * malformed, is not.
+   */
+  public isCurrentDay(utcDay: string, now: Date): boolean {
+    const today = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now.getTime() - ONE_DAY_MS)
+      .toISOString()
+      .slice(0, 10);
+
+    return utcDay === today || utcDay === yesterday;
   }
 }

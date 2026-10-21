@@ -1168,8 +1168,16 @@ history is not narrowed to shared communities or conversations. The public view
 discloses the device credentials and the device count to anyone who reaches the
 node. That anonymous disclosure is flagged for security review, not by design.
 Reads are limited per client address, then per target and per node, and a view
-is cached for five seconds. Pruning of old records is not reported: the records
-are tracked as a follow-up issue.
+is cached for five seconds.
+
+A node prunes the sealing records it holds right after start and then every
+hour: every `device-sealing-record:` head whose UTC day (the last key segment)
+is neither today nor yesterday is forgotten from the in-memory head caches and
+from the node's persisted head cache, including a persisted row the merger
+refused at restore. Pruning is scoped to the sealing prefix and never touches
+another prefix. The replicated OrbitDB log is append-only and shared, so a node
+cannot remove those log entries: a rebuild replays them, and the merger refuses
+every record outside the two-day window before it parses the authorization.
 
 ## Live call projection boundary
 

@@ -6,6 +6,11 @@ export type OrbitDBReplicatedHeadCacheEntry = {
 export default abstract class OrbitDBReplicatedHeadCache {
   public abstract deleteByNetworkId(networkId: string): Promise<void>;
 
+  /** Deletes the cached heads of every network whose key `matches`. */
+  public abstract deleteMatching(
+    matches: (key: string) => boolean,
+  ): Promise<void>;
+
   public abstract findByNetworkId(
     networkId: string,
   ): Promise<OrbitDBReplicatedHeadCacheEntry[]>;

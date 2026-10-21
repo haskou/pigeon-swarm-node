@@ -48,9 +48,9 @@ describe('LocalOrbitDBReplicatedHeadCache', () => {
       warmedAt: 1,
     });
 
-    await expect(
-      cache.findReconciledHeadSignature('network-1'),
-    ).resolves.toBe('["head-1"]');
+    await expect(cache.findReconciledHeadSignature('network-1')).resolves.toBe(
+      '["head-1"]',
+    );
     expect(database.findOne).toHaveBeenCalledWith(
       'orbitdb_replicated_head_cache_warm_networks',
       'network-1',
