@@ -1,10 +1,14 @@
+import { CallSignal } from '@app/contexts/calls/domain/CallSignal';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsEnum,
   IsIn,
   IsInt,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -36,11 +40,16 @@ export class PostCallSignalBody {
   public readonly scopeType: string;
 
   @ArrayMinSize(1)
+  @ArrayMaxSize(CallSignal.MAX_SEALED_ENTRIES)
+  @ArrayUnique(
+    (entry: PostCallSealedEntryBody) => entry.recipientDeviceCredential,
+  )
   @ValidateNested({ each: true })
   @Type(() => PostCallSealedEntryBody)
   public readonly sealedEntries: PostCallSealedEntryBody[];
 
   @IsString()
+  @MaxLength(CallSignal.MAX_CREDENTIAL_LENGTH)
   public readonly senderDeviceCredential: string;
 
   @IsString()
@@ -53,5 +62,6 @@ export class PostCallSignalBody {
   public readonly signalType: PostCallSignalType;
 
   @IsString()
+  @MaxLength(CallSignal.MAX_SIGNATURE_LENGTH)
   public readonly signature: string;
 }

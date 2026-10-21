@@ -30,12 +30,53 @@ export interface CallSignalAttributes {
   signature: string;
 }
 
+const isBoundedString = (value: unknown, max: number): boolean =>
+  typeof value === 'string' && value.length > 0 && value.length <= max;
+
+const hasBoundedSignatureAndCredential = (
+  attributes: CallSignalAttributes,
+): boolean =>
+  isBoundedString(attributes.signature, CallSignal.MAX_SIGNATURE_LENGTH) &&
+  isBoundedString(
+    attributes.senderDeviceCredential,
+    CallSignal.MAX_CREDENTIAL_LENGTH,
+  );
+
+/** Exactly the two opaque string fields, within their bounds: nothing else rides along. */
+const isSealedEntry = (entry: unknown): entry is CallSignalSealedEntry => {
+  if (typeof entry !== 'object' || entry === null) {
+    return false;
+  }
+  const { envelope, recipientDeviceCredential } =
+    entry as Partial<CallSignalSealedEntry>;
+
+  return (
+    Object.keys(entry).length === 2 &&
+    isBoundedString(envelope, CallSignal.MAX_ENVELOPE_LENGTH) &&
+    isBoundedString(recipientDeviceCredential, CallSignal.MAX_CREDENTIAL_LENGTH)
+  );
+};
+
+const areSealedEntries = (
+  entries: unknown,
+): entries is CallSignalSealedEntry[] =>
+  Array.isArray(entries) &&
+  entries.length > 0 &&
+  entries.length <= CallSignal.MAX_SEALED_ENTRIES &&
+  entries.every(isSealedEntry) &&
+  new Set(entries.map((entry) => entry.recipientDeviceCredential)).size ===
+    entries.length;
+
 /**
  * A signed call signal as the node carries it. `envelope` and `signature` are
  * opaque here: the node never decrypts or verifies them, the UI does.
  */
 export class CallSignal {
   public static readonly LIFETIME_MS = 20_000;
+  public static readonly MAX_SEALED_ENTRIES = 128;
+  public static readonly MAX_ENVELOPE_LENGTH = 32_768;
+  public static readonly MAX_CREDENTIAL_LENGTH = 128;
+  public static readonly MAX_SIGNATURE_LENGTH = 256;
 
   private readonly callId: CallId;
   private readonly createdAt: Timestamp;
@@ -74,16 +115,8 @@ export class CallSignal {
       new InvalidCallSignalError(),
     );
     assert(
-      signature.length > 0 && senderDeviceCredential.length > 0,
-      new InvalidCallSignalError(),
-    );
-    assert(
-      sealedEntries.length > 0 &&
-        sealedEntries.every(
-          (entry) =>
-            entry.envelope.length > 0 &&
-            entry.recipientDeviceCredential.length > 0,
-        ),
+      hasBoundedSignatureAndCredential(attributes) &&
+        areSealedEntries(sealedEntries),
       new InvalidCallSignalError(),
     );
 
@@ -94,7 +127,10 @@ export class CallSignal {
     this.recipientIdentityId = new IdentityId(attributes.recipientIdentityId);
     this.scopeType = new CallScopeType(attributes.scopeType);
     assert(!this.scopeType.isGroupCapability(), new InvalidCallSignalError());
-    this.sealedEntries = sealedEntries.map((entry) => ({ ...entry }));
+    this.sealedEntries = sealedEntries.map((entry) => ({
+      envelope: entry.envelope,
+      recipientDeviceCredential: entry.recipientDeviceCredential,
+    }));
     this.senderDeviceCredential = senderDeviceCredential;
     this.senderIdentityId = new IdentityId(attributes.senderIdentityId);
     this.signalId = new CallSignalId(attributes.signalId);
@@ -108,6 +144,14 @@ export class CallSignal {
     assert(
       this.getExpiresAt().valueOf() > at.valueOf() &&
         createdAt <= at.valueOf() + CALL_SIGNAL_MAX_CLOCK_SKEW_MS,
+      new InvalidCallSignalError(),
+    );
+  }
+
+  /** Refuses a signal created beyond the clock-skew bound; an expired one is still a signal. */
+  public assertNotCreatedInTheFutureAt(at: Timestamp): void {
+    assert(
+      this.createdAt.valueOf() <= at.valueOf() + CALL_SIGNAL_MAX_CLOCK_SKEW_MS,
       new InvalidCallSignalError(),
     );
   }
@@ -138,6 +182,14 @@ export class CallSignal {
 
   public getSenderIdentityId(): IdentityId {
     return this.senderIdentityId;
+  }
+
+  /** Whether both carry the same sealed content: a higher attempt must not rewrite it. */
+  public hasSameContentAs(other: CallSignal): boolean {
+    return (
+      JSON.stringify(this.toPrimitives()) ===
+      JSON.stringify(other.toPrimitives())
+    );
   }
 
   public isRecipient(identityId: IdentityId): boolean {

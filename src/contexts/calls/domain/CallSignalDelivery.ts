@@ -168,7 +168,10 @@ export class CallSignalDelivery extends AggregateRoot {
   }
 
   public supersedes(delivery: CallSignalDelivery): boolean {
-    return this.schedule.supersedes(delivery.schedule);
+    return (
+      this.signal.hasSameContentAs(delivery.signal) &&
+      this.schedule.supersedes(delivery.schedule)
+    );
   }
 
   public toPrimitives() {

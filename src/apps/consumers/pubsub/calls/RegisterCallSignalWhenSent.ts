@@ -8,6 +8,7 @@ import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/Domai
 import Kernel from '@haskou/ddd-kernel';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { Timestamp } from '@haskou/value-objects';
 
 export default class RegisterCallSignalWhenSent extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-call-signal-when-sent';
@@ -42,6 +43,7 @@ export default class RegisterCallSignalWhenSent extends Consumer {
       message = new CallSignalDeliveryRegisterMessage(
         event.attributes as CallSignalSentAttributes,
       );
+      message.assertSignalIsNotFromTheFuture(Timestamp.now());
     } catch (error) {
       if (error instanceof InvalidCallSignalError) {
         Kernel.logger.warn?.(

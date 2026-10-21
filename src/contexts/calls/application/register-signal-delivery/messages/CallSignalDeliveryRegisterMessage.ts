@@ -1,11 +1,12 @@
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
-import { Timestamp } from '@haskou/value-objects';
+import { assert, Timestamp } from '@haskou/value-objects';
 
 import { CallSignal } from '../../../domain/CallSignal';
 import { CallSignalDelivery } from '../../../domain/CallSignalDelivery';
 import { CallSignalDeliveryRoute } from '../../../domain/CallSignalDeliveryRoute';
 import { CallSignalDeliverySchedule } from '../../../domain/CallSignalDeliverySchedule';
+import { InvalidCallSignalError } from '../../../domain/errors/InvalidCallSignalError';
 import { CallSignalSentAttributes } from '../../../domain/events/CallSignalSentAttributes';
 import { CallSignalDeliveryAttempt } from '../../../domain/value-objects/CallSignalDeliveryAttempt';
 
@@ -16,14 +17,33 @@ export class CallSignalDeliveryRegisterMessage {
   private readonly sentAt: Timestamp;
   private readonly signal: CallSignal;
 
+  /**
+   * Built from a bus payload that may be hostile: every field goes through its
+   * value object, and any malformed one is an `InvalidCallSignalError`, never
+   * a raw error that would be retried.
+   */
   constructor(attributes: CallSignalSentAttributes) {
     this.signal = CallSignal.fromPrimitives(attributes);
-    this.attempt = new CallSignalDeliveryAttempt(attributes.attempt);
-    this.ownerNodeId = new NodeId(attributes.ownerNodeId);
-    this.participantIds = attributes.participantIds.map(
-      (participantId) => new IdentityId(participantId),
-    );
-    this.sentAt = new Timestamp(attributes.sentAt);
+
+    try {
+      assert(
+        Array.isArray(attributes.participantIds),
+        new InvalidCallSignalError(),
+      );
+      this.attempt = new CallSignalDeliveryAttempt(attributes.attempt);
+      this.ownerNodeId = new NodeId(attributes.ownerNodeId);
+      this.participantIds = attributes.participantIds.map(
+        (participantId) => new IdentityId(participantId),
+      );
+      this.sentAt = new Timestamp(attributes.sentAt);
+    } catch {
+      throw new InvalidCallSignalError();
+    }
+  }
+
+  /** A signal created far ahead of the clock would outlive every purge. */
+  public assertSignalIsNotFromTheFuture(now: Timestamp): void {
+    this.signal.assertNotCreatedInTheFutureAt(now);
   }
 
   public toDelivery(): CallSignalDelivery {
