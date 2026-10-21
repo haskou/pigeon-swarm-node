@@ -33,7 +33,7 @@ export default class IPFS {
     return network;
   }
 
-  private async statAcrossNetworksOffline(
+  private async statLocally(
     cid: IPFSId,
     networks: IPFSNetwork[],
   ): Promise<void> {
@@ -41,7 +41,7 @@ export default class IPFS {
 
     for (const network of networks) {
       try {
-        await network.stat(cid, true);
+        await network.stat(cid);
 
         return;
       } catch (error: unknown) {
@@ -100,27 +100,16 @@ export default class IPFS {
     return IPFSCidCodec.isRaw(parsedCid);
   }
 
-  public async stat(
-    cid: IPFSId,
-    offlineOnly: boolean = false,
-    networkIds?: string[],
-  ): Promise<boolean> {
+  public async stat(cid: IPFSId, networkIds?: string[]): Promise<boolean> {
     try {
       await this.initialize();
 
-      if (networkIds && networkIds.length > 0) {
-        const networksToCheck = this.getNetworksByIds(networkIds);
-
-        if (offlineOnly) {
-          await this.statAcrossNetworksOffline(cid, networksToCheck);
-        } else {
-          await this.racer.raceStat(networksToCheck, cid);
-        }
-      } else if (offlineOnly) {
-        await this.statAcrossNetworksOffline(cid, this.registry.getAll());
-      } else {
-        await this.racer.raceStat(this.registry.getAll(), cid);
-      }
+      await this.statLocally(
+        cid,
+        networkIds && networkIds.length > 0
+          ? this.getNetworksByIds(networkIds)
+          : this.registry.getAll(),
+      );
 
       return true;
     } catch (error: unknown) {

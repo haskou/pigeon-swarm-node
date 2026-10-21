@@ -106,12 +106,6 @@ export default class IPFSContentRacer {
     );
   }
 
-  public async raceStat(networks: IPFSNetwork[], cid: IPFSId): Promise<void> {
-    return this.raceFirst(cid, networks, (network, signal) =>
-      network.stat(cid, false, signal),
-    );
-  }
-
   public async raceGetRecord(
     networks: IPFSNetwork[],
     key: string,

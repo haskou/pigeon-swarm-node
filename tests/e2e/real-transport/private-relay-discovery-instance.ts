@@ -451,7 +451,7 @@ async function assertPreDiscoveryFetchMiss(command: Command): Promise<void> {
   }
 
   try {
-    await getNetwork().stat(cid, true);
+    await getNetwork().stat(cid);
 
     throw new Error(
       `False-positive guard failed: CID ${cid.valueOf()} is already local before discovery.`,
@@ -580,7 +580,7 @@ async function assertFetch(command: Command): Promise<void> {
     throw new Error(`Fetched bytes mismatch for ${cid.valueOf()}`);
   }
 
-  await getNetwork().stat(cid, true);
+  await getNetwork().stat(cid);
   emit('ipfs-fetch-ok', {
     cid: cid.valueOf(),
     sha256: expectedSha256,
