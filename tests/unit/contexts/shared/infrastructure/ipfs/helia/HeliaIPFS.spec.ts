@@ -416,9 +416,10 @@ describe('HeliaIPFS', () => {
     it('rejects as not ready when the DHT query ends not found after its signal was aborted', async () => {
       const controller = new AbortController();
       const ipfs = createIpfs({
-        routingGet: jest.fn().mockImplementation(async () => {
+        routingGet: jest.fn().mockImplementation(() => {
           controller.abort();
-          throw namedError('NotFoundError');
+
+          return Promise.reject(namedError('NotFoundError'));
         }),
       });
 
