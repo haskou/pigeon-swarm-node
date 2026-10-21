@@ -1,14 +1,14 @@
-import Kernel from '@haskou/ddd-kernel';
-import { mock } from 'jest-mock-extended';
+import { IPFSBlockNotFoundPublicError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundPublicError';
 import {
   heliaRuntimeAdapter,
   HeliaInstance,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
-import { IPFSBlockNotFoundPublicError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundPublicError';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
 import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
+import Kernel from '@haskou/ddd-kernel';
+import { mock } from 'jest-mock-extended';
 
 describe('HeliaIPFS', () => {
   afterEach(() => {
@@ -61,8 +61,8 @@ describe('HeliaIPFS', () => {
     listener(
       new CustomEvent('message', {
         detail: {
-          topic: 'PRIVATE-TOPIC',
           data: new TextEncoder().encode('PRIVATE-DECRYPTED-TEXT'),
+          topic: 'PRIVATE-TOPIC',
         },
       }),
     );
@@ -74,8 +74,8 @@ describe('HeliaIPFS', () => {
     listener(
       new CustomEvent('message', {
         detail: {
-          topic: 'PRIVATE-TOPIC',
           data: new TextEncoder().encode('{}'),
+          topic: 'PRIVATE-TOPIC',
         },
       }),
     );
@@ -107,7 +107,6 @@ describe('HeliaIPFS', () => {
           ) => {
             onProgressSeen(options.onProgress !== undefined);
             options.onProgress?.({
-              type: 'bitswap:found-provider',
               detail: {
                 provider: {
                   id: { toString: () => 'PRIVATE-PROVIDER' },
@@ -115,6 +114,7 @@ describe('HeliaIPFS', () => {
                 },
                 sender: { toString: () => 'PRIVATE-SENDER' },
               },
+              type: 'bitswap:found-provider',
             });
 
             return {};
@@ -202,8 +202,8 @@ describe('HeliaIPFS', () => {
       provide: jest.fn().mockImplementation(async (_cid, options) => {
         for (const messageName of messages) {
           options.onProgress?.({
-            type: 'kad-dht:query:peer-response',
             detail: { messageName },
+            type: 'kad-dht:query:peer-response',
           });
         }
       }),
@@ -326,8 +326,8 @@ describe('HeliaIPFS', () => {
         .mockResolvedValue({} as never);
 
       return new (class extends HeliaIPFS {})(heliaCore, {
-        storageLocation: 'memory',
         distributedHashTableEnabled: options.dht,
+        storageLocation: 'memory',
       });
     };
 
@@ -374,7 +374,7 @@ describe('HeliaIPFS', () => {
     });
 
     it('resolves undefined with no peers and the DHT disabled', async () => {
-      const ipfs = createIpfs({ peers: [], dht: false });
+      const ipfs = createIpfs({ dht: false, peers: [] });
 
       await expect(ipfs.getRecord('key')).resolves.toBeUndefined();
     });
