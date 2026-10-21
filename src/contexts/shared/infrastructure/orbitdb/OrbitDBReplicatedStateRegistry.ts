@@ -2087,34 +2087,9 @@ export default class OrbitDBReplicatedStateRegistry {
       this.settlingAllHeads = this.deferredHeadOverflow;
       this.deferredHeadKeys.clear();
       this.deferredHeadOverflow = false;
-      const settles = this.settlingAllHeads
-        ? (key: string): boolean => this.isMergeableHeadKey(key)
-        : (key: string): boolean => this.settlingHeadKeys.has(key);
-      let persisted = true;
-      let completed = false;
-
-      try {
-        for (const [networkId, { heads }] of this.storesByNetworkId) {
-          persisted =
-            (await this.hydrateHeadKeyHistory(networkId, heads, settles)) &&
-            persisted;
-        }
-        completed = true;
-      } catch (error) {
-        Kernel.logger.warn?.(
-          `OrbitDB deferred head settle failed: error=${errorClassName(error)}`,
-        );
-      } finally {
-        if (!completed) {
-          this.deferredHeadOverflow ||= this.settlingAllHeads;
-          this.settlingHeadKeys.forEach((key) => this.deferHead(key));
-        }
-        this.settlingHeadKeys = new Set();
-        this.settlingAllHeads = false;
-      }
+      const persisted = await this.offerSettlingHeads();
 
       return (
-        completed &&
         persisted &&
         !this.deferredHeadOverflow &&
         this.deferredHeadKeys.size === 0
@@ -2122,6 +2097,38 @@ export default class OrbitDBReplicatedStateRegistry {
     });
 
     return this.headSettlement;
+  }
+
+  /**
+   * Offers the heads being settled to their mergers. Resolves whether every
+   * offered head was persisted; a failed pass defers them all again.
+   */
+  private async offerSettlingHeads(): Promise<boolean> {
+    const settles = this.settlingAllHeads
+      ? (key: string): boolean => this.isMergeableHeadKey(key)
+      : (key: string): boolean => this.settlingHeadKeys.has(key);
+    const persisted: boolean[] = [];
+
+    try {
+      for (const [networkId, { heads }] of this.storesByNetworkId) {
+        persisted.push(
+          await this.hydrateHeadKeyHistory(networkId, heads, settles),
+        );
+      }
+
+      return persisted.every(Boolean);
+    } catch (error) {
+      Kernel.logger.warn?.(
+        `OrbitDB deferred head settle failed: error=${errorClassName(error)}`,
+      );
+      this.deferredHeadOverflow ||= this.settlingAllHeads;
+      this.settlingHeadKeys.forEach((key) => this.deferHead(key));
+
+      return false;
+    } finally {
+      this.settlingHeadKeys = new Set();
+      this.settlingAllHeads = false;
+    }
   }
 
   /**
@@ -2139,21 +2146,6 @@ export default class OrbitDBReplicatedStateRegistry {
     }
     this.deferredHeadSettleScheduled = true;
     void this.settleDeferredHeads();
-  }
-
-  /**
-   * Whether a head under the prefix was deferred by its merger and is not
-   * settled yet: a list read under it would be partial, so it answers not
-   * ready instead.
-   */
-  public hasDeferredHeadsUnder(prefix: string): boolean {
-    return (
-      this.deferredHeadOverflow ||
-      this.settlingAllHeads ||
-      [...this.deferredHeadKeys, ...this.settlingHeadKeys].some((key) =>
-        key.startsWith(prefix),
-      )
-    );
   }
 
   private cacheHeadIn(
@@ -2423,8 +2415,8 @@ export default class OrbitDBReplicatedStateRegistry {
   }
 
   /**
-   * Replays the log of a heads store, newest entry first, through the head cache for
-   * every key it includes. Resolves whether every replayed head was
+   * Replays the log of a heads store, newest entry first, through the head
+   * cache for every key it includes. Resolves whether every replayed head was
    * persisted.
    */
   private async hydrateHeadKeyHistory(
@@ -2433,7 +2425,7 @@ export default class OrbitDBReplicatedStateRegistry {
     includes: (key: string) => boolean,
   ): Promise<boolean> {
     if (!store.log?.get) return true;
-    let persisted = true;
+    const persisted: boolean[] = [];
 
     for await (const entry of new OrbitDBHeadHistoryReader(
       store.log,
@@ -2441,13 +2433,11 @@ export default class OrbitDBReplicatedStateRegistry {
       const { key, value } = entry.payload ?? {};
 
       if (typeof key === 'string' && includes(key) && this.isRecord(value)) {
-        persisted =
-          (await this.hydrateHeadRecord(networkId, { key, value })) &&
-          persisted;
+        persisted.push(await this.hydrateHeadRecord(networkId, { key, value }));
       }
     }
 
-    return persisted;
+    return persisted.every(Boolean);
   }
 
   private async hydrateHeadCache(
@@ -3713,6 +3703,21 @@ export default class OrbitDBReplicatedStateRegistry {
    */
   public hasPendingRestoredHeadAdmissions(prefix: string): boolean {
     return this.hasPendingHeadUnder(prefix, true);
+  }
+
+  /**
+   * Whether a head under the prefix was deferred by its merger and is not
+   * settled yet: a list read under it would be partial, so it answers not
+   * ready instead.
+   */
+  public hasDeferredHeadsUnder(prefix: string): boolean {
+    return (
+      this.deferredHeadOverflow ||
+      this.settlingAllHeads ||
+      [...this.deferredHeadKeys, ...this.settlingHeadKeys].some((key) =>
+        key.startsWith(prefix),
+      )
+    );
   }
 
   /**
