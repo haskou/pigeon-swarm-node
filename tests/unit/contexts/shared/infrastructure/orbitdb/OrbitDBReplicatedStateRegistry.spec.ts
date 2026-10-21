@@ -594,6 +594,37 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it('defers instead of refusing a head whose dependency is deferred but not held', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+      const sealing = sealingOf('device');
+
+      registry.registerHeadRecordMerger(
+        AUTHORIZATION.key,
+        (_current, candidate) => {
+          if (candidate.pending) throw new ReplicatedStateNotReadyError();
+
+          return candidate;
+        },
+      );
+      registry.registerHeadRecordMerger('sealing:', (current, candidate) =>
+        registry.findSettledCachedHead(AUTHORIZATION.key)
+          ? (current ?? candidate)
+          : undefined,
+      );
+      await registry.register('network-1', stores);
+      heads.emitUpdate({
+        payload: { key: AUTHORIZATION.key, value: { pending: true } },
+      });
+      await flushPromises();
+      heads.emitUpdate({ payload: sealing });
+      await flushPromises();
+
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(true);
+      expect(registry.findCachedHead(sealing.key)).toBeUndefined();
+      registry.clear();
+    });
+
     it('settles a head replayed before the head it waits on in the same settle pass', async () => {
       const registry = new OrbitDBReplicatedStateRegistry();
       const network = createStores();
