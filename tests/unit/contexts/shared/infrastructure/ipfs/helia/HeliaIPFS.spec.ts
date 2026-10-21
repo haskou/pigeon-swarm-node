@@ -390,6 +390,29 @@ describe('HeliaIPFS', () => {
       );
     });
 
+    it('rejects as not ready without asking the DHT when the local datastore fails for another reason', async () => {
+      const routingGet = jest.fn();
+      const ipfs = createIpfs({
+        datastoreGet: jest.fn().mockRejectedValue(namedError('GetFailedError')),
+        routingGet,
+      });
+
+      await expect(ipfs.getRecord('key')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+      expect(routingGet).not.toHaveBeenCalled();
+    });
+
+    it('rejects as not ready when the DHT query is aborted', async () => {
+      const ipfs = createIpfs({
+        routingGet: jest.fn().mockRejectedValue(namedError('AbortError')),
+      });
+
+      await expect(ipfs.getRecord('key')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
     it('does not map a blockstore timeout in stat to a missing block', async () => {
       jest
         .spyOn(heliaRuntimeAdapter, 'parseCid')
