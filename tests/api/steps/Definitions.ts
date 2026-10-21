@@ -2646,23 +2646,12 @@ export default class Definitions {
 
   @given('I sign the current device transition log request')
   public async iSignTheCurrentDeviceTransitionLogRequest(): Promise<void> {
-    await this.signDeviceAuthorizationRequest(
-      '/transitions',
-      await this.ensureIdentityDeviceOwnerKeyPair(),
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.body = undefined;
+    await this.signCurrentRequest(
+      'GET',
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions`,
     );
-  }
-
-  @given('the enrolled device signs the current device transition log request')
-  public async theEnrolledDeviceSignsTheCurrentDeviceTransitionLogRequest(): Promise<void> {
-    await this.signDeviceAuthorizationRequest(
-      '/transitions',
-      this.identityDeviceTargetKeyPair as KeyPair,
-    );
-  }
-
-  @given('I sign the current device transition log recovery request')
-  public async iSignTheCurrentDeviceTransitionLogRecoveryRequest(): Promise<void> {
-    await this.signDeviceAuthorizationRecoveryRequest('/transitions');
   }
 
   @given('another identity signs the current device transition log request')
@@ -2689,10 +2678,29 @@ export default class Definitions {
     expect(this.response?.data).to.deep.equal({
       concurrentRecoveries: [],
       identityId: this.ownerIdentityId?.valueOf(),
+      nextCursor: null,
       recoveries: [],
       transitions: this.signedDeviceAuthorizationTransitions
         .map((body) => JSON.parse(body) as { revision: number })
         .filter(({ revision }) => revision > after),
+    });
+  }
+
+  @then(
+    'response serves {int} signed device authorization transitions with next cursor {string}',
+  )
+  public responseServesSignedDeviceAuthorizationTransitionsWithNextCursor(
+    count: number,
+    nextCursor: string,
+  ): void {
+    expect(this.response?.data).to.deep.equal({
+      concurrentRecoveries: [],
+      identityId: this.ownerIdentityId?.valueOf(),
+      nextCursor,
+      recoveries: [],
+      transitions: this.signedDeviceAuthorizationTransitions
+        .map((body) => JSON.parse(body) as { revision: number })
+        .slice(0, count),
     });
   }
 
@@ -9165,6 +9173,43 @@ export default class Definitions {
     this.response = await this.restClient.get(target, this.headers);
   }
 
+  @when('I GET the current device sealing view')
+  public async iGetTheCurrentDeviceSealingView(): Promise<void> {
+    const identityId = this.ownerIdentityId as IdentityId;
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/sealing-view`,
+      {},
+    );
+  }
+
+  @when('I GET the sealing view of an identity the node does not hold')
+  public async iGetTheSealingViewOfAnIdentityTheNodeDoesNotHold(): Promise<void> {
+    const unknown = new IdentityId(
+      (await KeyPair.generate()).toPrimitives().publicKey,
+    );
+    this.response = await this.restClient.get(
+      `/identity-devices/${encodeURIComponent(unknown.valueOf())}/sealing-view`,
+      {},
+    );
+  }
+
+  @then('response serves the public sealing view of the owner device')
+  public async responseServesThePublicSealingViewOfTheOwnerDevice(): Promise<void> {
+    const owner = await this.ensureIdentityDeviceOwnerKeyPair();
+    expect(this.response?.data).to.deep.equal({
+      devices: [
+        {
+          deviceCredential: new IdentityId(
+            owner.toPrimitives().publicKey,
+          ).valueOf(),
+          sealingKeys: [],
+        },
+      ],
+      identityId: this.ownerIdentityId?.valueOf(),
+      revision: 0,
+    });
+  }
+
   @when('I GET the current device transition log')
   public async iGetTheCurrentDeviceTransitionLog(): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
@@ -9174,13 +9219,13 @@ export default class Definitions {
     );
   }
 
-  @when('I GET the current device transition log after revision {string}')
-  public async iGetTheCurrentDeviceTransitionLogAfterRevision(
-    after: string,
+  @when('I GET the current device transition log with query {string}')
+  public async iGetTheCurrentDeviceTransitionLogWithQuery(
+    query: string,
   ): Promise<void> {
     const identityId = this.ownerIdentityId as IdentityId;
     this.response = await this.getSignedTarget(
-      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions?after=${encodeURIComponent(after)}`,
+      `/identity-devices/${encodeURIComponent(identityId.valueOf())}/transitions?${query}`,
       this.headers,
     );
   }
