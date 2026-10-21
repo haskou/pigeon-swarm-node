@@ -1,10 +1,16 @@
 import RegisterCallSignalWhenSent from '@app/apps/consumers/pubsub/calls/RegisterCallSignalWhenSent';
 import CallSignalDeliveryRegistrar from '@app/contexts/calls/application/register-signal-delivery/CallSignalDeliveryRegistrar';
+import { CallSignal } from '@app/contexts/calls/domain/CallSignal';
+import { CallSignalDelivery } from '@app/contexts/calls/domain/CallSignalDelivery';
+import { CallSignalDeliveryRoute } from '@app/contexts/calls/domain/CallSignalDeliveryRoute';
 import { CallSignalSentAttributes } from '@app/contexts/calls/domain/events/CallSignalSentAttributes';
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
+import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import InMemoryCallSignalDeliveryRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
@@ -194,6 +200,10 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
         ),
       ]);
 
+      // The probe is only meaningful if the signal was actually registered.
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(true);
       expect(
         (await registeredText(s.bystander, signalId))?.includes(marker) ??
           false,
@@ -204,6 +214,37 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       ).toBe(false);
       // The sender controls its own publication; no receiving node relays it.
       expect(s.fabric.carried).toHaveLength(1);
+      expect(s.fabric.carried[0]).toContain(signalId);
+    });
+
+    it('E1/E2: the real send path never puts a plaintext payload on the wire', async () => {
+      const s = await scenario();
+      const marker = `probe-${randomUUID()}`;
+      const signalId = randomUUID();
+      const attributes = signalAttributes({
+        networkId,
+        payload: { sdp: marker },
+        signalId,
+      });
+      const delivery = CallSignalDelivery.send(
+        new CallSignalDeliveryRoute(
+          new CallId(CALL_ID),
+          new NodeId(OWNER_NODE_ID),
+          new NetworkId(networkId),
+          attributes.participantIds.map((id) => new IdentityId(id)),
+        ),
+        CallSignal.fromPrimitives(attributes as never),
+      );
+
+      await s.sender.adapter.publish(delivery.pullDomainEvents());
+
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(true);
+      expect(s.fabric.carried.length).toBeGreaterThan(0);
+      expect(s.fabric.carried.some((frame) => frame.includes(marker))).toBe(
+        false,
+      );
     });
 
     it.each([
