@@ -52,8 +52,10 @@ function peerIdFromConnectionEvent(event: Event): string {
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly RECORD_UNVERIFIED_MESSAGE =
     'The IPFS record could not be verified as present or absent. Retry shortly.';
+
   private static readonly CONTENT_UNVERIFIED_MESSAGE =
     'The IPFS content could not be verified as present or absent. Retry shortly.';
+
   private static readonly automaticProviderPublicationWindowMs = 5 * 60_000;
   private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
   private static readonly routingPublicationRetryDelayMs = 30_000;
