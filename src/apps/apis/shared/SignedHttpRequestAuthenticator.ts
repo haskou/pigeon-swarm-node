@@ -7,6 +7,7 @@ import { Signature } from '@haskou/pigeon-swarm-crypto';
 import { Request } from 'express';
 
 import { IdentityIsBlockedOnThisNodeError } from './errors/IdentityIsBlockedOnThisNodeError';
+import { IdentityIsNotServedByThisNodeError } from './errors/IdentityIsNotServedByThisNodeError';
 import { InvalidSignedRequestError } from './errors/InvalidSignedRequestError';
 import { NonCanonicalIdentityIdError } from './errors/NonCanonicalIdentityIdError';
 import { SignedHttpRequestVerifier } from './SignedHttpRequestVerifier';
@@ -103,6 +104,21 @@ export default class SignedHttpRequestAuthenticator {
       this.verifier.verifySignature(request);
 
     await this.admit(request, identityId, signature, timestamp);
+
+    return identityId;
+  }
+
+  /**
+   * Authenticates like `authenticate`, then refuses (403014) a signer this
+   * node does not serve: any self-generated key can sign, so the signature
+   * alone proves nothing about who the caller is.
+   */
+  public async authenticateServed(request: Request): Promise<IdentityId> {
+    const identityId = await this.authenticate(request);
+
+    if (!(await this.serves(identityId))) {
+      throw new IdentityIsNotServedByThisNodeError();
+    }
 
     return identityId;
   }

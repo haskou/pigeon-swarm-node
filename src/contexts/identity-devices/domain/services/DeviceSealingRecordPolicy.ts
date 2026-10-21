@@ -4,25 +4,35 @@ import { DeviceSealingRecord } from '@app/contexts/identity-devices/domain/Devic
 const ONE_DAY_MS = 86_400_000;
 
 export default class DeviceSealingRecordPolicy {
+  /**
+   * The authorization is a provider, asked last: the day and the signature are
+   * cheap, the authorization head is parsed and verified, so a record that
+   * fails them never costs that work.
+   */
   public admits(
     record: DeviceSealingRecord,
-    authorization: DeviceAuthorization | undefined,
+    authorizationOf: () => DeviceAuthorization | undefined,
     now: Date,
   ): boolean {
-    if (!authorization) {
-      return false;
-    }
     const today = now.toISOString().slice(0, 10);
     const yesterday = new Date(now.getTime() - ONE_DAY_MS)
       .toISOString()
       .slice(0, 10);
 
+    if (record.getUtcDay() !== today && record.getUtcDay() !== yesterday) {
+      return false;
+    }
+
+    if (!record.hasValidSignature()) {
+      return false;
+    }
+    const authorization = authorizationOf();
+
     return (
-      (record.getUtcDay() === today || record.getUtcDay() === yesterday) &&
+      authorization !== undefined &&
       record.getIdentityId().valueOf() ===
         authorization.getIdentityId().valueOf() &&
-      authorization.isAuthorized(record.getDeviceCredential()) &&
-      record.hasValidSignature()
+      authorization.isAuthorized(record.getDeviceCredential())
     );
   }
 }

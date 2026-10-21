@@ -101,16 +101,19 @@ paths:
         - identity-devices
       summary: Read a page of the signed transitions of an identity
       description: |
-        Any signed caller. The signer may be any identity, not the path
-        identity; an anonymous request is refused (401). No device or recovery
-        proof header is read. Authorization is not widened on any other route.
+        Signed by an identity this node serves (it holds the identity, or the
+        identity owns the node). Any self-generated key can sign, so a signer
+        this node does not serve is refused (403, code 403014) and nothing is
+        read. The signer may be any served identity, not the path identity; an
+        anonymous request is refused (401). No device or recovery proof header
+        is read. Authorization is not widened on any other route.
 
-        This discloses the add and remove history of the device set (the count
-        and order of enrollments, revocations and recoveries) of any identity
-        the node holds to every signed identity of the node. It is an explicit
-        design position that lets a sender replay the log and verify the
-        sealing view it was served; it is scoped to private networks and is
-        flagged for security review.
+        A served caller reads the full signed history of any identity the node
+        holds: authorization times, compromisedSince and compromisedCredentials,
+        pairing ids and expirations, operation ids, epochs, and the credentials
+        of every added, removed or recovered device. It is an explicit design
+        position that lets a sender replay the log and verify the sealing view
+        it was served; it is flagged for security review.
 
         Every entry is the stored signed transition, byte-for-byte the
         primitives POST /identity-devices/{identityId}/transitions accepted,
@@ -123,10 +126,12 @@ paths:
         (a group larger than limit is served whole, and the first group is
         always served). nextCursor is the revision of the last served group, to
         send as cursor on the next request, or null once the log is exhausted.
-        recoveries and concurrentRecoveries are served on every page.
+        recoveries, concurrentRecoveries and transitions all hold only entries
+        above cursor and each entry counts toward limit.
 
-        The read is rate limited per signing identity (60 per minute) and per
-        node (600 per minute), code 429030. Any query parameter other than
+        The read is rate limited per client address (60 per minute), per served
+        requester (60 per minute, canonical id) and per node (3000 per minute),
+        code 429030. Any query parameter other than
         cursor and limit is refused (400050).
       parameters:
         - in: path
@@ -169,12 +174,14 @@ paths:
           description: cursor or limit is malformed or out of range, or the query holds another parameter such as the retired after (code 400050).
         '401':
           description: The signature is missing, invalid or stale.
+        '403':
+          description: The signer is blocked on this node (403012) or is not served by this node (403014).
         '409':
-          description: The authorization checkpoint is unavailable on this node.
+          description: The authorization checkpoint is unavailable on this node, or the path identity is not an identity id (code is the error class name).
         '414':
           $ref: '../open-api.yaml#/components/responses/RequestTargetTooLong'
         '429':
-          description: Per-signer (60 per minute) or per-node (600 per minute) transition read rate limit exceeded (code 429030).
+          description: Per-address (60 per minute), per-requester (60 per minute) or per-node (3000 per minute) transition read rate limit exceeded (code 429030).
     post:
       tags:
         - identity-devices
@@ -252,8 +259,9 @@ paths:
         the authorization head: the credential must be authorized there, and
         the day must be today or yesterday in UTC. The record is stored as a
         head under the device-sealing-record registry prefix; the node never
-        sees a private key. No rate limit applies to this route beyond the
-        signed-request replay guard. The body limit is 8 KB.
+        sees a private key. Publications are limited per identity (30 per minute)
+        and per node (600 per minute), code 429030, which bounds the signature
+        verifications they cost. The body limit is 8 KB.
       parameters:
         - in: path
           name: identityId
@@ -283,13 +291,15 @@ paths:
         '401':
           description: The signature is missing, invalid or stale, or the signer is not the path identity.
         '409':
-          description: A different sealingPublicKey is already admitted for the same identity, device and day.
+          description: A different sealingPublicKey is already admitted for the same identity, device and day, or the path identity is not an identity id (code is then the error class name).
         '413':
           description: The body exceeds 8 KB.
         '415':
           description: Request body is not application/json.
         '422':
           description: The record was not admitted - the credential is not authorized at the head, the day is not today or yesterday in UTC, the signature is invalid or a field is malformed or oversized (code 422040).
+        '429':
+          description: Per-identity (30 per minute) or per-node (600 per minute) sealing record publication rate limit exceeded (code 429030).
   /identity-devices/{identityId}/sealing-view:
     get:
       tags:
@@ -303,8 +313,14 @@ paths:
         verifies it by replaying the signed transitions read from
         GET /identity-devices/{identityId}/transitions.
 
-        Rate limited per target identity (60 per minute) and per node (600 per
-        minute), code 429030.
+        Anyone who reaches the node learns the device credentials and the device
+        count of any identity it holds. Rate limited per client address (60 per
+        minute), then per target identity (300 per minute) and per node (3000
+        per minute), code 429030, so one address can neither silence an
+        identity nor the node. A served view is cached for five seconds and a
+        cache hit spends neither the target nor the node budget. A path that is
+        not the canonical encoding of a usable key is refused (400, code
+        400080) before any budget is spent.
       parameters:
         - in: path
           name: identityId
@@ -322,10 +338,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DeviceSealingView'
+        '400':
+          description: The identity id is not the canonical encoding of a usable key (code 400080).
         '404':
           description: The node holds no authorization for the identity (code 404050).
+        '409':
+          description: The path is not an identity id (code is the error class name).
         '429':
-          description: Per-identity (60 per minute) or per-node (600 per minute) sealing view rate limit exceeded (code 429030).
+          description: Per-address (60 per minute), per-identity (300 per minute) or per-node (3000 per minute) sealing view rate limit exceeded (code 429030).
   /identity-devices/{identityId}/sealed-secrets:
     put:
       tags:

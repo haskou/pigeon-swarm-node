@@ -11,6 +11,7 @@ import { Request, Response } from 'express';
 import { Get, JsonController, Param, Req, Res } from 'routing-controllers';
 
 import { DeviceAuthorizationRequestAuthenticator } from '../DeviceAuthorizationRequestAuthenticator';
+import DeviceAuthorizationTransitionClientRateLimiter from '../DeviceAuthorizationTransitionClientRateLimiter';
 import DeviceAuthorizationTransitionReadRateLimiter from '../DeviceAuthorizationTransitionReadRateLimiter';
 import { GetDeviceAuthorizationTransitionLogRequest } from '../requests/GetDeviceAuthorizationTransitionLogRequest';
 import { DeviceAuthorizationTransitionLogViewModel } from '../view-model/DeviceAuthorizationTransitionLogViewModel';
@@ -29,6 +30,11 @@ export class GetDeviceAuthorizationRoute extends Route {
   private readonly finder = this.get<DeviceAuthorizationFinder>(
     DeviceAuthorizationFinder,
   );
+
+  private readonly transitionClientRateLimiter =
+    this.get<DeviceAuthorizationTransitionClientRateLimiter>(
+      DeviceAuthorizationTransitionClientRateLimiter,
+    );
 
   private readonly transitionReadRateLimiter =
     this.get<DeviceAuthorizationTransitionReadRateLimiter>(
@@ -100,10 +106,14 @@ export class GetDeviceAuthorizationRoute extends Route {
   }
 
   /**
-   * The signed transitions of any identity, for any signed caller: a sender
-   * replays them to verify the sealing view it was served. Rate-limited per
-   * requester, so one caller cannot exhaust another's reads. This discloses the
-   * add and remove history of the device set, an accepted waiver.
+   * The signed transition log of any identity this node serves, for a caller
+   * this node serves: a sender replays it to verify the sealing view it was
+   * served. Any self-generated key can sign, so a signer this node does not
+   * serve is refused (403014). A served caller reads the full history:
+   * authorization times, compromise marks and compromised credentials, pairing
+   * ids and expirations, operation ids, epochs, and the credentials of removed
+   * devices and recoveries. Spent in order: the client address, the signature,
+   * the served check, then the requester budget keyed on its canonical id.
    */
   @Get('/:identityId/transitions')
   public async findTransitions(
@@ -111,7 +121,8 @@ export class GetDeviceAuthorizationRoute extends Route {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    const requester = await this.authenticator.authenticate(request);
+    this.transitionClientRateLimiter.consume(request.ip);
+    const requester = await this.authenticator.authenticateServed(request);
     this.transitionReadRateLimiter.consume(requester);
     const page = GetDeviceAuthorizationTransitionLogRequest.fromQuery(
       request.query,

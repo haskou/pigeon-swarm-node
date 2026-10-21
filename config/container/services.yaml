@@ -59,6 +59,11 @@ services:
     class: /apps/apis/identities-api/IdentityPublishRateLimiter
     arguments:
       - '@shared/infrastructure/local-db/EmbeddedLocalDatabase'
+  apps/apis/identity-devices-api/DeviceAuthorizationTransitionClientRateLimiter:
+    class: >-
+      /apps/apis/identity-devices-api/DeviceAuthorizationTransitionClientRateLimiter
+    arguments: []
+    parent: apps/apis/identity-devices-api/ClientAddressRateLimiter
   apps/apis/identity-devices-api/DeviceAuthorizationTransitionRateLimiter:
     class: /apps/apis/identity-devices-api/DeviceAuthorizationTransitionRateLimiter
     arguments: []
@@ -68,6 +73,17 @@ services:
       /apps/apis/identity-devices-api/DeviceAuthorizationTransitionReadRateLimiter
     arguments: []
     parent: apps/apis/identity-devices-api/DeviceAuthorizationRateLimiter
+  apps/apis/identity-devices-api/DeviceSealingRecordRateLimiter:
+    class: /apps/apis/identity-devices-api/DeviceSealingRecordRateLimiter
+    arguments: []
+    parent: apps/apis/identity-devices-api/DeviceAuthorizationRateLimiter
+  apps/apis/identity-devices-api/DeviceSealingViewCache:
+    class: /apps/apis/identity-devices-api/DeviceSealingViewCache
+    arguments: []
+  apps/apis/identity-devices-api/DeviceSealingViewClientRateLimiter:
+    class: /apps/apis/identity-devices-api/DeviceSealingViewClientRateLimiter
+    arguments: []
+    parent: apps/apis/identity-devices-api/ClientAddressRateLimiter
   apps/apis/identity-devices-api/DeviceSealingViewRateLimiter:
     class: /apps/apis/identity-devices-api/DeviceSealingViewRateLimiter
     arguments: []
@@ -2911,6 +2927,7 @@ services:
   shared/infrastructure/messageBus/DomainEventPublisher: '@shared/infrastructure/messageBus/MessageBus'
   shared/infrastructure/messageBus/LocalDomainEventPublisher: '@shared/infrastructure/messageBus/MessageBus'
   shared/infrastructure/messageBus/MessageBusAdapter: '@shared/infrastructure/messageBus/libp2p/Libp2pGossipsubMessageBusAdapter'
+  apps/apis/identity-devices-api/ClientAddressRateLimiter: '@apps/apis/identity-devices-api/DeviceSealingViewClientRateLimiter'
   apps/apis/identity-devices-api/DeviceAuthorizationRateLimiter: '@apps/apis/identity-devices-api/DeviceSealingViewRateLimiter'
   contexts/public-mutations/domain/services/PublicMutationPolicy: >-
     @contexts/stickers/infrastructure/orbitdb/policies/StickerSavedPackMutationPolicy

@@ -41,7 +41,7 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
     }
     const admitted = this.policy.admits(
       record,
-      this.authorizationOf(record.getIdentityId().valueOf()),
+      () => this.authorizationOf(record.getIdentityId().valueOf()),
       new Date(Date.now()),
     );
 
@@ -89,7 +89,7 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
   public async publish(record: DeviceSealingRecord): Promise<boolean> {
     const admitted = this.policy.admits(
       record,
-      this.authorizationOf(record.getIdentityId().valueOf()),
+      () => this.authorizationOf(record.getIdentityId().valueOf()),
       new Date(Date.now()),
     );
 
@@ -118,7 +118,16 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
   }
 
   public findCurrent(identityId: string): DeviceSealingRecord[] {
-    const authorization = this.authorizationOf(identityId);
+    let loaded = false;
+    let authorization: DeviceAuthorization | undefined;
+    const authorizationOf = (): DeviceAuthorization | undefined => {
+      if (!loaded) {
+        authorization = this.authorizationOf(identityId);
+        loaded = true;
+      }
+
+      return authorization;
+    };
     const now = new Date(Date.now());
 
     return this.registry
@@ -129,7 +138,7 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
       .filter(
         (record): record is DeviceSealingRecord =>
           record !== undefined &&
-          this.policy.admits(record, authorization, now),
+          this.policy.admits(record, authorizationOf, now),
       );
   }
 }

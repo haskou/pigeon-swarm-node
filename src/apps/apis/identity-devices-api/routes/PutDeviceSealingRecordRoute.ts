@@ -18,6 +18,7 @@ import {
 } from 'routing-controllers';
 
 import { PutDeviceSealingRecordBody } from '../bodies/PutDeviceSealingRecordBody';
+import DeviceSealingRecordRateLimiter from '../DeviceSealingRecordRateLimiter';
 import { DeviceSealingRecordRejectedHttpError } from '../errors/DeviceSealingRecordRejectedHttpError';
 
 @JsonController('/identity-devices')
@@ -28,6 +29,10 @@ export class PutDeviceSealingRecordRoute extends Route {
 
   private readonly publisher = this.get<DeviceSealingRecordPublisher>(
     DeviceSealingRecordPublisher,
+  );
+
+  private readonly rateLimiter = this.get<DeviceSealingRecordRateLimiter>(
+    DeviceSealingRecordRateLimiter,
   );
 
   /** Only the identity itself publishes the sealing records of its devices. */
@@ -46,6 +51,7 @@ export class PutDeviceSealingRecordRoute extends Route {
     const target = new IdentityId(decodeURIComponent(identityId));
 
     assert(target.isEqual(requester), new InvalidSignedRequestError());
+    this.rateLimiter.consume(requester);
 
     try {
       const created = await this.publisher.publish(
