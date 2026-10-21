@@ -44,6 +44,8 @@ paths:
                 $ref: '#/components/schemas/InsufficientAdmissionProofResource'
         '403':
           description: Identity creation refused by this node's registration control (code 403011) - the mode is `closed`, or it is `codes` and the registration code is missing, unknown, expired or used up. Only creation of an identity this node does not hold yet is gated.
+        '409':
+          description: The identity already has a different genesis (code DeviceAuthorizationGenesisConflictError). A second, differently signed version 1 never replaces the genesis this node holds, so the identity's enrolled and revoked devices stay as they are. Nothing is stored.
         '429':
           description: Identity publication rate limit exceeded (code 429040, IDENTITIES_PUBLISH_RATE_LIMIT_PER_MINUTE publications per identity per minute). Identity admission network quota exceeded (code 429041, IDENTITIES_NETWORK_ADMISSION_RATE_LIMIT_PER_MINUTE, off by default). Identity admission rate limit per client address exceeded (code 429042, IDENTITIES_SOURCE_ADMISSION_RATE_LIMIT_PER_MINUTE, default 30).
   /identities/{identityId}:
@@ -131,6 +133,8 @@ paths:
                 $ref: '#/components/schemas/InsufficientAdmissionProofResource'
         '403':
           description: Identity creation refused by this node's registration control (code 403011), exactly as for POST /identities - a PUT for an identity this node does not hold yet creates it. The signing identity is blocked on this node (code 403012).
+        '409':
+          description: A version 1 body whose genesis differs from the one this node holds for the identity (code DeviceAuthorizationGenesisConflictError), exactly as for POST /identities. Nothing is stored.
         '429':
           description: Identity publication rate limit exceeded (code 429040). Identity admission network quota exceeded (code 429041, off by default). Identity admission rate limit per client address exceeded (code 429042).
 components:
