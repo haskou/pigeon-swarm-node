@@ -406,6 +406,11 @@ services:
     class: >-
       /apps/runtimes/call-turn-configuration-runtime/CallTurnRuntimeConfigurationPublisher
     arguments: []
+  apps/runtimes/device-sealing-record-pruning-runtime/DeviceSealingRecordPruningRuntime:
+    class: >-
+      /apps/runtimes/device-sealing-record-pruning-runtime/DeviceSealingRecordPruningRuntime
+    arguments:
+      - '@contexts/identity-devices/application/prune/DeviceSealingRecordPruner'
   apps/runtimes/ipfs-runtime/IPFSRuntime:
     class: /apps/runtimes/ipfs-runtime/IPFSRuntime
     arguments:
@@ -1589,6 +1594,11 @@ services:
     arguments:
       - >-
         @contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository
+  contexts/identity-devices/application/prune/DeviceSealingRecordPruner:
+    class: /contexts/identity-devices/application/prune/DeviceSealingRecordPruner
+    arguments:
+      - >-
+        @contexts/identity-devices/domain/repositories/DeviceSealingRecordRepository
   contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher:
     class: >-
       /contexts/identity-devices/application/publish/DeviceAuthorizationEventPublisher
