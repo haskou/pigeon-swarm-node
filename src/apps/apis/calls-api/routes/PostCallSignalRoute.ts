@@ -28,7 +28,11 @@ export class PostCallSignalRoute extends CallRouteSupport {
   @Post('/:callId/signals')
   public async sendSignal(
     @Param('callId') callId: string,
-    @Body({ options: { limit: '64kb' } }) body: PostCallSignalBody,
+    @Body({
+      options: { limit: '64kb' },
+      validate: { forbidNonWhitelisted: true, whitelist: true },
+    })
+    body: PostCallSignalBody,
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
@@ -37,9 +41,7 @@ export class PostCallSignalRoute extends CallRouteSupport {
       new CallSignalSendMessage(
         callId,
         senderIdentityId.valueOf(),
-        body.recipientIdentityId,
-        body.signalType,
-        body.payload,
+        body,
         this.capability(request),
       ),
       async () => {

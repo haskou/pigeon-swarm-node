@@ -29,8 +29,10 @@ import DiagnosticsSessionRepository from '../contexts/diagnostics/domain/reposit
 import InMemoryDiagnosticsSessionRepository from '../contexts/diagnostics/infrastructure/memory/InMemoryDiagnosticsSessionRepository';
 import { DeviceAuthorizationRepository } from '../contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
 import { DeviceSealedSecretRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealedSecretRepository';
+import { DeviceSealingRecordRepository } from '../contexts/identity-devices/domain/repositories/DeviceSealingRecordRepository';
 import LocalDeviceSealedSecretRepository from '../contexts/identity-devices/infrastructure/local-db/LocalDeviceSealedSecretRepository';
 import OrbitDBDeviceAuthorizationRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
+import OrbitDBDeviceSealingRecordRepository from '../contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository';
 import { MailboxLimits } from '../contexts/mailboxes/domain/MailboxLimits';
 import MailboxRepository from '../contexts/mailboxes/domain/repositories/MailboxRepository';
 import { MailboxLimitsFromEnvironment } from '../contexts/mailboxes/infrastructure/environment/MailboxLimitsFromEnvironment';
@@ -285,6 +287,10 @@ export default class PigeonApplication {
           token: DeviceAuthorizationRepository,
           useClass: OrbitDBDeviceAuthorizationRepository,
         },
+        {
+          token: DeviceSealingRecordRepository,
+          useClass: OrbitDBDeviceSealingRecordRepository,
+        },
         { token: MailboxRepository, useClass: LocalMailboxRepository },
         {
           token: DeviceSealedSecretRepository,
@@ -517,6 +523,10 @@ export default class PigeonApplication {
 
   public async loadLocalNodeState(): Promise<void> {
     const nodeLoader = this.kernel.di.getService<NodeLoader>(NodeLoader);
+    // Registers the sealing record merger before replicated heads replay.
+    this.kernel.di.getService<DeviceSealingRecordRepository>(
+      DeviceSealingRecordRepository,
+    );
 
     await nodeLoader.loadNode();
   }

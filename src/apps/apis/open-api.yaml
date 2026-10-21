@@ -29,6 +29,10 @@ paths:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1devices'
   /identity-devices/{identityId}/transitions:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1transitions'
+  /identity-devices/{identityId}/sealing-records:
+    $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1sealing-records'
+  /identity-devices/{identityId}/sealing-view:
+    $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1sealing-view'
   /identity-devices/{identityId}/sealed-secrets:
     $ref: './identity-devices-api/swagger.yaml#/paths/~1identity-devices~1{identityId}~1sealed-secrets'
   /private-authorization/scopes:

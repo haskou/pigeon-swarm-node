@@ -395,24 +395,16 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
     }
 
     it('serves the accepted history in replay order without rejected records', async () => {
-      const { document, genesis, history, phone } = await retiredPhone();
+      const { document, genesis, history } = await retiredPhone();
 
       const log = replayer.transitionLogOf(genesis, document);
-      const full = log.disclosedTo(genesis.getRecoveryAuthority());
+      const full = log.disclose();
 
       expect(full.getRecoveries()).toEqual([]);
       expect(full.getConcurrentRecoveries()).toEqual([]);
       expect(
         full.getTransitions().map((transition) => transition.toPrimitives()),
       ).toEqual(history.map(({ transition }) => transition));
-      expect(
-        log
-          .disclosedTo(
-            DeviceCredential.fromString(phone.toPrimitives().publicKey),
-          )
-          .getTransitions()
-          .map((transition) => transition.toPrimitives()),
-      ).toEqual(history.slice(0, 2).map(({ transition }) => transition));
     });
 
     it('serves the frontier of an overflowed document', async () => {
@@ -425,7 +417,7 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
 
       expect(
         log
-          .disclosedTo(genesis.getRecoveryAuthority())
+          .disclose()
           .getTransitions()
           .map((transition) => transition.toPrimitives()),
       ).toEqual(history.map(({ transition }) => transition));
@@ -476,10 +468,7 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
       });
 
       const log = replayer.transitionLogOf(genesis, document);
-      const full = log.disclosedTo(genesis.getRecoveryAuthority());
-      const owned = log.disclosedTo(
-        DeviceCredential.fromString(owner.toPrimitives().publicKey),
-      );
+      const full = log.disclose();
 
       expect(
         full.getRecoveries().map((transition) => transition.toPrimitives()),
@@ -492,10 +481,6 @@ describe(OrbitDBDeviceAuthorizationReplayer.name, () => {
       expect(
         full.getTransitions().map((transition) => transition.toPrimitives()),
       ).toEqual([reenrolled.transition]);
-      expect(owned.getTransitions()).toEqual([]);
-      expect(
-        owned.getRecoveries().map((transition) => transition.toPrimitives()),
-      ).toEqual([winner.toPrimitives()]);
     });
   });
 });

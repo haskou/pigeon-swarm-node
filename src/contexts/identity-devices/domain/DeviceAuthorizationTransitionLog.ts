@@ -1,11 +1,9 @@
-import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { assert } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from './DeviceAuthorization';
 import { DeviceAuthorizationTransition } from './DeviceAuthorizationTransition';
 import { DeviceAuthorizationTransitionDisclosure } from './DeviceAuthorizationTransitionDisclosure';
-import { DeviceAuthorizationTransitionReader } from './DeviceAuthorizationTransitionReader';
 import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDeviceAuthorizationTransitionError';
 
 /**
@@ -13,8 +11,7 @@ import { InvalidDeviceAuthorizationTransitionError } from './errors/InvalidDevic
  * identity: the recovery lineage behind the replay base, the recoveries that
  * lost its checkpoints, and the accepted history in replay order, with every
  * replayed state from the base to the head. A client verifies these itself
- * with the shared replay rules, so the node adds no trust of its own; it only
- * decides how much of the log each reader may read.
+ * with the shared replay rules, so the node adds no trust of its own.
  */
 export class DeviceAuthorizationTransitionLog {
   private readonly recoveries: DeviceAuthorizationTransition[];
@@ -35,73 +32,23 @@ export class DeviceAuthorizationTransitionLog {
     this.states = [...states];
   }
 
-  /**
-   * A device reads the history up to and including the revision group that
-   * removed it, never anything signed after it left; a device in no replayed
-   * state reads none of the history.
-   */
-  private transitionsDisclosedTo(
-    credential: DeviceCredential,
-  ): DeviceAuthorizationTransition[] {
-    const lastAuthorizedRevision = this.states
-      .findLast((state) => state.isAuthorized(credential))
-      ?.getRevision();
-
-    if (lastAuthorizedRevision === undefined) {
-      return [];
-    }
-
-    return this.transitions.filter(
-      (transition) =>
-        !transition.getPreviousRevision().isGreaterThan(lastAuthorizedRevision),
-    );
-  }
-
   /** The recovery authority of the identity; a recovery keeps it. */
   public getRecoveryAuthority(): RecoveryAuthority {
     return this.states[0].getRecoveryAuthority();
   }
 
   /**
-   * Whether the reader is the recovery authority of the identity or a device
-   * some replayed state authorized, removed since or not. Any other key reads
-   * at most the public recovery lineage.
+   * The whole signed log. Every entry is public: each carries its author's
+   * signature and a client replays it with the shared rules, so the node adds
+   * no trust of its own. The history is disclosed to any signed caller, an
+   * accepted waiver of the add and remove order of a device set.
    */
-  public records(reader: DeviceAuthorizationTransitionReader): boolean {
-    if (reader instanceof RecoveryAuthority) {
-      return reader.isEqual(this.getRecoveryAuthority());
-    }
-
-    return this.states.some((state) => state.isAuthorized(reader));
-  }
-
-  /**
-   * The recovery authority of the identity reads everything and any other
-   * authority nothing. Every device reads the recovery lineage, so one whose
-   * states a recovery discarded still finds the recovery that ended its epoch.
-   */
-  public disclosedTo(
-    reader: DeviceAuthorizationTransitionReader,
-  ): DeviceAuthorizationTransitionDisclosure {
-    const [base] = this.states;
-    const isRecoveryAuthority = reader instanceof RecoveryAuthority;
-
-    if (isRecoveryAuthority && !reader.isEqual(base.getRecoveryAuthority())) {
-      return new DeviceAuthorizationTransitionDisclosure(
-        base.getIdentityId(),
-        [],
-        [],
-        [],
-      );
-    }
-
+  public disclose(): DeviceAuthorizationTransitionDisclosure {
     return new DeviceAuthorizationTransitionDisclosure(
-      base.getIdentityId(),
+      this.states[0].getIdentityId(),
       this.recoveries,
       this.concurrentRecoveries,
-      isRecoveryAuthority
-        ? this.transitions
-        : this.transitionsDisclosedTo(reader),
+      this.transitions,
     );
   }
 }

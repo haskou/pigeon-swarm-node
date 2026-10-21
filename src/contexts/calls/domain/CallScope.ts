@@ -81,6 +81,10 @@ export class CallScope {
     return this.type.isGroupCapability();
   }
 
+  public getType(): CallScopeType {
+    return this.type;
+  }
+
   /**
    * Whether the roster is the runtime lease set rather than persisted
    * participant records: community channel and group capability calls.

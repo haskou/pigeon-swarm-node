@@ -2001,7 +2001,7 @@ export default class OrbitDBReplicatedStateRegistry {
         ? this.mergeHeadRecordCollection(current, candidate)
         : candidate;
     try {
-      return merger(current, candidate);
+      return merger(current, candidate, key);
     } catch {
       Kernel.logger.warn?.('Rejected incompatible replicated state');
 

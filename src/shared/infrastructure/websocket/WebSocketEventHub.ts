@@ -1,11 +1,16 @@
 import { CallViewModel } from '@app/apps/apis/calls-api/view-model/CallViewModel';
 import CallEventAttestor from '@app/contexts/calls/application/attest-event/CallEventAttestor';
 import { CallEventAttestation } from '@app/contexts/calls/domain/CallEventAttestation';
+import {
+  CallSignal,
+  CallSignalAttributes,
+} from '@app/contexts/calls/domain/CallSignal';
 import { NodeCommunityStateWasAnnounced } from '@app/contexts/nodes/domain/events/NodeCommunityStateWasAnnounced';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
 import { BearerCapability } from '@haskou/pigeon-swarm-crypto';
+import { Timestamp } from '@haskou/value-objects';
 import { randomUUID } from 'node:crypto';
 import { RawData, WebSocket } from 'ws';
 
@@ -46,6 +51,14 @@ const identityAttributeKeys = [
 ];
 
 const MAX_CLIENTS_PER_IDENTITY = 16;
+/** The sender retries at most this many times. */
+const MAX_CALL_SIGNAL_ATTEMPT = 5;
+const MAX_RELAYED_CALL_SIGNALS = 10_000;
+
+type RelayedCallSignal = CallSignalAttributes & {
+  attempt: number;
+  sentAt: number;
+};
 const BLOCKED_IDENTITY_CLOSE_REASON = 'Identity is blocked on this node';
 const MAX_CLIENT_MESSAGES_PER_WINDOW = 200;
 const CLIENT_MESSAGE_WINDOW_MS = 10_000;
@@ -68,6 +81,11 @@ export class WebSocketEventHub {
   private readonly messageWindows = new WeakMap<
     WebSocket,
     { count: number; resetAt: number }
+  >();
+
+  private readonly relayedCallSignals = new Map<
+    string,
+    { attempt: number; expiresAt: number }
   >();
 
   private networkSynchronizationStatusProvider?: () => unknown;
@@ -101,10 +119,11 @@ export class WebSocketEventHub {
     }
 
     if (this.isCallSignalEvent(event)) {
-      this.collectIdentityValues(
-        event.attributes.recipientIdentityId,
-        recipients,
-      );
+      const recipient = event.attributes.recipientIdentityId;
+
+      if (typeof recipient === 'string' && recipient.length > 0) {
+        recipients.add(recipient);
+      }
 
       return recipients;
     }
@@ -679,12 +698,115 @@ export class WebSocketEventHub {
     );
   }
 
+  /**
+   * The only shape a call signal leaves the node in: rebuilt through the
+   * domain, so an expired, far-future or malformed signal is dropped and no key
+   * the domain does not name (a plaintext field in an entry) rides along.
+   */
+  private relayableCallSignal(
+    event: DomainEvent,
+  ): RelayedCallSignal | undefined {
+    const { attempt, sentAt } = event.attributes;
+
+    if (
+      !Number.isSafeInteger(attempt) ||
+      (attempt as number) < 1 ||
+      (attempt as number) > MAX_CALL_SIGNAL_ATTEMPT ||
+      !Number.isSafeInteger(sentAt)
+    ) {
+      return undefined;
+    }
+
+    try {
+      const signal = CallSignal.fromPrimitives(
+        event.attributes as unknown as CallSignalAttributes,
+      );
+
+      signal.assertFreshAt(Timestamp.now());
+
+      return {
+        ...signal.toPrimitives(),
+        attempt: attempt as number,
+        sentAt: sentAt as number,
+      };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** A retry carries a higher attempt; the same attempt again is a replay. */
+  private admitCallSignalRelay(signal: RelayedCallSignal): boolean {
+    const seen = this.relayedCallSignals.get(signal.signalId);
+
+    if (seen && seen.attempt >= signal.attempt) {
+      return false;
+    }
+    this.relayedCallSignals.delete(signal.signalId);
+
+    if (this.relayedCallSignals.size >= MAX_RELAYED_CALL_SIGNALS) {
+      const now = Date.now();
+
+      this.relayedCallSignals.forEach((entry, key) => {
+        if (entry.expiresAt <= now) {
+          this.relayedCallSignals.delete(key);
+        }
+      });
+    }
+
+    if (this.relayedCallSignals.size >= MAX_RELAYED_CALL_SIGNALS) {
+      const oldest = this.relayedCallSignals.keys().next();
+
+      if (!oldest.done) {
+        this.relayedCallSignals.delete(oldest.value);
+      }
+    }
+    this.relayedCallSignals.set(signal.signalId, {
+      attempt: signal.attempt,
+      expiresAt: signal.expiresAt,
+    });
+
+    return true;
+  }
+
+  private liveCallAttributes(
+    callId: string,
+    audience: CallRealtimeAudience,
+  ): Record<string, unknown> {
+    return {
+      callId,
+      liveCall: new CallViewModel(
+        audience.call,
+        audience.leases,
+        audience.participants,
+        audience.leasesWarmingUp,
+      ).toResource(),
+      liveCallRevision: ++this.liveCallRevision,
+    };
+  }
+
+  private mayRelayCallSignal(
+    event: DomainEvent,
+    audience: CallRealtimeAudience,
+    recipients: string[],
+    signal: RelayedCallSignal | undefined,
+  ): boolean {
+    return (
+      this.canDeliverCallSignal(event, audience, recipients) &&
+      (!signal || this.admitCallSignalRelay(signal))
+    );
+  }
+
   private enqueueCallEvent(event: DomainEvent): void {
     if (this.shouldSuppressCallParticipantLeaseEvent(event)) return;
 
     const callId = event.attributes.callId;
 
     if (typeof callId !== 'string') return;
+    const signal = this.isCallSignalEvent(event)
+      ? this.relayableCallSignal(event)
+      : undefined;
+
+    if (this.isCallSignalEvent(event) && !signal) return;
 
     this.enqueueCallDelivery(callId, async () => {
       const candidates = this.callEventCandidates(event);
@@ -703,33 +825,10 @@ export class WebSocketEventHub {
 
       if (recipients.length === 0) return;
 
-      if (!this.canDeliverCallSignal(event, audience, recipients)) return;
+      if (!this.mayRelayCallSignal(event, audience, recipients, signal)) return;
 
       const decoded = JSON.parse(event.decode());
-      const attributes = this.isCallSignalEvent(event)
-        ? Object.fromEntries(
-            [
-              'attempt',
-              'callId',
-              'expiresAt',
-              'payload',
-              'recipientIdentityId',
-              'senderIdentityId',
-              'sentAt',
-              'signalId',
-              'signalType',
-            ].map((key) => [key, event.attributes[key]]),
-          )
-        : {
-            callId,
-            liveCall: new CallViewModel(
-              audience.call,
-              audience.leases,
-              audience.participants,
-              audience.leasesWarmingUp,
-            ).toResource(),
-            liveCallRevision: ++this.liveCallRevision,
-          };
+      const attributes = signal ?? this.liveCallAttributes(callId, audience);
       this.sendToRecipients(recipients, {
         event: { ...decoded, aggregate_id: callId, attributes },
         type: 'domain_event',
@@ -749,6 +848,7 @@ export class WebSocketEventHub {
     this.clients.clear();
     this.blockedIdentityIds = new Set();
     this.mailboxSubscriptions.clear();
+    this.relayedCallSignals.clear();
   }
 
   /** Replaces the identities blocked on this node, closing their open sockets. */

@@ -215,10 +215,10 @@ describe(DeviceAuthorizationTransitionLog.name, () => {
     );
   }
 
-  it('discloses every transition to the recovery authority of the identity', async () => {
-    const { genesis, identityId, log, transitions } = await retiredPhoneLog();
+  it('discloses every transition of a log with a retired device', async () => {
+    const { identityId, log, transitions } = await retiredPhoneLog();
 
-    expectDisclosure(log.disclosedTo(genesis.getRecoveryAuthority()), {
+    expectDisclosure(log.disclose(), {
       concurrentRecoveries: [],
       identityId,
       recoveries: [],
@@ -226,73 +226,11 @@ describe(DeviceAuthorizationTransitionLog.name, () => {
     });
   });
 
-  it('discloses every transition to a device authorized at the head', async () => {
-    const { identityId, laptop, log, transitions } = await retiredPhoneLog();
-
-    expectDisclosure(log.disclosedTo(credentialOf(laptop)), {
-      concurrentRecoveries: [],
-      identityId,
-      recoveries: [],
-      transitions,
-    });
-  });
-
-  it('discloses to a removed device up to the revision group that removed it', async () => {
-    const { identityId, log, phone, transitions } = await retiredPhoneLog();
-
-    expectDisclosure(log.disclosedTo(credentialOf(phone)), {
-      concurrentRecoveries: [],
-      identityId,
-      recoveries: [],
-      transitions: transitions.slice(0, 2),
-    });
-  });
-
-  it('discloses no transition to a device in no replayed state', async () => {
-    const { identityId, log } = await retiredPhoneLog();
-    const stranger = await KeyPair.generate();
-
-    expectDisclosure(log.disclosedTo(credentialOf(stranger)), {
-      concurrentRecoveries: [],
-      identityId,
-      recoveries: [],
-      transitions: [],
-    });
-  });
-
-  it('discloses nothing to another recovery authority', async () => {
-    const { identityId, log } = await recoveredLog();
-    const other = await KeyPair.generate();
-
-    expectDisclosure(
-      log.disclosedTo(
-        RecoveryAuthority.fromString(other.toPrimitives().publicKey),
-      ),
-      {
-        concurrentRecoveries: [],
-        identityId,
-        recoveries: [],
-        transitions: [],
-      },
-    );
-  });
-
-  it('discloses the recovery lineage to a device enrolled before the recovery', async () => {
-    const { identityId, log, loser, owner, winner } = await recoveredLog();
-
-    expectDisclosure(log.disclosedTo(credentialOf(owner)), {
-      concurrentRecoveries: [loser],
-      identityId,
-      recoveries: [winner],
-      transitions: [],
-    });
-  });
-
-  it('discloses the recovery lineage and the history to a device enrolled after it', async () => {
-    const { identityId, laptop, log, loser, reenrollment, winner } =
+  it('discloses the recovery lineage together with the history', async () => {
+    const { identityId, log, loser, reenrollment, winner } =
       await recoveredLog();
 
-    expectDisclosure(log.disclosedTo(credentialOf(laptop)), {
+    expectDisclosure(log.disclose(), {
       concurrentRecoveries: [loser],
       identityId,
       recoveries: [winner],
@@ -304,33 +242,23 @@ describe(DeviceAuthorizationTransitionLog.name, () => {
     const retired = await retiredPhoneLog();
     const recovered = await recoveredLog();
 
-    expectDisclosure(
-      retired.log
-        .disclosedTo(retired.genesis.getRecoveryAuthority())
-        .after(revisionOf(1)),
-      {
-        concurrentRecoveries: [],
-        identityId: retired.identityId,
-        recoveries: [],
-        transitions: retired.transitions.slice(1),
-      },
-    );
-    expectDisclosure(
-      recovered.log
-        .disclosedTo(recovered.genesis.getRecoveryAuthority())
-        .after(revisionOf(1)),
-      {
-        concurrentRecoveries: [],
-        identityId: recovered.identityId,
-        recoveries: [],
-        transitions: [recovered.reenrollment],
-      },
-    );
+    expectDisclosure(retired.log.disclose().page(revisionOf(1), 100), {
+      concurrentRecoveries: [],
+      identityId: retired.identityId,
+      recoveries: [],
+      transitions: retired.transitions.slice(1),
+    });
+    expectDisclosure(recovered.log.disclose().page(revisionOf(1), 100), {
+      concurrentRecoveries: [],
+      identityId: recovered.identityId,
+      recoveries: [],
+      transitions: [recovered.reenrollment],
+    });
   });
 
   it('never lets a caller change a disclosure through the returned lists', async () => {
-    const { genesis, log } = await retiredPhoneLog();
-    const disclosure = log.disclosedTo(genesis.getRecoveryAuthority());
+    const { log } = await retiredPhoneLog();
+    const disclosure = log.disclose();
 
     disclosure.getTransitions().pop();
 
@@ -343,41 +271,6 @@ describe(DeviceAuthorizationTransitionLog.name, () => {
     expect(
       log.getRecoveryAuthority().isEqual(genesis.getRecoveryAuthority()),
     ).toBe(true);
-  });
-
-  it('records the recovery authority of the identity as a reader', async () => {
-    const { genesis, log } = await retiredPhoneLog();
-
-    expect(log.records(genesis.getRecoveryAuthority())).toBe(true);
-  });
-
-  it('does not record another recovery authority as a reader', async () => {
-    const { log } = await retiredPhoneLog();
-    const other = await KeyPair.generate();
-
-    expect(
-      log.records(RecoveryAuthority.fromString(other.toPrimitives().publicKey)),
-    ).toBe(false);
-  });
-
-  it('records a device authorized at the head or removed after it was authorized', async () => {
-    const { laptop, log, phone } = await retiredPhoneLog();
-
-    expect(log.records(credentialOf(laptop))).toBe(true);
-    expect(log.records(credentialOf(phone))).toBe(true);
-  });
-
-  it('does not record a device in no replayed state', async () => {
-    const { log } = await retiredPhoneLog();
-    const stranger = await KeyPair.generate();
-
-    expect(log.records(credentialOf(stranger))).toBe(false);
-  });
-
-  it('does not record a device whose states a recovery discarded', async () => {
-    const { log, owner } = await recoveredLog();
-
-    expect(log.records(credentialOf(owner))).toBe(false);
   });
 
   it('refuses a log without a replayed state', () => {

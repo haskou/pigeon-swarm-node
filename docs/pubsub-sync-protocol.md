@@ -250,8 +250,9 @@ Members of a network can observe:
   types of each media connection. Leases are not stored. For a group call this
   reveals who is connected to a call id, not which group it belongs to.
 - Signal events (`calls.v1.signal.sent`): sender and recipient identity ids,
-  `signalType` and `payload`. The node treats `payload` as opaque and does not
-  encrypt it, so network members can read it.
+  sender device credential, `signalId`, `signalType`, `scopeType`, the clock
+  fields, the sealed entries and the `signature`. The node treats the sealed
+  entries and the signature as opaque: it does not open or verify them.
 - Signal acknowledgements (`calls.v1.signal.acknowledged`): the signal id and
   both identity ids.
 
@@ -295,18 +296,33 @@ Signal event attributes are:
 {
   "attempt": 1,
   "callId": "<callId>",
+  "createdAt": 1770000000000,
   "expiresAt": 1770000020000,
   "networkId": "<networkId>",
   "ownerNodeId": "<nodeId>",
   "participantIds": ["<senderIdentityId>", "<recipientIdentityId>"],
-  "payload": {},
   "recipientIdentityId": "<recipientIdentityId>",
+  "scopeType": "conversation",
+  "sealedEntries": [
+    {
+      "envelope": "<envelope>",
+      "recipientDeviceCredential": "<deviceCredential>"
+    }
+  ],
+  "senderDeviceCredential": "<deviceCredential>",
   "senderIdentityId": "<senderIdentityId>",
   "sentAt": 1770000000000,
   "signalId": "<signalId>",
-  "signalType": "offer"
+  "signalType": "offer",
+  "signature": "<signature>"
 }
 ```
+
+The signature covers the bytes `pigeon:call-signal:v1` and a newline, followed by
+RFC 8785 canonical JSON of every field except `signature`. No field that changes
+the meaning of the signal, including `callId`, the identities, `signalType`,
+`scopeType`, `sealedEntries`, `createdAt` and `expiresAt`, can be altered after
+signing. The node does not verify the signature; the recipient UI does.
 
 After successfully applying the signal, the recipient sends
 `{"type":"call_signal_ack","signalId":"<signalId>"}` through its
@@ -1121,6 +1137,30 @@ recovery, at any revision, that carries a compromise cap the kept one lacks, wit
 the lost recoveries it recovered from, in `checkpoint.concurrent` (at most 128).
 A heal therefore never drops a cap that only a losing partition's recovery carried.
 
+## Device sealing records
+
+A device publishes one daily sealing record per UTC day through `PUT
+/identity-devices/{identityId}/sealing-records`. The signed record
+`{deviceCredential, identityId, sealingPublicKey, utcDay}` (signing prefix
+`pigeon:device-sealing-record:v1`, at most 1024 bytes) is stored as a head under
+the `device-sealing-record:` registry prefix and replicated like other heads.
+Every node admits it only when the credential is authorized at the
+authorization head, the day is today or yesterday in UTC and the device
+signature verifies; the merger keeps one key per (identity, device, day) and
+refuses a different key for the same triple. The public `GET
+/identity-devices/{identityId}/sealing-view` serves the keys for UTC days D and
+D-1 only. Senders verify it against the signed transitions read from `GET
+/identity-devices/{identityId}/transitions`, which every identity the node
+serves may read (a signer it does not serve gets `403014`): the full signed
+history of an identity is therefore disclosed to every identity in the
+replicated index the node holds, which is any published identity, not only the
+users of the node; the registration mode is the control (flagged for security
+review). The public view discloses the device
+credentials and the device count to anyone who reaches the node; reads are
+limited per client address, then per target and per node, and a view is cached
+for five seconds. Pruning of old records is not reported: the records are
+tracked as a follow-up issue.
+
 ## Live call projection boundary
 
 Conversation lifecycle documents retain merge tombstones; runtime leases stay
@@ -1130,8 +1170,9 @@ clients do not receive these raw documents or lease attributes. They receive
 current conversation/community/channel access at delivery time. Browser event
 aggregate IDs identify the call, never the composite participant/owner lease. The revision
 is local to the connected server; clients reset tracking after reconnect.
-Signal delivery retains only recipient/sender, signal payload/type/id, attempt
-and expiry timing; it omits the historical participant list and owning-node ID.
+Signal delivery retains the signed wire object (identity ids, device credential,
+signal type and id, sealed entries, signature and clock fields), the attempt and
+the expiry timing; it omits the historical participant list and owning-node ID.
 
 Projection changes emit local snapshot notifications after OrbitDB state is
 merged. Applying a remote lease compares the local before/after connection

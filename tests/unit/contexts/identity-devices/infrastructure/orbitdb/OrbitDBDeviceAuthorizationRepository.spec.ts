@@ -70,8 +70,8 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       },
     );
     registry.findHead.mockImplementation(() => Promise.resolve(head));
-    registry.putHead.mockImplementation((_key, value) => {
-      head = head && merger ? merger(head, value) : value;
+    registry.putHead.mockImplementation((key, value) => {
+      head = head && merger ? merger(head, value, key) : value;
 
       return Promise.resolve();
     });
@@ -402,14 +402,18 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     );
     await provisionAuthorization(repository, genesis);
 
-    const merged = getMerger()?.(getHead(), {
-      authorization: authorization.toPrimitives(),
-      genesis: genesis.toPrimitives(),
-      history: [{ transition: transition.toPrimitives() }],
-      id: `device-authorization:${identityId.valueOf()}`,
-      identityId: identityId.valueOf(),
-      kind: 'device_authorization',
-    }) as { authorization?: { revision?: number } };
+    const merged = getMerger()?.(
+      getHead(),
+      {
+        authorization: authorization.toPrimitives(),
+        genesis: genesis.toPrimitives(),
+        history: [{ transition: transition.toPrimitives() }],
+        id: `device-authorization:${identityId.valueOf()}`,
+        identityId: identityId.valueOf(),
+        kind: 'device_authorization',
+      },
+      `device-authorization:${identityId.valueOf()}`,
+    ) as { authorization?: { revision?: number } };
 
     expect(merged.authorization?.revision).toBe(1);
   });
@@ -468,10 +472,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const mergedFromFirst = first.getMerger()?.(
       first.getHead(),
       second.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
     const mergedFromSecond = second.getMerger()?.(
       second.getHead(),
       first.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
 
     expect(mergedFromFirst).toEqual(mergedFromSecond);
@@ -704,6 +710,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         const merged = left.getMerger()?.(
           left.getHead(),
           right.getHead() ?? {},
+          `device-authorization:${identityId.valueOf()}`,
         ) as Record<string, unknown>;
         const reader = repositoryFixture();
         await provisionAuthorization(reader.repository, genesis);
@@ -841,6 +848,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         const merged = left.getMerger()?.(
           left.getHead(),
           right.getHead() ?? {},
+          `device-authorization:${identityId.valueOf()}`,
         ) as Record<string, unknown>;
         const reader = repositoryFixture();
         await provisionAuthorization(reader.repository, genesis);
@@ -872,10 +880,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     });
 
     it('rejects a replicated checkpoint whose concurrent recovery the recovery authority did not sign', async () => {
-      const { compromised, retired } = await concurrentRecoveries();
+      const { compromised, identityId, retired } = await concurrentRecoveries();
       const merged = retired.getMerger()?.(
         retired.getHead(),
         compromised.getHead() ?? {},
+        `device-authorization:${identityId.valueOf()}`,
       ) as {
         checkpoint: {
           concurrent: { transition: Record<string, unknown> }[];
@@ -887,8 +896,20 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         merged.checkpoint.transition.transition.signature;
 
       expect(merged.checkpoint.concurrent).toHaveLength(1);
-      expect(retired.getMerger()?.(undefined, merged)).toEqual(merged);
-      expect(retired.getMerger()?.(undefined, forged)).toBeUndefined();
+      expect(
+        retired.getMerger()?.(
+          undefined,
+          merged,
+          `device-authorization:${identityId.valueOf()}`,
+        ),
+      ).toEqual(merged);
+      expect(
+        retired.getMerger()?.(
+          undefined,
+          forged,
+          `device-authorization:${identityId.valueOf()}`,
+        ),
+      ).toBeUndefined();
     });
 
     /**
@@ -1004,6 +1025,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         const merged = left.getMerger()?.(
           left.getHead(),
           right.getHead() ?? {},
+          `device-authorization:${identityId.valueOf()}`,
         ) as Record<string, unknown>;
         const reader = repositoryFixture();
         await provisionAuthorization(reader.repository, genesis);
@@ -1035,10 +1057,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     });
 
     it('rejects a replicated checkpoint whose earlier concurrent recovery the recovery authority did not sign', async () => {
-      const { capped, uncapped } = await crossRevisionRecoveries();
+      const { capped, identityId, uncapped } = await crossRevisionRecoveries();
       const merged = uncapped.getMerger()?.(
         uncapped.getHead(),
         capped.getHead() ?? {},
+        `device-authorization:${identityId.valueOf()}`,
       ) as {
         checkpoint: {
           concurrent?: { transition: Record<string, unknown> }[];
@@ -1052,8 +1075,20 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       forged.checkpoint.concurrent![0].transition.signature =
         merged.checkpoint.transition.transition.signature;
 
-      expect(uncapped.getMerger()?.(undefined, merged)).toEqual(merged);
-      expect(uncapped.getMerger()?.(undefined, forged)).toBeUndefined();
+      expect(
+        uncapped.getMerger()?.(
+          undefined,
+          merged,
+          `device-authorization:${identityId.valueOf()}`,
+        ),
+      ).toEqual(merged);
+      expect(
+        uncapped.getMerger()?.(
+          undefined,
+          forged,
+          `device-authorization:${identityId.valueOf()}`,
+        ),
+      ).toBeUndefined();
     });
 
     /**
@@ -1234,6 +1269,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         const merged = left.getMerger()?.(
           left.getHead(),
           right.getHead() ?? {},
+          `device-authorization:${identityId.valueOf()}`,
         ) as { checkpoint: { concurrent?: unknown[] } } & Record<
           string,
           unknown
@@ -1279,7 +1315,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         [won.getHead(), firstRecoveryHead],
         [firstRecoveryHead, won.getHead()],
       ]) {
-        const merged = won.getMerger()?.(left, right ?? {}) as {
+        const merged = won.getMerger()?.(
+          left,
+          right ?? {},
+          `device-authorization:${identityId.valueOf()}`,
+        ) as {
           checkpoint: { concurrent?: unknown[] };
         } & Record<string, unknown>;
         const reader = repositoryFixture();
@@ -1768,7 +1808,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         sources: [{ checkpoint, history: emptyHistory }],
       };
 
-      expect(getMerger()?.(trusted, candidate)).toEqual(trusted);
+      expect(
+        getMerger()?.(
+          trusted,
+          candidate,
+          `device-authorization:${identityId.valueOf()}`,
+        ),
+      ).toEqual(trusted);
     });
 
     it('derives the caps of an overflowed timeline from its witness and carries them into the recovery over it', async () => {
@@ -1876,7 +1922,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         history: competingHistory,
         sources: [{ history: competingHistory }],
       };
-      const overflow = aggregate.getMerger()?.(competing, malicious) as {
+      const overflow = aggregate.getMerger()?.(
+        competing,
+        malicious,
+        `device-authorization:${identityId.valueOf()}`,
+      ) as {
         authorization: { revision: number };
         overflow?: unknown;
       };
@@ -1993,7 +2043,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       expect(
         log
-          .disclosedTo(genesis.getRecoveryAuthority())
+          .disclose()
           .getTransitions()
           .map((transition) => transition.toPrimitives()),
       ).toEqual(
@@ -2001,12 +2051,6 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
           transition.toPrimitives(),
         ),
       );
-      expect(
-        log
-          .disclosedTo(credentialOf(phone))
-          .getTransitions()
-          .map((transition) => transition.toPrimitives()),
-      ).toEqual([enrolled.toPrimitives(), retired.toPrimitives()]);
     });
 
     it('serves the recovery that replaced the history below its checkpoint', async () => {
@@ -2035,7 +2079,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       const disclosure = (
         await repository.requireTransitionLog(identityId)
-      ).disclosedTo(credentialOf(phone));
+      ).disclose();
 
       expect(
         disclosure
@@ -2166,10 +2210,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const mergedFromFirst = first.getMerger()?.(
       first.getHead(),
       second.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
     const mergedFromSecond = second.getMerger()?.(
       second.getHead(),
       first.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
 
     expect(mergedFromFirst).toEqual(mergedFromSecond);
@@ -2184,10 +2230,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const overflow = first.getMerger()?.(
       mergedFromFirst,
       third.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as { authorization?: { credentials?: string[] }; overflow?: unknown };
     const reversedOverflow = first.getMerger()?.(
       third.getHead(),
       mergedFromFirst ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
 
     expect(overflow).toEqual(reversedOverflow);
@@ -2211,6 +2259,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const alternateMerged = first.getMerger()?.(
       alternateFirst,
       alternateSecond,
+      `device-authorization:${identityId.valueOf()}`,
     );
     const recovered = repositoryFixture();
     const recoveryTarget = await KeyPair.generate();
@@ -2250,15 +2299,25 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ),
     );
     const recoveryHead = recovered.getHead();
-    const onceMerged = first.getMerger()?.(recoveryHead, mergedFromFirst ?? {});
-    const staleFlood = first.getMerger()?.(onceMerged, alternateMerged ?? {});
+    const onceMerged = first.getMerger()?.(
+      recoveryHead,
+      mergedFromFirst ?? {},
+      `device-authorization:${identityId.valueOf()}`,
+    );
+    const staleFlood = first.getMerger()?.(
+      onceMerged,
+      alternateMerged ?? {},
+      `device-authorization:${identityId.valueOf()}`,
+    );
     const staleOverflow = first.getMerger()?.(
       mergedFromFirst,
       alternateMerged ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
     const recoveredAfterOverflow = first.getMerger()?.(
       staleOverflow,
       recoveryHead ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
 
     expect(onceMerged).toEqual(recoveryHead);
@@ -2307,6 +2366,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const merged = first.getMerger()?.(
       first.getHead(),
       second.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as { authorization?: { credentials?: string[]; revision?: number } };
 
     expect(merged.authorization?.revision).toBe(2);
@@ -2384,10 +2444,12 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const merged = honest.getMerger()?.(
       honest.getHead(),
       malicious.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as { authorization?: { credentials?: string[]; revision?: number } };
     const reversed = malicious.getMerger()?.(
       malicious.getHead(),
       honest.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
 
     expect(merged).toEqual(reversed);
@@ -2533,6 +2595,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const overflow = aggregate.getMerger()?.(
       competingRevocation,
       malicious,
+      `device-authorization:${identityId.valueOf()}`,
     ) as {
       authorization?: { credentials?: string[] };
       overflow?: unknown;
@@ -2540,18 +2603,39 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const reversedOverflow = aggregate.getMerger()?.(
       malicious,
       competingRevocation,
+      `device-authorization:${identityId.valueOf()}`,
     );
-    const repeatedOverflow = aggregate.getMerger()?.(overflow, overflow);
-    const merged = aggregate.getMerger()?.(honest, malicious) as {
+    const repeatedOverflow = aggregate.getMerger()?.(
+      overflow,
+      overflow,
+      `device-authorization:${identityId.valueOf()}`,
+    );
+    const merged = aggregate.getMerger()?.(
+      honest,
+      malicious,
+      `device-authorization:${identityId.valueOf()}`,
+    ) as {
       authorization?: { credentials?: string[] };
       history?: Array<{
         transition: ReturnType<DeviceAuthorizationTransition['toPrimitives']>;
       }>;
       overflow?: unknown;
     };
-    const reversed = aggregate.getMerger()?.(malicious, honest);
-    const leftAssociated = aggregate.getMerger()?.(merged, competingRevocation);
-    const rightAssociated = aggregate.getMerger()?.(overflow, honest);
+    const reversed = aggregate.getMerger()?.(
+      malicious,
+      honest,
+      `device-authorization:${identityId.valueOf()}`,
+    );
+    const leftAssociated = aggregate.getMerger()?.(
+      merged,
+      competingRevocation,
+      `device-authorization:${identityId.valueOf()}`,
+    );
+    const rightAssociated = aggregate.getMerger()?.(
+      overflow,
+      honest,
+      `device-authorization:${identityId.valueOf()}`,
+    );
 
     expect(overflow).toEqual(reversedOverflow);
     expect(repeatedOverflow).toEqual(overflow);
@@ -2567,7 +2651,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     };
 
     expect(
-      aggregate.getMerger()?.(base as Record<string, unknown>, forgedFrontier),
+      aggregate.getMerger()?.(
+        base as Record<string, unknown>,
+        forgedFrontier,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
     ).toEqual(base);
     expect(Buffer.byteLength(JSON.stringify(overflow), 'utf8')).toBeLessThan(
       6_000_000,
@@ -2671,6 +2759,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const merged = first.getMerger()?.(
       first.getHead(),
       second.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as { authorization?: { credentials?: string[]; revision?: number } };
 
     expect(merged.authorization?.revision).toBe(2);
@@ -2752,10 +2841,23 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const enrollmentHead = enrollmentBranch.getHead() ?? {};
     const revocationHead = revocationBranch.getHead() ?? {};
     const recoveryHead = recoveryBranch.getHead() ?? {};
-    const left = merge?.(merge?.(enrollmentHead, revocationHead), recoveryHead);
+    const left = merge?.(
+      merge?.(
+        enrollmentHead,
+        revocationHead,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+      recoveryHead,
+      `device-authorization:${identityId.valueOf()}`,
+    );
     const right = merge?.(
       enrollmentHead,
-      merge?.(revocationHead, recoveryHead) ?? {},
+      merge?.(
+        revocationHead,
+        recoveryHead,
+        `device-authorization:${identityId.valueOf()}`,
+      ) ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     );
 
     expect(left).toEqual(right);
@@ -2815,6 +2917,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       malicious = aggregate.getMerger()?.(
         malicious,
         branch.getHead() ?? {},
+        `device-authorization:${identityId.valueOf()}`,
       ) as Record<string, unknown>;
     }
 
@@ -2839,6 +2942,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const merged = aggregate.getMerger()?.(
       malicious,
       honest.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as {
       authorization?: { credentials?: string[] };
       history?: Array<{ transition: { previousRevision: number } }>;
@@ -2959,6 +3063,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const merged = baseRepository.getMerger()?.(
       attacker.getHead(),
       honest.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as { authorization?: { credentials?: string[] } };
 
     expect(merged.authorization?.credentials).not.toContain(
@@ -3020,6 +3125,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const merged = first.getMerger()?.(
       first.getHead(),
       second.getHead() ?? {},
+      `device-authorization:${identityId.valueOf()}`,
     ) as { authorization?: { credentials?: string[]; revision?: number } };
 
     expect(merged.authorization?.revision).toBe(2);
@@ -3128,7 +3234,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ],
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
   });
 
   it('rejects replicated transitions containing unsigned fields', async () => {
@@ -3158,7 +3270,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ],
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
   });
 
   it('rejects replicated authorization history above the replay limit', async () => {
@@ -3183,7 +3301,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       })),
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
   });
 
   it('accepts authorization history beyond the sibling limit across revisions', async () => {
@@ -3220,12 +3344,16 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       history.push({ transition: transition.toPrimitives() });
     }
 
-    const merged = getMerger()?.(trusted, {
-      ...(trusted ?? {}),
-      authorization: authorization.toPrimitives(),
-      history,
-      sources: [{ history }],
-    }) as { authorization?: { revision?: number }; history?: unknown[] };
+    const merged = getMerger()?.(
+      trusted,
+      {
+        ...(trusted ?? {}),
+        authorization: authorization.toPrimitives(),
+        history,
+        sources: [{ history }],
+      },
+      `device-authorization:${identityId.valueOf()}`,
+    ) as { authorization?: { revision?: number }; history?: unknown[] };
 
     expect(merged.authorization?.revision).toBe(129);
     expect(merged.history).toHaveLength(129);
@@ -3406,7 +3534,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       sources: [{ checkpoint, history: emptyHistory }],
     };
 
-    expect(getMerger()?.(trusted, candidate)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        candidate,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
   });
 
   it('rejects sequential history above the total replay limit before parsing', async () => {
@@ -3435,13 +3569,19 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       })),
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
     expect(parser).not.toHaveBeenCalled();
     parser.mockRestore();
   });
 
   it('rejects aggregate history bytes before parsing transitions', async () => {
-    const { genesis } = await fixture();
+    const { genesis, identityId } = await fixture();
     const { getHead, getMerger, repository } = repositoryFixture();
     await provisionAuthorization(repository, genesis);
     const trusted = getHead();
@@ -3456,13 +3596,19 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       })),
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
     expect(parser).not.toHaveBeenCalled();
     parser.mockRestore();
   });
 
   it('rejects oversized authorization history before parsing transitions', async () => {
-    const { genesis } = await fixture();
+    const { genesis, identityId } = await fixture();
     const { getHead, getMerger, repository } = repositoryFixture();
     await provisionAuthorization(repository, genesis);
     const trusted = getHead();
@@ -3478,13 +3624,19 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       ],
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
     expect(parser).not.toHaveBeenCalled();
     parser.mockRestore();
   });
 
   it('rejects unbounded source arrays before canonicalizing the document', async () => {
-    const { genesis } = await fixture();
+    const { genesis, identityId } = await fixture();
     const { getHead, getMerger, repository } = repositoryFixture();
     await provisionAuthorization(repository, genesis);
     const trusted = getHead();
@@ -3496,7 +3648,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       })),
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
     expect(parser).not.toHaveBeenCalled();
     parser.mockRestore();
   });
@@ -3527,7 +3685,13 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       })),
     };
 
-    expect(getMerger()?.(trusted, injected)).toEqual(trusted);
+    expect(
+      getMerger()?.(
+        trusted,
+        injected,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toEqual(trusted);
     expect(parser.mock.calls.length).toBeLessThanOrEqual(2);
     parser.mockRestore();
   });
@@ -3591,17 +3755,33 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     const forgedHead = attacker.getHead() as Record<string, unknown>;
     const victim = repositoryFixture();
 
-    expect(victim.getMerger()?.(undefined, forgedHead)).toBeUndefined();
+    expect(
+      victim.getMerger()?.(
+        undefined,
+        forgedHead,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toBeUndefined();
 
     victim.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
       [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
     );
     await victim.repository.require(identityId);
 
-    expect(victim.getMerger()?.(undefined, forgedHead)).toBeUndefined();
+    expect(
+      victim.getMerger()?.(
+        undefined,
+        forgedHead,
+        `device-authorization:${identityId.valueOf()}`,
+      ),
+    ).toBeUndefined();
     expect(
       (
-        victim.getMerger()?.(undefined, victim.getHead() ?? {}) as {
+        victim.getMerger()?.(
+          undefined,
+          victim.getHead() ?? {},
+          `device-authorization:${identityId.valueOf()}`,
+        ) as {
           genesis?: unknown;
         }
       ).genesis,
@@ -3748,7 +3928,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       revocation.authorize(owner.sign(revocation.getSigningPayload())),
     );
     const revisionTwo = getHead();
-    const merged = getMerger()?.(revisionOne, revisionTwo ?? {}) as {
+    const merged = getMerger()?.(
+      revisionOne,
+      revisionTwo ?? {},
+      `device-authorization:${identityId.valueOf()}`,
+    ) as {
       authorization?: { revision?: number };
     };
 

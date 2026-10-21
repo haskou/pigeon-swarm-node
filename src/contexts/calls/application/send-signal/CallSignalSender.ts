@@ -1,11 +1,12 @@
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { DomainEventPublisher } from '@app/shared/infrastructure/messageBus/DomainEventPublisher';
+import { Timestamp } from '@haskou/value-objects';
 
 import { CallSignalDelivery } from '../../domain/CallSignalDelivery';
 import { CallParticipantNotFoundError } from '../../domain/errors/CallParticipantNotFoundError';
+import { CallSignalAlreadySentError } from '../../domain/errors/CallSignalAlreadySentError';
 import CallRepository from '../../domain/repositories/CallRepository';
 import CallSignalDeliveryRepository from '../../domain/repositories/CallSignalDeliveryRepository';
-import { CallSignalId } from '../../domain/value-objects/CallSignalId';
 import CallAccessAuthorizer from '../authorize-call/CallAccessAuthorizer';
 import { CallSignalSendMessage } from './messages/CallSignalSendMessage';
 
@@ -23,6 +24,7 @@ export default class CallSignalSender {
     onCallFound?: () => Promise<void>,
   ): Promise<CallSignalDelivery> {
     const call = await this.repository.requireById(message.callId);
+    const { signal } = message;
 
     await this.accessAuthorizer.assertAccess(
       call,
@@ -30,7 +32,17 @@ export default class CallSignalSender {
       message.capability,
     );
 
-    await this.accessAuthorizer.assertAccess(call, message.recipientIdentityId);
+    await this.accessAuthorizer.assertAccess(
+      call,
+      signal.getRecipientIdentityId(),
+    );
+
+    call.assertCanCarrySignal(signal);
+    signal.assertFreshAt(Timestamp.now());
+
+    if (await this.deliveryRepository.hasById(signal.getId())) {
+      throw new CallSignalAlreadySentError();
+    }
 
     await onCallFound?.();
 
@@ -38,14 +50,7 @@ export default class CallSignalSender {
     let delivery: CallSignalDelivery;
 
     try {
-      delivery = call.sendSignal(
-        CallSignalId.generate(),
-        localNodeId,
-        message.senderIdentityId,
-        message.recipientIdentityId,
-        message.signalType,
-        message.payload,
-      );
+      delivery = call.sendSignal(signal, localNodeId);
     } catch (error) {
       if (error instanceof CallParticipantNotFoundError) {
         await this.repository.assertParticipantSettled(
@@ -54,7 +59,7 @@ export default class CallSignalSender {
         );
         await this.repository.assertParticipantSettled(
           call.getId(),
-          message.recipientIdentityId,
+          signal.getRecipientIdentityId(),
         );
       }
       throw error;

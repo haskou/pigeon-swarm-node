@@ -12,6 +12,30 @@ describe('Call signal consumers', () => {
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
   const recipientIdentityId =
     'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=';
+  const createdAt = 1_770_000_000_000;
+  const signalAttributes = {
+    attempt: 1,
+    callId: '550e8400-e29b-41d4-a716-446655440000',
+    createdAt,
+    expiresAt: createdAt + 20_000,
+    networkId: 'f8955c6e-39b1-42cc-8182-42ef86982b4e',
+    ownerNodeId: '9278e9db-bc4d-4a8f-9577-7cad4386512f',
+    participantIds: [senderIdentityId, recipientIdentityId],
+    recipientIdentityId,
+    scopeType: 'conversation',
+    sealedEntries: [
+      {
+        envelope: 'sealed-envelope-for-recipient-device',
+        recipientDeviceCredential: 'recipient-device-credential',
+      },
+    ],
+    senderDeviceCredential: 'sender-device-credential',
+    senderIdentityId,
+    sentAt: createdAt,
+    signalId: '68da3440-c60e-4fe3-b86a-2b8931ea345f',
+    signalType: 'offer',
+    signature: 'ed25519-signature-over-signed-bytes',
+  };
 
   it('registers received signal deliveries', async () => {
     const eventConsumer = mock<DomainEventConsumer>();
@@ -22,26 +46,73 @@ describe('Call signal consumers', () => {
     );
     const event = new CallSignalSentEvent(
       '550e8400-e29b-41d4-a716-446655440000',
-      {
-        attempt: 1,
-        callId: '550e8400-e29b-41d4-a716-446655440000',
-        expiresAt: 1_770_000_020_000,
-        networkId: 'f8955c6e-39b1-42cc-8182-42ef86982b4e',
-        ownerNodeId: '9278e9db-bc4d-4a8f-9577-7cad4386512f',
-        participantIds: [senderIdentityId, recipientIdentityId],
-        payload: { sdp: 'offer-sdp' },
-        recipientIdentityId,
-        senderIdentityId,
-        sentAt: 1_770_000_000_000,
-        signalId: '68da3440-c60e-4fe3-b86a-2b8931ea345f',
-        signalType: 'offer',
-      },
+      signalAttributes,
     );
 
     await consumer.handler(event);
 
     expect(registrar.register).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ['an empty signature', { signature: '' }],
+    [
+      'an expiry that is not twenty seconds after creation',
+      { expiresAt: createdAt + 30_000 },
+    ],
+    ['an empty sealed entry list', { sealedEntries: [] }],
+  ])(
+    'refuses a received signal with %s without registering it',
+    async (_case, override) => {
+      const eventConsumer = mock<DomainEventConsumer>();
+      const registrar = mock<CallSignalDeliveryRegistrar>();
+      const consumer = new RegisterCallSignalWhenSent(
+        eventConsumer,
+        registrar,
+      );
+      const event = new CallSignalSentEvent(
+        '550e8400-e29b-41d4-a716-446655440000',
+        { ...signalAttributes, ...override },
+      );
+
+      await expect(consumer.handler(event)).resolves.toBeUndefined();
+      expect(registrar.register).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['participant ids that are not an array', { participantIds: 'nobody' }],
+    ['participant ids holding a non-identity', { participantIds: [7] }],
+    ['an owner node id that is not a node id', { ownerNodeId: 'not-a-node' }],
+    ['an attempt outside the retry policy', { attempt: 99 }],
+    ['a non-numeric attempt', { attempt: 'one' }],
+    ['a sent-at that is not a timestamp', { sentAt: 'yesterday' }],
+    [
+      'a creation time far in the future',
+      {
+        createdAt: Date.now() + 3_600_000,
+        expiresAt: Date.now() + 3_620_000,
+        sentAt: Date.now(),
+      },
+    ],
+  ])(
+    'refuses a received signal with %s without a raw error and without registering',
+    async (_case, override) => {
+      const eventConsumer = mock<DomainEventConsumer>();
+      const registrar = mock<CallSignalDeliveryRegistrar>();
+      const consumer = new RegisterCallSignalWhenSent(
+        eventConsumer,
+        registrar,
+      );
+      const event = new CallSignalSentEvent(
+        '550e8400-e29b-41d4-a716-446655440000',
+        { ...signalAttributes, ...override } as never,
+      );
+
+      await expect(consumer.handler(event)).resolves.toBeUndefined();
+      expect(registrar.register).not.toHaveBeenCalled();
+    },
+  );
 
   it('registers received signal acknowledgements', async () => {
     const eventConsumer = mock<DomainEventConsumer>();

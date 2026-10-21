@@ -1,10 +1,14 @@
 import CallSignalDeliveryRegistrar from '@app/contexts/calls/application/register-signal-delivery/CallSignalDeliveryRegistrar';
 import { CallSignalDeliveryRegisterMessage } from '@app/contexts/calls/application/register-signal-delivery/messages/CallSignalDeliveryRegisterMessage';
+import { InvalidCallSignalError } from '@app/contexts/calls/domain/errors/InvalidCallSignalError';
+import { CallSignalSentAttributes } from '@app/contexts/calls/domain/events/CallSignalSentAttributes';
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
 import { pigeonEnvironment } from '@app/shared/infrastructure/environment/PigeonEnvironment';
 import { DomainEventConsumer } from '@app/shared/infrastructure/messageBus/DomainEventConsumer';
+import Kernel from '@haskou/ddd-kernel';
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
+import { Timestamp } from '@haskou/value-objects';
 
 export default class RegisterCallSignalWhenSent extends Consumer {
   public static QUEUE_NAME = 'pigeon-swarm.register-call-signal-when-sent';
@@ -33,28 +37,25 @@ export default class RegisterCallSignalWhenSent extends Consumer {
   }
 
   public async handler(event: DomainEvent): Promise<void> {
-    const participantIds = Array.isArray(event.attributes.participantIds)
-      ? event.attributes.participantIds.filter(
-          (participantId): participantId is string =>
-            typeof participantId === 'string',
-        )
-      : [];
+    let message: CallSignalDeliveryRegisterMessage;
 
-    await this.registrar.register(
-      new CallSignalDeliveryRegisterMessage({
-        attempt: Number(event.attributes.attempt),
-        callId: String(event.attributes.callId),
-        expiresAt: Number(event.attributes.expiresAt),
-        networkId: String(event.attributes.networkId),
-        ownerNodeId: String(event.attributes.ownerNodeId),
-        participantIds,
-        payload: event.attributes.payload,
-        recipientIdentityId: String(event.attributes.recipientIdentityId),
-        senderIdentityId: String(event.attributes.senderIdentityId),
-        sentAt: Number(event.attributes.sentAt),
-        signalId: String(event.attributes.signalId),
-        signalType: String(event.attributes.signalType),
-      }),
-    );
+    try {
+      message = new CallSignalDeliveryRegisterMessage(
+        event.attributes as CallSignalSentAttributes,
+      );
+      message.assertSignalIsNotFromTheFuture(Timestamp.now());
+    } catch (error) {
+      if (error instanceof InvalidCallSignalError) {
+        Kernel.logger.warn?.(
+          'Refused a received call signal that is not valid.',
+        );
+
+        return;
+      }
+
+      throw error;
+    }
+
+    await this.registrar.register(message);
   }
 }

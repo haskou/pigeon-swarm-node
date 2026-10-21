@@ -1,6 +1,6 @@
 import { assert, StringValueObject } from '@haskou/value-objects';
 
-import { InvalidCallScopeError } from '../errors/InvalidCallScopeError';
+import { InvalidCallSignalError } from '../errors/InvalidCallSignalError';
 
 export enum CallSignalTypeEnum {
   ANSWER = 'answer',
@@ -18,7 +18,7 @@ export class CallSignalType extends StringValueObject {
 
     assert(
       CallSignalType.VALID_VALUES.includes(this.value),
-      new InvalidCallScopeError(),
+      new InvalidCallSignalError(),
     );
   }
 }

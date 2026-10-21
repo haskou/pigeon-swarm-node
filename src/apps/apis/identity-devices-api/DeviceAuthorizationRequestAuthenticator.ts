@@ -1,8 +1,6 @@
 import { DeviceCredential } from '@app/contexts/identities/domain/value-objects/DeviceCredential';
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
-import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
-import { DeviceAuthorizationTransitionReader } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionReader';
 import { PublicKey, Signature } from '@haskou/pigeon-swarm-crypto';
 import { assert } from '@haskou/value-objects';
 import { Request } from 'express';
@@ -19,7 +17,7 @@ interface DeviceProof {
 
 interface SignerProof {
   signature: Signature;
-  signer: DeviceAuthorizationTransitionReader;
+  signer: DeviceCredential | RecoveryAuthority;
 }
 
 /**
@@ -158,34 +156,6 @@ export class DeviceAuthorizationRequestAuthenticator {
         new InvalidSignedRequestError(),
       );
       this.acceptOnce(request, signer, signature);
-    } catch {
-      throw new InvalidSignedRequestError();
-    }
-  }
-
-  /**
-   * The reader of the device-authorization transition log: the recovery
-   * authority or any device that signed the request, authorized at the head
-   * or not, so a removed device can still read the transition that removed
-   * it. Only a reader the log records takes a replay slot; any other key reads
-   * at most the public recovery lineage, so it gets no slot to fill.
-   */
-  public authenticateReader(
-    request: Request,
-    log: DeviceAuthorizationTransitionLog,
-  ): DeviceAuthorizationTransitionReader {
-    this.verifier.assertTargetWithinLimit(request);
-    try {
-      const { signature, signer } = this.signerOf(
-        request,
-        log.getRecoveryAuthority(),
-      );
-
-      if (log.records(signer)) {
-        this.acceptOnce(request, signer, signature);
-      }
-
-      return signer;
     } catch {
       throw new InvalidSignedRequestError();
     }

@@ -252,6 +252,8 @@ async function main(): Promise<void> {
       call.id,
       nodeAIdentity.id,
     );
+    const signalId = globalThis.crypto.randomUUID();
+    const signalCreatedAt = Date.now();
     const callSignal = await receiveAndAcknowledgeCallSignal(
       nodeB,
       nodeBIdentity,
@@ -262,9 +264,23 @@ async function main(): Promise<void> {
           'POST',
           `/calls/${call.id}/signals`,
           {
-            payload: { sdp: 'node-a-offer-sdp' },
+            callId: call.id,
+            createdAt: signalCreatedAt,
+            expiresAt: signalCreatedAt + 20_000,
+            networkId: NETWORK_ID,
             recipientIdentityId: nodeBIdentity?.id,
+            scopeType: 'conversation',
+            sealedEntries: [
+              {
+                envelope: `envelope-${signalId}`,
+                recipientDeviceCredential: nodeBIdentity?.deviceCredential ?? '',
+              },
+            ],
+            senderDeviceCredential: nodeAIdentity.deviceCredential,
+            senderIdentityId: nodeAIdentity.id,
+            signalId,
             signalType: 'offer',
+            signature: `signature-${signalId}`,
           },
           nodeAIdentity,
         ),

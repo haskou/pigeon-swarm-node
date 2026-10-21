@@ -50,6 +50,7 @@ const singularSegments: Record<string, true> = {
   'replication-status': true,
   revocation: true,
   saved: true,
+  'sealing-view': true,
   thread: true,
   usage: true,
   'vapid-public-key': true,

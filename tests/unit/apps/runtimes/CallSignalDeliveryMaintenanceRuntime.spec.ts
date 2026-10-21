@@ -5,8 +5,6 @@ import { CallSignalDelivery } from '@app/contexts/calls/domain/CallSignalDeliver
 import { CallSignalDeliveryRoute } from '@app/contexts/calls/domain/CallSignalDeliveryRoute';
 import { CallSignal } from '@app/contexts/calls/domain/CallSignal';
 import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
-import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
-import { CallSignalType } from '@app/contexts/calls/domain/value-objects/CallSignalType';
 import InMemoryCallSignalDeliveryRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
 import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -14,6 +12,33 @@ import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { Timestamp } from '@haskou/value-objects';
 import { mock } from 'jest-mock-extended';
+
+function wireSignal(
+  senderIdentityId: IdentityId,
+  recipientIdentityId: IdentityId,
+) {
+  const createdAt = Date.now();
+
+  return CallSignal.fromPrimitives({
+    callId: '550e8400-e29b-41d4-a716-446655440000',
+    createdAt,
+    expiresAt: createdAt + 20_000,
+    networkId: '550e8400-e29b-41d4-a716-446655440003',
+    recipientIdentityId: recipientIdentityId.valueOf(),
+    scopeType: 'conversation',
+    sealedEntries: [
+      {
+        envelope: 'sealed-envelope-for-recipient-device',
+        recipientDeviceCredential: 'recipient-device-credential',
+      },
+    ],
+    senderDeviceCredential: 'sender-device-credential',
+    senderIdentityId: senderIdentityId.valueOf(),
+    signalId: '550e8400-e29b-41d4-a716-446655440001',
+    signalType: 'offer',
+    signature: 'ed25519-signature-over-signed-bytes',
+  });
+}
 
 describe('CallSignalDeliveryMaintenanceRuntime', () => {
   const ownerNodeId = new NodeId('550e8400-e29b-41d4-a716-446655440002');
@@ -68,19 +93,13 @@ describe('CallSignalDeliveryMaintenanceRuntime', () => {
     await runtime.run();
     await repository.save(
       CallSignalDelivery.send(
-        new CallSignalId('550e8400-e29b-41d4-a716-446655440001'),
         new CallSignalDeliveryRoute(
           new CallId('550e8400-e29b-41d4-a716-446655440000'),
           ownerNodeId,
           new NetworkId('550e8400-e29b-41d4-a716-446655440003'),
           [senderIdentityId, recipientIdentityId],
         ),
-        new CallSignal(
-          senderIdentityId,
-          recipientIdentityId,
-          new CallSignalType('offer'),
-          { sdp: 'offer' },
-        ),
+        wireSignal(senderIdentityId, recipientIdentityId),
         new Timestamp(Date.now()),
       ),
     );
@@ -114,19 +133,13 @@ describe('CallSignalDeliveryMaintenanceRuntime', () => {
 
     await repository.save(
       CallSignalDelivery.send(
-        new CallSignalId('550e8400-e29b-41d4-a716-446655440001'),
         new CallSignalDeliveryRoute(
           new CallId('550e8400-e29b-41d4-a716-446655440000'),
           new NodeId('550e8400-e29b-41d4-a716-446655440004'),
           new NetworkId('550e8400-e29b-41d4-a716-446655440003'),
           [senderIdentityId, recipientIdentityId],
         ),
-        new CallSignal(
-          senderIdentityId,
-          recipientIdentityId,
-          new CallSignalType('offer'),
-          { sdp: 'offer' },
-        ),
+        wireSignal(senderIdentityId, recipientIdentityId),
         new Timestamp(Date.now()),
       ),
     );
@@ -162,19 +175,13 @@ describe('CallSignalDeliveryMaintenanceRuntime', () => {
 
     await repository.save(
       CallSignalDelivery.send(
-        new CallSignalId('550e8400-e29b-41d4-a716-446655440001'),
         new CallSignalDeliveryRoute(
           new CallId('550e8400-e29b-41d4-a716-446655440000'),
           ownerNodeId,
           new NetworkId('550e8400-e29b-41d4-a716-446655440003'),
           [senderIdentityId, recipientIdentityId],
         ),
-        new CallSignal(
-          senderIdentityId,
-          recipientIdentityId,
-          new CallSignalType('offer'),
-          { sdp: 'offer' },
-        ),
+        wireSignal(senderIdentityId, recipientIdentityId),
         new Timestamp(Date.now()),
       ),
     );
