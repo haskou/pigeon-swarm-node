@@ -3,7 +3,7 @@ import { HeliaInstance } from './adapters/HeliaRuntimeAdapter';
 import { IPFSId } from './IPFSId';
 
 export interface IPFSConnection {
-  stat(cid: IPFSId, offlineOnly: boolean, signal?: AbortSignal): Promise<void>;
+  stat(cid: IPFSId): Promise<void>;
   addBytes(bytes: Uint8Array, signal?: AbortSignal): Promise<IPFSId>;
   dial(multiaddr: string, signal?: AbortSignal): Promise<void>;
   listen(multiaddr: string): Promise<void>;

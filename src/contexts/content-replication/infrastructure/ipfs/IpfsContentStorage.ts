@@ -68,7 +68,7 @@ export default class IpfsContentStorage extends ReplicatedContentStorage {
   ): Promise<void> {
     await this.translateNotFound(contentId, async () => {
       const ipfsId = this.toIpfsId(contentId);
-      const hasLocalContent = await this.ipfs.stat(ipfsId, true, [
+      const hasLocalContent = await this.ipfs.stat(ipfsId, [
         networkId.valueOf(),
       ]);
 
