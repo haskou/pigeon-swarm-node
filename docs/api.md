@@ -176,9 +176,10 @@ Implemented:
 - no identity-signed `GET`, `HEAD` or `OPTIONS` request takes a slot, and
   neither does the transitions read of a key that was never authorized (see
   _Identity device authorization_). Replaying either inside the window only
-  returns again what that key may read, at most the public recovery lineage.
-  The guard is kept for state changes and for device and recovery proofs, which
-  take a slot on every method
+  returns again what that key may read; for the transitions read of a served
+  caller that is the full signed history, disclosed by design. The guard is
+  kept for state changes and for device and recovery proofs, which take a slot
+  on every method
 - `X-Identity-Id` must be the one canonical encoding of a usable Ed25519 key
   (PEM armour and whitespace are ignored). An alias encoding of the signing key,
   such as another DER prefix byte or base64 padding bits that decode to the
@@ -6734,10 +6735,12 @@ GET /identity-devices/{percent-encoded identityId}/devices
 It has exactly the authentication of the checkpoint read: the stable identity
 signing key must match the requested identity and exactly one complete device
 or recovery proof is required, so no other participant can read this
-inventory. Other routes disclose parts of it by design: the anonymous
-`sealing-view` below serves the device credentials and the device count of any
-identity this node holds, and the transitions read serves the history of the
-device set to any identity this node serves. The response is `{ credentials, epoch, identityId, revision }`, where
+inventory. Other routes disclose parts of it: the transitions read serves the
+history of the device set by design to any identity this node serves, and the
+anonymous `sealing-view` below serves the device credentials and the device
+count of any identity this node holds. The anonymous view is flagged for
+security review, not by design. The response is
+`{ credentials, epoch, identityId, revision }`, where
 `credentials` holds the normalized public credentials authorized at the
 current head. It carries no labels, commitments, revoked credentials or
 revocation history; a client keeps its own device names. Failures are the same
@@ -6756,23 +6759,24 @@ this node does not serve returns `403` (`403014`) and nothing is read. The
 signer may be any served identity, not the path identity, and no device or
 recovery proof header is read. An anonymous request returns `401`, and so does
 a request that is not signed correctly or is blocked (`403012`). A served
-identity is one in the replicated identity index (see the waiver below). This is the
-only read whose authorization #698 stage 2 widened;
+identity is one in the replicated identity index (see Disclosure by design
+below). This is the only read whose authorization #698 stage 2 widened;
 `GET /identity-devices/{identityId}` and `/devices` stay owner-only.
 
-Disclosure waiver: every identity this node serves can read the full signed
-history of any identity the node holds: authorization times,
+Disclosure by design: every identity this node serves can read the full signed
+history of any identity the node holds, and this read is not narrowed to shared
+communities or conversations. The history holds authorization times,
 `compromisedSince` and `compromisedCredentials`, pairing ids and expirations,
-operation ids, epochs, and the credentials of every added, removed or
-recovered device. A sender needs it to replay the log and verify a recipient's
-sealing view. "Served" is not "a user of this node": `holds()` reads the
-replicated identity index, so any identity published anywhere on the network
-counts, and on a node whose registration mode is `open` (or `codes`, with a
-code) anyone can register one cheaply and then read every history. The
-registration mode (open, codes, closed) is therefore the real access control
-of this read. A stronger design, relationship-scoped reads (the caller must
-share a community or conversation with the identity), is tracked as a
-follow-up issue. It is flagged for security review.
+operation ids, epochs, and the credentials of every added, removed or recovered
+device. It is readable by any served caller because verifying a sealing view
+needs the replay from genesis: a first-contact sender cannot check a view
+without the log. "Served" means the identity is in the replicated identity
+index, so an identity published anywhere on the network counts. On a node whose
+registration mode is `open` (or `codes`, with a code) anyone can register an
+identity and then read these histories, so the registration mode (open, codes,
+closed) is the access control of this read. The log exposes public device
+credentials and when they were authorized, removed or marked compromised; it
+never serves sealed secrets.
 
 The response is `{ concurrentRecoveries, identityId, nextCursor, recoveries,
 transitions }`. Every entry is a stored transition in exactly the primitives
