@@ -37,6 +37,8 @@ If initialization fails (for example an invalid environment value, an `API_PORT`
 
 The node stops on `SIGTERM` (sent by `docker stop`) and on `SIGINT` (Ctrl-C). It closes its IPFS networks, OrbitDB stores and local database, so every write it acknowledged is on disk when it exits with status `0`. The shutdown gets 8 seconds. If it does not finish, the node logs `Shutdown on SIGTERM` (or `SIGINT`) and exits with status `1`. Docker sends `SIGKILL` 10 seconds after `SIGTERM` by default, so the node is never killed mid-close by a clean stop. The production image starts `node dist/index.js` in exec form, so the signal reaches the node process itself.
 
+After the consumers and schedulers stop, the node stops the `in-memory` bus timers, then the IPFS networks and OrbitDB stores, and closes the local database last. A signal that arrives while a failed start is already shutting down joins that shutdown instead of starting a second one. The `local` development image starts the node through `yarn local` and `nodemon`; this guarantee is stated for the production image only.
+
 ## Resetting the Node Owner
 
 The node owner is the identity that claimed the node with `PUT /node/owner`. If its key is lost, no one can sign as the owner again, so the node operator hands the node to a new owner on the host:

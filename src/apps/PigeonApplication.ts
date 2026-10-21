@@ -121,6 +121,9 @@ export default class PigeonApplication {
   });
 
   private server: ExpressKernelServer | undefined;
+  // A signal can arrive while the init-failure path already shuts down: both
+  // share one kernel shutdown, so no hook runs twice.
+  private shutdownInProgress: Promise<void> | undefined;
   private readonly swaggerRegistrar = new ApiSwaggerRegistrar();
   private readonly webSocketRealtimeServer = new WebSocketRealtimeServer();
 
@@ -563,6 +566,8 @@ export default class PigeonApplication {
   }
 
   public async shutdown(): Promise<void> {
-    await this.kernel.shutdown();
+    this.shutdownInProgress ??= this.kernel.shutdown();
+
+    await this.shutdownInProgress;
   }
 }
