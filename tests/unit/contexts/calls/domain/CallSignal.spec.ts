@@ -184,6 +184,154 @@ describe('CallSignal', () => {
     ).toThrow(InvalidCallSignalError);
   });
 
+  it('refuses sealed entries that are not an array without a raw TypeError', () => {
+    expect(() =>
+      CallSignal.fromPrimitives(wire({ sealedEntries: 'not-an-array' })),
+    ).toThrow(InvalidCallSignalError);
+  });
+
+  it('refuses a sealed entry that carries a key beyond the two sealed fields', () => {
+    expect(() =>
+      CallSignal.fromPrimitives(
+        wire({
+          sealedEntries: [
+            {
+              envelope: 'sealed',
+              plaintext: { sdp: 'v=0' },
+              recipientDeviceCredential: 'recipient-device',
+            },
+          ],
+        }),
+      ),
+    ).toThrow(InvalidCallSignalError);
+  });
+
+  it('refuses a sealed entry whose fields are not strings', () => {
+    expect(() =>
+      CallSignal.fromPrimitives(
+        wire({
+          sealedEntries: [
+            { envelope: 7, recipientDeviceCredential: 'recipient-device' },
+          ],
+        }),
+      ),
+    ).toThrow(InvalidCallSignalError);
+  });
+
+  it('accepts the maximum number of sealed entries and refuses one more', () => {
+    const entries = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        envelope: 'sealed',
+        recipientDeviceCredential: `recipient-device-${index}`,
+      }));
+
+    expect(() =>
+      CallSignal.fromPrimitives(
+        wire({ sealedEntries: entries(CallSignal.MAX_SEALED_ENTRIES) }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      CallSignal.fromPrimitives(
+        wire({ sealedEntries: entries(CallSignal.MAX_SEALED_ENTRIES + 1) }),
+      ),
+    ).toThrow(InvalidCallSignalError);
+  });
+
+  it('refuses two sealed entries for the same recipient device', () => {
+    expect(() =>
+      CallSignal.fromPrimitives(
+        wire({
+          sealedEntries: [
+            { envelope: 'first', recipientDeviceCredential: 'same-device' },
+            { envelope: 'second', recipientDeviceCredential: 'same-device' },
+          ],
+        }),
+      ),
+    ).toThrow(InvalidCallSignalError);
+  });
+
+  it.each([
+    [
+      'an envelope',
+      {
+        sealedEntries: [
+          {
+            envelope: 'e'.repeat(CallSignal.MAX_ENVELOPE_LENGTH + 1),
+            recipientDeviceCredential: 'recipient-device',
+          },
+        ],
+      },
+    ],
+    [
+      'a recipient device credential',
+      {
+        sealedEntries: [
+          {
+            envelope: 'sealed',
+            recipientDeviceCredential: 'c'.repeat(
+              CallSignal.MAX_CREDENTIAL_LENGTH + 1,
+            ),
+          },
+        ],
+      },
+    ],
+    [
+      'the sender device credential',
+      { senderDeviceCredential: 'c'.repeat(CallSignal.MAX_CREDENTIAL_LENGTH + 1) },
+    ],
+    [
+      'the signature',
+      { signature: 's'.repeat(CallSignal.MAX_SIGNATURE_LENGTH + 1) },
+    ],
+  ])('refuses %s above its length cap', (_label, override) => {
+    expect(() => CallSignal.fromPrimitives(wire(override))).toThrow(
+      InvalidCallSignalError,
+    );
+  });
+
+  it('returns sealed entries holding exactly the two sealed fields', () => {
+    const [entry] = CallSignal.fromPrimitives(wire()).toPrimitives()
+      .sealedEntries;
+
+    expect(Object.keys(entry).sort()).toEqual([
+      'envelope',
+      'recipientDeviceCredential',
+    ]);
+  });
+
+  it('knows whether another signal carries the very same signed content', () => {
+    const signal = CallSignal.fromPrimitives(wire());
+
+    expect(signal.hasSameContentAs(CallSignal.fromPrimitives(wire()))).toBe(
+      true,
+    );
+    expect(
+      signal.hasSameContentAs(
+        CallSignal.fromPrimitives(
+          wire({
+            sealedEntries: [
+              {
+                envelope: 'attacker-chosen-envelope',
+                recipientDeviceCredential: 'recipient-device-credential',
+              },
+            ],
+          }),
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it('refuses a creation time beyond the clock-skew bound as a future signal even once expired logic is ignored', () => {
+    const signal = CallSignal.fromPrimitives(wire());
+
+    expect(() =>
+      signal.assertNotCreatedInTheFutureAt(new Timestamp(createdAt - 5_001)),
+    ).toThrow(InvalidCallSignalError);
+    expect(() =>
+      signal.assertNotCreatedInTheFutureAt(new Timestamp(createdAt + 60_000)),
+    ).not.toThrow();
+  });
+
   it('identifies the recipient', () => {
     const signal = CallSignal.fromPrimitives(wire());
 

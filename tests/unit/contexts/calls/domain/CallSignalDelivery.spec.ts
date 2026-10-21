@@ -149,4 +149,28 @@ describe('CallSignalDelivery', () => {
       InvalidCallSignalDeliveryAttemptError,
     );
   });
+
+  it('does not supersede a delivery whose sealed content differs', () => {
+    const stored = send();
+    const forged = CallSignalDelivery.fromPrimitives({
+      ...stored.toPrimitives(),
+      attempt: 2,
+      sealedEntries: [
+        {
+          envelope: 'attacker-chosen-envelope',
+          recipientDeviceCredential: 'recipient-device-credential',
+        },
+      ],
+    });
+
+    expect(forged.supersedes(stored)).toBe(false);
+  });
+
+  it('supersedes the same signed content with a higher attempt', () => {
+    const stored = send();
+    const retried = CallSignalDelivery.fromPrimitives(stored.toPrimitives());
+
+    expect(retried.retry(new Timestamp(1_770_000_001_000))).toBe(true);
+    expect(retried.supersedes(stored)).toBe(true);
+  });
 });

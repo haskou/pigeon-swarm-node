@@ -58,4 +58,71 @@ describe('PostCallSignalBody', () => {
 
     expect(errors.map((error) => error.property)).toContain('signalType');
   });
+
+  it('refuses more sealed entries than a device set can hold', async () => {
+    const errors = await errorsFor(
+      wire({
+        sealedEntries: Array.from({ length: 129 }, (_, index) => ({
+          envelope: 'sealed',
+          recipientDeviceCredential: `device-${index}`,
+        })),
+      }),
+    );
+
+    expect(errors.map((error) => error.property)).toContain('sealedEntries');
+  });
+
+  it('refuses two sealed entries for the same device credential', async () => {
+    const errors = await errorsFor(
+      wire({
+        sealedEntries: [
+          { envelope: 'first', recipientDeviceCredential: 'same-device' },
+          { envelope: 'second', recipientDeviceCredential: 'same-device' },
+        ],
+      }),
+    );
+
+    expect(errors.map((error) => error.property)).toContain('sealedEntries');
+  });
+
+  it('refuses an oversized envelope', async () => {
+    const errors = await errorsFor(
+      wire({
+        sealedEntries: [
+          {
+            envelope: 'e'.repeat(32_769),
+            recipientDeviceCredential: 'recipient-device',
+          },
+        ],
+      }),
+    );
+
+    expect(JSON.stringify(errors)).toContain('envelope');
+  });
+
+  it('refuses an oversized device credential', async () => {
+    const errors = await errorsFor(
+      wire({ senderDeviceCredential: 'c'.repeat(129) }),
+    );
+
+    expect(errors.map((error) => error.property)).toContain(
+      'senderDeviceCredential',
+    );
+  });
+
+  it('refuses a plaintext extra key inside a sealed entry', async () => {
+    const errors = await errorsFor(
+      wire({
+        sealedEntries: [
+          {
+            envelope: 'sealed',
+            plaintext: 'v=0',
+            recipientDeviceCredential: 'recipient-device',
+          },
+        ],
+      }),
+    );
+
+    expect(JSON.stringify(errors)).toContain('plaintext');
+  });
 });

@@ -80,6 +80,40 @@ describe('Call signal consumers', () => {
     },
   );
 
+  it.each([
+    ['participant ids that are not an array', { participantIds: 'nobody' }],
+    ['participant ids holding a non-identity', { participantIds: [7] }],
+    ['an owner node id that is not a node id', { ownerNodeId: 'not-a-node' }],
+    ['an attempt outside the retry policy', { attempt: 99 }],
+    ['a non-numeric attempt', { attempt: 'one' }],
+    ['a sent-at that is not a timestamp', { sentAt: 'yesterday' }],
+    [
+      'a creation time far in the future',
+      {
+        createdAt: Date.now() + 3_600_000,
+        expiresAt: Date.now() + 3_620_000,
+        sentAt: Date.now(),
+      },
+    ],
+  ])(
+    'refuses a received signal with %s without a raw error and without registering',
+    async (_case, override) => {
+      const eventConsumer = mock<DomainEventConsumer>();
+      const registrar = mock<CallSignalDeliveryRegistrar>();
+      const consumer = new RegisterCallSignalWhenSent(
+        eventConsumer,
+        registrar,
+      );
+      const event = new CallSignalSentEvent(
+        '550e8400-e29b-41d4-a716-446655440000',
+        { ...signalAttributes, ...override } as never,
+      );
+
+      await expect(consumer.handler(event)).resolves.toBeUndefined();
+      expect(registrar.register).not.toHaveBeenCalled();
+    },
+  );
+
   it('registers received signal acknowledgements', async () => {
     const eventConsumer = mock<DomainEventConsumer>();
     const registrar = mock<CallSignalAcknowledgementRegistrar>();

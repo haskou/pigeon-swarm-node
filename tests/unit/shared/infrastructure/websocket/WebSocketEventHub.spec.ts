@@ -614,18 +614,14 @@ describe('WebSocketEventHub', () => {
     const senderClient = buildClient();
     const recipientClient = buildClient();
     const otherParticipantClient = buildClient();
-    const event = new TestDomainEvent('call-id', {
-      callId: 'call-id',
+    const event = signalSentEvent(senderIdentityId, recipientIdentityId, {
       participantIds: [
         senderIdentityId.valueOf(),
         recipientIdentityId.valueOf(),
         otherParticipantIdentityId.valueOf(),
       ],
-      recipientIdentityId: recipientIdentityId.valueOf(),
-      senderIdentityId: senderIdentityId.valueOf(),
     });
 
-    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.signal.sent');
     hub.register(senderIdentityId, senderClient);
     hub.register(recipientIdentityId, recipientClient);
     hub.register(otherParticipantIdentityId, otherParticipantClient);
@@ -650,26 +646,11 @@ describe('WebSocketEventHub', () => {
     const senderIdentityId = await generateIdentityId();
     const recipientIdentityId = await generateIdentityId();
     const recipientClient = buildClient();
-    const event = new TestDomainEvent('call-id', {
-      callId: 'call-id',
-      createdAt: 1_770_000_000_000,
-      expiresAt: 1_770_000_020_000,
-      networkId: 'network-id',
-      participantIds: [senderIdentityId.valueOf(), recipientIdentityId.valueOf()],
+    const event = signalSentEvent(senderIdentityId, recipientIdentityId, {
       payload: { sdp: 'not-on-the-wire' },
-      recipientIdentityId: recipientIdentityId.valueOf(),
-      scopeType: 'conversation',
-      sealedEntries: [
-        { envelope: 'sealed-envelope', recipientDeviceCredential: 'device' },
-      ],
-      senderDeviceCredential: 'sender-device-credential',
-      senderIdentityId: senderIdentityId.valueOf(),
-      signalId: 'signal-id',
-      signalType: 'offer',
       signature: 'signature-over-signed-bytes',
     });
 
-    jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.signal.sent');
     hub.register(recipientIdentityId, recipientClient);
     jest.clearAllMocks();
 
@@ -681,6 +662,113 @@ describe('WebSocketEventHub', () => {
     expect(sent).toContain('"signature":"signature-over-signed-bytes"');
     expect(sent).toContain('"sealedEntries"');
     expect(sent).not.toContain('"payload"');
+  });
+
+  describe('call signal relay hardening', () => {
+    async function relay(
+      overrides: Record<string, unknown>,
+      events: number = 1,
+    ): Promise<string[]> {
+      const hub = new WebSocketEventHub();
+      const senderIdentityId = await generateIdentityId();
+      const recipientIdentityId = await generateIdentityId();
+      const recipientClient = buildClient();
+
+      hub.register(recipientIdentityId, recipientClient);
+      jest.clearAllMocks();
+      authorizeCallAudience(hub);
+      hub.publish(
+        Array.from({ length: events }, () =>
+          signalSentEvent(senderIdentityId, recipientIdentityId, overrides),
+        ),
+      );
+      await flushPromises();
+
+      return (recipientClient.send as jest.Mock).mock.calls.map(
+        ([message]) => message as string,
+      );
+    }
+
+    it('refuses a recipient identity id that is an array', async () => {
+      const hub = new WebSocketEventHub();
+      const senderIdentityId = await generateIdentityId();
+      const recipientIdentityId = await generateIdentityId();
+      const bystanderIdentityId = await generateIdentityId();
+      const recipientClient = buildClient();
+      const bystanderClient = buildClient();
+
+      hub.register(recipientIdentityId, recipientClient);
+      hub.register(bystanderIdentityId, bystanderClient);
+      jest.clearAllMocks();
+      authorizeCallAudience(hub);
+      hub.publish([
+        signalSentEvent(senderIdentityId, recipientIdentityId, {
+          recipientIdentityId: [
+            recipientIdentityId.valueOf(),
+            bystanderIdentityId.valueOf(),
+          ],
+        }),
+      ]);
+      await flushPromises();
+
+      expect(recipientClient.send).not.toHaveBeenCalled();
+      expect(bystanderClient.send).not.toHaveBeenCalled();
+    });
+
+    it('drops a signal that has already expired', async () => {
+      const createdAt = Date.now() - 60_000;
+
+      expect(
+        await relay({ createdAt, expiresAt: createdAt + 20_000 }),
+      ).toHaveLength(0);
+    });
+
+    it('drops a signal created far in the future', async () => {
+      const createdAt = Date.now() + 3_600_000;
+
+      expect(
+        await relay({ createdAt, expiresAt: createdAt + 20_000 }),
+      ).toHaveLength(0);
+    });
+
+    it('drops a sealed entry carrying a plaintext key', async () => {
+      expect(
+        await relay({
+          sealedEntries: [
+            {
+              envelope: 'sealed',
+              plaintext: 'v=0',
+              recipientDeviceCredential: 'device',
+            },
+          ],
+        }),
+      ).toHaveLength(0);
+    });
+
+    it('relays a replayed signal and attempt only once', async () => {
+      expect(await relay({}, 2)).toHaveLength(1);
+    });
+
+    it('relays a retry of the same signal with a higher attempt', async () => {
+      const hub = new WebSocketEventHub();
+      const senderIdentityId = await generateIdentityId();
+      const recipientIdentityId = await generateIdentityId();
+      const recipientClient = buildClient();
+
+      hub.register(recipientIdentityId, recipientClient);
+      jest.clearAllMocks();
+      authorizeCallAudience(hub);
+      hub.publish([
+        signalSentEvent(senderIdentityId, recipientIdentityId, { attempt: 1 }),
+      ]);
+      await flushPromises();
+      hub.publish([
+        signalSentEvent(senderIdentityId, recipientIdentityId, { attempt: 2 }),
+      ]);
+      await flushPromises();
+
+      expect(recipientClient.send).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('sends call lease connection transitions to call participants', async () => {
@@ -1271,6 +1359,40 @@ async function generateIdentityId(): Promise<IdentityId> {
   const keyPair = await KeyPair.generate();
 
   return new IdentityId(keyPair.toPrimitives().publicKey);
+}
+
+const SIGNAL_ID = '68da3440-c60e-4fe3-b86a-2b8931ea345f';
+
+function signalSentEvent(
+  senderIdentityId: IdentityId,
+  recipientIdentityId: IdentityId,
+  overrides: Record<string, unknown> = {},
+): DomainEvent {
+  const createdAt = Date.now();
+  const event = new TestDomainEvent('550e8400-e29b-41d4-a716-446655440000', {
+    attempt: 1,
+    callId: '550e8400-e29b-41d4-a716-446655440000',
+    createdAt,
+    expiresAt: createdAt + 20_000,
+    networkId: '550e8400-e29b-41d4-a716-446655440000',
+    participantIds: [senderIdentityId.valueOf(), recipientIdentityId.valueOf()],
+    recipientIdentityId: recipientIdentityId.valueOf(),
+    scopeType: 'conversation',
+    sealedEntries: [
+      { envelope: 'sealed-envelope', recipientDeviceCredential: 'device' },
+    ],
+    senderDeviceCredential: 'sender-device-credential',
+    senderIdentityId: senderIdentityId.valueOf(),
+    sentAt: createdAt,
+    signalId: SIGNAL_ID,
+    signalType: 'offer',
+    signature: 'signature',
+    ...overrides,
+  });
+
+  jest.spyOn(event, 'eventName').mockReturnValue('calls.v1.signal.sent');
+
+  return event;
 }
 
 function buildClient(readyState: number = WebSocket.OPEN): WebSocket {

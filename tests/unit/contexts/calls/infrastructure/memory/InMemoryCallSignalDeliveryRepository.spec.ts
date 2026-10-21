@@ -89,4 +89,28 @@ describe('InMemoryCallSignalDeliveryRepository', () => {
 
     await expect(repository.hasById(expired.getId())).resolves.toBe(false);
   });
+
+  it('keeps the stored sealed content when a known signal id arrives with a higher attempt and other content', async () => {
+    const repository = new InMemoryCallSignalDeliveryRepository();
+    const stored = delivery();
+    const forged = CallSignalDelivery.fromPrimitives({
+      ...stored.toPrimitives(),
+      attempt: 2,
+      sealedEntries: [
+        {
+          envelope: 'attacker-chosen-envelope',
+          recipientDeviceCredential: 'recipient-device-credential',
+        },
+      ],
+    });
+
+    await repository.save(stored);
+    await repository.save(forged);
+
+    const current = await repository.requireById(stored.getId());
+
+    expect(current.toPrimitives().sealedEntries).toEqual(
+      stored.toPrimitives().sealedEntries,
+    );
+  });
 });
