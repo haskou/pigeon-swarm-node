@@ -4,8 +4,10 @@ import {
   heliaRuntimeAdapter,
   HeliaInstance,
 } from '@app/contexts/shared/infrastructure/ipfs/helia/adapters/HeliaRuntimeAdapter';
+import { IPFSBlockNotFoundPublicError } from '@app/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundPublicError';
 import { HeliaIPFS } from '@app/contexts/shared/infrastructure/ipfs/helia/HeliaIPFS';
 import { IPFSId } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import { Libp2pPubSubService } from '@app/shared/infrastructure/pubsub/libp2p/Libp2pPubSubService';
 
 describe('HeliaIPFS', () => {
@@ -283,5 +285,137 @@ describe('HeliaIPFS', () => {
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(heliaRouting.findProviders).not.toHaveBeenCalled();
+  });
+
+  describe('record reads fail closed', () => {
+    const namedError = (name: string): Error =>
+      Object.assign(new Error('PRIVATE-DETAIL'), { name });
+    const aggregate = (...errors: Error[]): Error =>
+      Object.assign(new AggregateError(errors, 'PRIVATE-DETAIL'), {
+        name: 'GetFailedError',
+      });
+
+    const createIpfs = (options: {
+      datastoreGet?: jest.Mock;
+      routingGet?: jest.Mock;
+      peers?: string[];
+      dht?: boolean;
+      blockstoreGet?: jest.Mock;
+    }): HeliaIPFS => {
+      const heliaCore = {
+        blockstore: { get: options.blockstoreGet ?? jest.fn() },
+        datastore: {
+          get:
+            options.datastoreGet ??
+            jest.fn().mockRejectedValue(namedError('NotFoundError')),
+        },
+        libp2p: {
+          addEventListener: jest.fn(),
+          getPeers: jest
+            .fn()
+            .mockReturnValue(
+              (options.peers ?? ['peer']).map((peer) => ({
+                toCID: () => peer,
+              })),
+            ),
+          services: {},
+        },
+        routing: { get: options.routingGet ?? jest.fn() },
+      } as unknown as HeliaInstance;
+
+      jest
+        .spyOn(heliaRuntimeAdapter, 'createDatastoreKey')
+        .mockResolvedValue({} as never);
+
+      return new (class extends HeliaIPFS {})(heliaCore, {
+        storageLocation: 'memory',
+        distributedHashTableEnabled: options.dht,
+      });
+    };
+
+    it('rejects as not ready when routing.get fails with a timeout', async () => {
+      const ipfs = createIpfs({
+        routingGet: jest.fn().mockRejectedValue(namedError('TimeoutError')),
+      });
+
+      await expect(ipfs.getRecord('key')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('rejects as not ready when only some routers answered not found', async () => {
+      const ipfs = createIpfs({
+        routingGet: jest
+          .fn()
+          .mockRejectedValue(
+            aggregate(namedError('NotFoundError'), namedError('TimeoutError')),
+          ),
+      });
+
+      await expect(ipfs.getRecord('key')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('resolves undefined when every router answered not found', async () => {
+      const ipfs = createIpfs({
+        routingGet: jest
+          .fn()
+          .mockRejectedValue(aggregate(namedError('NotFoundError'))),
+      });
+
+      await expect(ipfs.getRecord('key')).resolves.toBeUndefined();
+    });
+
+    it('rejects as not ready with no peers and the DHT enabled', async () => {
+      const ipfs = createIpfs({ peers: [] });
+
+      await expect(ipfs.getRecord('key')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('resolves undefined with no peers and the DHT disabled', async () => {
+      const ipfs = createIpfs({ peers: [], dht: false });
+
+      await expect(ipfs.getRecord('key')).resolves.toBeUndefined();
+    });
+
+    it('rejects as not ready when the local datastore fails for another reason', async () => {
+      const ipfs = createIpfs({
+        datastoreGet: jest.fn().mockRejectedValue(namedError('GetFailedError')),
+        dht: false,
+      });
+
+      await expect(ipfs.getRecord('key')).rejects.toBeInstanceOf(
+        ReplicatedStateNotReadyError,
+      );
+    });
+
+    it('does not map a blockstore timeout in stat to a missing block', async () => {
+      jest
+        .spyOn(heliaRuntimeAdapter, 'parseCid')
+        .mockResolvedValue({} as never);
+      const ipfs = createIpfs({
+        blockstoreGet: jest.fn().mockRejectedValue(namedError('TimeoutError')),
+      });
+
+      await expect(
+        ipfs.stat(new IPFSId('PRIVATE-CID'), false),
+      ).rejects.toBeInstanceOf(ReplicatedStateNotReadyError);
+    });
+
+    it('maps a definitive missing block in stat to a block-not-found error', async () => {
+      jest
+        .spyOn(heliaRuntimeAdapter, 'parseCid')
+        .mockResolvedValue({} as never);
+      const ipfs = createIpfs({
+        blockstoreGet: jest.fn().mockRejectedValue(namedError('NotFoundError')),
+      });
+
+      await expect(
+        ipfs.stat(new IPFSId('PRIVATE-CID'), false),
+      ).rejects.toBeInstanceOf(IPFSBlockNotFoundPublicError);
+    });
   });
 });
