@@ -16,6 +16,7 @@ import { PairingAuthorization } from '@app/contexts/identity-devices/domain/valu
 import { PairingExpiration } from '@app/contexts/identity-devices/domain/value-objects/PairingExpiration';
 import { PairingId } from '@app/contexts/identity-devices/domain/value-objects/PairingId';
 import OrbitDBDeviceAuthorizationRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceAuthorizationRepository';
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
@@ -747,7 +748,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       // which starts with the recovered credential: the recovery without the
       // cap must sort first so it wins the checkpoint.
       const [uncappedTarget, cappedTarget] =
-        keyOf(first).localeCompare(keyOf(second)) < 0
+        compareCodeUnits(keyOf(first), keyOf(second)) < 0
           ? [first, second]
           : [second, first];
       const base = repositoryFixture();
@@ -2964,9 +2965,10 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       KeyPair.generate(),
     ]);
     equivalentAuthors.sort((left, right) =>
-      left
-        .toPrimitives()
-        .publicKey.localeCompare(right.toPrimitives().publicKey),
+      compareCodeUnits(
+        left.toPrimitives().publicKey,
+        right.toPrimitives().publicKey,
+      ),
     );
     const [invalidAuthor, validAuthor] = equivalentAuthors;
     const target = await KeyPair.generate();
