@@ -311,13 +311,11 @@ describe('HeliaIPFS', () => {
         },
         libp2p: {
           addEventListener: jest.fn(),
-          getPeers: jest
-            .fn()
-            .mockReturnValue(
-              (options.peers ?? ['peer']).map((peer) => ({
-                toCID: () => peer,
-              })),
-            ),
+          getPeers: jest.fn().mockReturnValue(
+            (options.peers ?? ['peer']).map((peer) => ({
+              toCID: () => peer,
+            })),
+          ),
           services: {},
         },
         routing: { get: options.routingGet ?? jest.fn() },

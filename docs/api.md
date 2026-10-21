@@ -2573,6 +2573,15 @@ times out, the answer is the same `503`, even when another network reported the
 CID absent: one network's absence does not prove the content is absent
 everywhere. Retry.
 
+Identity and keychain record lookups follow the same rule. The Helia adapter
+reports a record as absent only when the local datastore or every DHT router
+answered not-found. A datastore error, a DHT timeout or abort, a router that
+failed while another answered not-found, or having no connected peers while the
+DHT is enabled is a retrieval failure: the lookup answers `503` with code
+`503020`, never "no record", so an unreachable DHT cannot make an existing
+identity or keychain read as missing. Block `stat` over the public network
+likewise reports a missing block only on a definitive not-found answer.
+
 ### Register content replication
 
 ```http
