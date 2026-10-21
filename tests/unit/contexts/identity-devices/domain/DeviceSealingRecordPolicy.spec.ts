@@ -193,6 +193,22 @@ describe('DeviceSealingRecordPolicy', () => {
     expect(authorizationOf).not.toHaveBeenCalled();
   });
 
+  it('serves a stored record without re-verifying its signature', () => {
+    const authorizationOf = jest.fn(() => fixture.authorization);
+
+    expect(
+      policy.serves(
+        sealingRecordOf({
+          deviceCredential: credentialOf(fixture.owner),
+          identityId: fixture.identityId,
+          signer: stranger,
+        }),
+        authorizationOf,
+        NOW,
+      ),
+    ).toBe(true);
+  });
+
   it('refuses a record when no authorisation is known', () => {
     expect(
       policy.admits(

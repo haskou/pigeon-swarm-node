@@ -17,16 +17,21 @@ export class DeleteNodeNetworkRoute extends NodeOwnerRouteSupport {
     @Req() request: Request,
     @Res() response: Response,
   ): Promise<Response> {
-    await this.changeNodeAsOwner(request, (identityId) =>
-      this.remover.remove(
+    const owner = await this.changeNodeAsOwner(request, async (identityId) => {
+      await this.remover.remove(
         new NodeNetworkRemoverMessage(networkId, identityId.valueOf()),
-      ),
-    );
+      );
+
+      return identityId;
+    });
 
     const node = await this.nodeLoader.loadNode();
 
-    return response
-      .status(HttpRouteStatusEnum.OK)
-      .send(new NetworksViewModel(node).toResource());
+    return response.status(HttpRouteStatusEnum.OK).send(
+      new NetworksViewModel(node, {
+        exposeKeys: node.isOwnedBy(owner),
+        exposePrivacy: true,
+      }).toResource(),
+    );
   }
 }

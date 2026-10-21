@@ -668,7 +668,7 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
-          description: Network added.
+          description: Network added. Private network keys and the `privateNetwork` flag are included only for the signed node owner; an unsigned addition to an unowned node receives neither.
           content:
             application/json:
               schema:
@@ -699,7 +699,7 @@ paths:
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':
-          description: Network deleted.
+          description: Network deleted. Private network keys are included only while the signer still owns the node.
           content:
             application/json:
               schema:

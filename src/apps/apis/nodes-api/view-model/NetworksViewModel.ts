@@ -3,12 +3,17 @@ import { Node } from '@app/contexts/nodes/domain/Node';
 import { NetworksResource } from '../resources/NetworksResource';
 
 export class NetworksViewModel {
+  /**
+   * `disclosure` has no default: every route decides who may see network keys
+   * and the private-network flag, so a new route never discloses them by
+   * omission.
+   */
   constructor(
     private readonly node: Node,
     private readonly disclosure: {
       exposeKeys: boolean;
       exposePrivacy: boolean;
-    } = { exposeKeys: true, exposePrivacy: true },
+    },
   ) {}
 
   public toResource(): NetworksResource {

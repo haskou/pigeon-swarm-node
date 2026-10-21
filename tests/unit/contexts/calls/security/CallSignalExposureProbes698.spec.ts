@@ -1,9 +1,17 @@
 import RegisterCallSignalWhenSent from '@app/apps/consumers/pubsub/calls/RegisterCallSignalWhenSent';
 import CallSignalDeliveryRegistrar from '@app/contexts/calls/application/register-signal-delivery/CallSignalDeliveryRegistrar';
+import { CallSignal } from '@app/contexts/calls/domain/CallSignal';
+import { CallSignalDelivery } from '@app/contexts/calls/domain/CallSignalDelivery';
+import { CallSignalDeliveryRoute } from '@app/contexts/calls/domain/CallSignalDeliveryRoute';
 import { CallSignalSentAttributes } from '@app/contexts/calls/domain/events/CallSignalSentAttributes';
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
+import { CallId } from '@app/contexts/calls/domain/value-objects/CallId';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import InMemoryCallSignalDeliveryRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { NetworkId } from '@app/contexts/shared/domain/value-objects/NetworkId';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -77,9 +85,12 @@ const startNode = async (network: IPFSNetwork): Promise<ProbeNode> => {
     new PubSubNetworkMessageCodec(),
   );
   const repository = new InMemoryCallSignalDeliveryRepository();
+  // Every probe node is a receiver: none of them owns the delivery.
+  const nodeRepository = mock<NodeRepository>();
+  nodeRepository.loadLocalNodeId.mockResolvedValue(new NodeId(randomUUID()));
   const consumer = new RegisterCallSignalWhenSent(
     adapter as unknown as DomainEventConsumer,
-    new CallSignalDeliveryRegistrar(repository),
+    new CallSignalDeliveryRegistrar(repository, nodeRepository),
   );
 
   await consumer.init();
@@ -87,7 +98,8 @@ const startNode = async (network: IPFSNetwork): Promise<ProbeNode> => {
   return { adapter, repository };
 };
 
-const CREATED_AT = 1_770_000_000_000;
+/** Signals are refused once expired, so the fixture is created now. */
+const CREATED_AT = Date.now();
 const ENVELOPE = 'opaque-sealed-envelope-for-the-recipient-device';
 
 /** A signal as the origin publishes it: sealed entries and a signature only. */
@@ -173,12 +185,15 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
       expect(
         s.fabric.carried.some((payload) => payload.includes('"sdp"')),
       ).toBe(false);
+      expect(s.fabric.carried.length).toBeGreaterThan(0);
     });
 
     it('E1/E2: never registers or relays a plaintext payload that a sender adds', async () => {
       const s = await scenario();
       const marker = `probe-${randomUUID()}`;
       const signalId = randomUUID();
+      // Nothing is on the wire before the sender publishes.
+      expect(s.fabric.carried).toHaveLength(0);
 
       await s.sender.adapter.publish([
         new CallSignalSentEvent(
@@ -187,6 +202,10 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
         ),
       ]);
 
+      // The probe is only meaningful if the signal was actually registered.
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(true);
       expect(
         (await registeredText(s.bystander, signalId))?.includes(marker) ??
           false,
@@ -195,6 +214,39 @@ describe('#698 stage-2 call signal exposure probes (E1, E2, E4)', () => {
         (await registeredText(s.recipient, signalId))?.includes(marker) ??
           false,
       ).toBe(false);
+      // The sender's publication is the only frame (frames are encrypted on a
+      // private network, so they are counted, not read): no receiver relays it.
+      expect(s.fabric.carried).toHaveLength(1);
+    });
+
+    it('E1/E2: the real send path never puts a plaintext payload on the wire', async () => {
+      const s = await scenario();
+      const marker = `probe-${randomUUID()}`;
+      const signalId = randomUUID();
+      const attributes = signalAttributes({
+        networkId,
+        payload: { sdp: marker },
+        signalId,
+      });
+      const delivery = CallSignalDelivery.send(
+        new CallSignalDeliveryRoute(
+          new CallId(CALL_ID),
+          new NodeId(OWNER_NODE_ID),
+          new NetworkId(networkId),
+          attributes.participantIds.map((id) => new IdentityId(id)),
+        ),
+        CallSignal.fromPrimitives(attributes as never),
+      );
+
+      await s.sender.adapter.publish(delivery.pullDomainEvents());
+
+      expect(
+        await s.recipient.repository.hasById(new CallSignalId(signalId)),
+      ).toBe(true);
+      expect(s.fabric.carried.length).toBeGreaterThan(0);
+      expect(s.fabric.carried.some((frame) => frame.includes(marker))).toBe(
+        false,
+      );
     });
 
     it.each([

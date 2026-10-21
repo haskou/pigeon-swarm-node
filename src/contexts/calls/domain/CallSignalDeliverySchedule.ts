@@ -97,7 +97,11 @@ export class CallSignalDeliverySchedule {
       return true;
     }
 
-    return this.attempt.isGreaterThan(schedule.attempt);
+    return (
+      this.attempt.isGreaterThan(schedule.attempt) &&
+      this.sentAt.valueOf() >= schedule.sentAt.valueOf() &&
+      this.nextRetryAt.valueOf() >= schedule.nextRetryAt.valueOf()
+    );
   }
 
   public toPrimitives() {

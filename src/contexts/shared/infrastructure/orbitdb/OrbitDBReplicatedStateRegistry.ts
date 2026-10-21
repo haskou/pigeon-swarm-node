@@ -3695,4 +3695,39 @@ export default class OrbitDBReplicatedStateRegistry {
       }
     });
   }
+
+  /**
+   * Forgets the heads under `prefix` that `isForgotten` names, in every
+   * network's head cache, among the projected heads and in this node's
+   * persisted head cache, including a persisted head that its merger refused
+   * at restore. `isForgotten` is asked only about keys under `prefix`, so a
+   * caller can never forget another prefix's heads. The replicated log is
+   * append-only and keeps their entries: a rebuild offers them to the prefix's
+   * merger again, so the prefix's merger must refuse what is forgotten.
+   */
+  public async forgetCachedHeads(
+    prefix: string,
+    isForgotten: (key: string) => boolean,
+  ): Promise<void> {
+    const matches = (key: string): boolean =>
+      key.startsWith(prefix) && isForgotten(key);
+
+    const keyed: Array<Map<string, unknown> | Set<string>> = [
+      ...this.readableHeadMaps(),
+      this.projectedHeads,
+      this.exactProjectedHeadKeys,
+      ...this.persistedHeadKeysByNetworkId.values(),
+      ...this.restoredHeadKeys.values(),
+      ...this.droppedRestoredHeadKeys.values(),
+      ...this.verifiedHeadKeys.values(),
+    ];
+
+    for (const collection of keyed) {
+      for (const key of collection.keys()) {
+        if (matches(key)) collection.delete(key);
+      }
+    }
+
+    await this.headCache?.deleteMatching(matches);
+  }
 }

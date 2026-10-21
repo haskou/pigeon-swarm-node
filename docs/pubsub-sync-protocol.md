@@ -290,6 +290,22 @@ acknowledges it or its 20-second TTL expires. It republishes the signal after
 same `signalId`, allowing recipients to acknowledge duplicates without
 applying SDP or ICE twice.
 
+A recipient refuses and does not register a received signal whose `expiresAt` has
+passed, whose `createdAt` is more than 5 seconds ahead of its clock, or whose
+`sentAt` lies outside `createdAt - 5 s <= sentAt <= min(expiresAt, now + 5 s)`; the
+refusal is logged at debug level. A node never registers a received delivery whose
+`ownerNodeId` is its own node id: the owner keeps only the delivery its own send
+and retry path saved, so a copied signal republished by another member cannot
+replace the owner's schedule or stop its retries. A retry supersedes only the
+registered delivery with the same route (`callId`, `ownerNodeId`, `networkId` and
+the ordered `participantIds`), and only with a strictly greater `attempt` and
+non-decreasing `sentAt` and `nextRetryAt`. A delivery on another route, or one
+whose clock values run backwards, never replaces the stored one.
+
+These bounds assume node clocks agree to within the 5-second skew; a node whose
+clock drifts further refuses valid signals for most of their 20-second lifetime.
+Run NTP (or an equivalent time sync) on every node.
+
 Signal event attributes are:
 
 ```json
@@ -1168,8 +1184,16 @@ history is not narrowed to shared communities or conversations. The public view
 discloses the device credentials and the device count to anyone who reaches the
 node. That anonymous disclosure is flagged for security review, not by design.
 Reads are limited per client address, then per target and per node, and a view
-is cached for five seconds. Pruning of old records is not reported: the records
-are tracked as a follow-up issue.
+is cached for five seconds.
+
+A node prunes the sealing records it holds right after start and then every
+hour: every `device-sealing-record:` head whose UTC day (the last key segment)
+is neither today nor yesterday is forgotten from the in-memory head caches and
+from the node's persisted head cache, including a persisted row the merger
+refused at restore. Pruning is scoped to the sealing prefix and never touches
+another prefix. The replicated OrbitDB log is append-only and shared, so a node
+cannot remove those log entries: a rebuild replays them, and the merger refuses
+every record outside the two-day window before it parses the authorization.
 
 ## Live call projection boundary
 

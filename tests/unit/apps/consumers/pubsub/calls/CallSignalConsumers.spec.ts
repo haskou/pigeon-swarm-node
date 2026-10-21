@@ -12,7 +12,8 @@ describe('Call signal consumers', () => {
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
   const recipientIdentityId =
     'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=';
-  const createdAt = 1_770_000_000_000;
+  /** Signals are refused once expired, so the fixture is created now. */
+  const createdAt = Date.now();
   const signalAttributes = {
     attempt: 1,
     callId: '550e8400-e29b-41d4-a716-446655440000',
@@ -40,10 +41,7 @@ describe('Call signal consumers', () => {
   it('registers received signal deliveries', async () => {
     const eventConsumer = mock<DomainEventConsumer>();
     const registrar = mock<CallSignalDeliveryRegistrar>();
-    const consumer = new RegisterCallSignalWhenSent(
-      eventConsumer,
-      registrar,
-    );
+    const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
     const event = new CallSignalSentEvent(
       '550e8400-e29b-41d4-a716-446655440000',
       signalAttributes,
@@ -52,6 +50,25 @@ describe('Call signal consumers', () => {
     await consumer.handler(event);
 
     expect(registrar.register).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a received signal that has already expired, without registering it', async () => {
+    const eventConsumer = mock<DomainEventConsumer>();
+    const registrar = mock<CallSignalDeliveryRegistrar>();
+    const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
+    const expiredAt = Date.now() - 60_000;
+    const event = new CallSignalSentEvent(
+      '550e8400-e29b-41d4-a716-446655440000',
+      {
+        ...signalAttributes,
+        createdAt: expiredAt,
+        expiresAt: expiredAt + 20_000,
+        sentAt: expiredAt,
+      },
+    );
+
+    await expect(consumer.handler(event)).resolves.toBeUndefined();
+    expect(registrar.register).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -66,10 +83,7 @@ describe('Call signal consumers', () => {
     async (_case, override) => {
       const eventConsumer = mock<DomainEventConsumer>();
       const registrar = mock<CallSignalDeliveryRegistrar>();
-      const consumer = new RegisterCallSignalWhenSent(
-        eventConsumer,
-        registrar,
-      );
+      const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
       const event = new CallSignalSentEvent(
         '550e8400-e29b-41d4-a716-446655440000',
         { ...signalAttributes, ...override },
@@ -95,15 +109,21 @@ describe('Call signal consumers', () => {
         sentAt: Date.now(),
       },
     ],
+    [
+      'a send time before the signal was created',
+      { sentAt: createdAt - 60_000 },
+    ],
+    ['a send time after the signal expires', { sentAt: createdAt + 3_600_000 }],
+    [
+      'a send time beyond the clock-skew bound',
+      { sentAt: Date.now() + 15_000 },
+    ],
   ])(
     'refuses a received signal with %s without a raw error and without registering',
     async (_case, override) => {
       const eventConsumer = mock<DomainEventConsumer>();
       const registrar = mock<CallSignalDeliveryRegistrar>();
-      const consumer = new RegisterCallSignalWhenSent(
-        eventConsumer,
-        registrar,
-      );
+      const consumer = new RegisterCallSignalWhenSent(eventConsumer, registrar);
       const event = new CallSignalSentEvent(
         '550e8400-e29b-41d4-a716-446655440000',
         { ...signalAttributes, ...override } as never,

@@ -44,6 +44,32 @@ Feature: Post node network
       }
       """
 
+  Scenario: Hide network keys from an anonymous caller adding a network before the node is owned
+    Given the local node has no owner and no networks
+    And I set a private node network body with id "550e8400-e29b-41d4-a716-446655440005" and name "private"
+    When I POST to "/node/networks"
+    Then response code is equal to 200
+
+    Given I clear request headers
+    And I set a public node network body with id "550e8400-e29b-41d4-a716-446655440006" and name "public"
+    When I POST to "/node/networks"
+    Then response code is equal to 200
+    And response body should not contain "key"
+    And response body should not contain "privateNetwork"
+
+  Scenario: Show network keys to the owner adding a network
+    Given the local node has no owner and no networks
+    And I sign the current node owner request
+    When I PUT "/node/owner"
+    Then response code is equal to 200
+
+    Given I set a private node network body with id "550e8400-e29b-41d4-a716-446655440007" and name "private"
+    And I sign the current node network request
+    When I POST to "/node/networks"
+    Then response code is equal to 200
+    And response body should contain "key"
+    And response body should contain "privateNetwork"
+
   Scenario: Reject network changes from a non-owner
     Given the local node has no owner and no networks
     And I sign the current node owner request

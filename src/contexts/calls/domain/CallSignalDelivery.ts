@@ -169,6 +169,7 @@ export class CallSignalDelivery extends AggregateRoot {
 
   public supersedes(delivery: CallSignalDelivery): boolean {
     return (
+      this.route.hasSameRouteAs(delivery.route) &&
       this.signal.hasSameContentAs(delivery.signal) &&
       this.schedule.supersedes(delivery.schedule)
     );

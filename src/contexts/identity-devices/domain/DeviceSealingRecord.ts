@@ -141,6 +141,11 @@ export class DeviceSealingRecord {
     return `${DEVICE_SEALING_RECORD_HEAD_PREFIX}${fields.identityId}:${fields.deviceCredential}:${fields.utcDay}`;
   }
 
+  /** The UTC day a head key names: its last segment, as `headKey` builds it. */
+  public static utcDayOfHeadKey(key: string): string {
+    return key.slice(key.lastIndexOf(':') + 1);
+  }
+
   public static fromStored(value: unknown): DeviceSealingRecord | undefined {
     const primitives = storedPrimitivesOf(value);
 

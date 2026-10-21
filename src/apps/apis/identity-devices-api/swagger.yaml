@@ -325,11 +325,15 @@ paths:
         and per node (3000 per minute), code 429030, so one address can neither
         silence an identity nor the node. A served view is cached for five
         seconds and a cache hit spends neither the target nor the node budget.
-        An unknown id spends only the address budget and a small node-wide
-        unknown-id budget (300 per minute), is remembered as unknown for five
-        seconds and is never tracked per target. A path that is not the
-        canonical encoding of a usable key is refused (400, code 400080) after
-        the address budget and before the cache and the target and node budgets.
+        Concurrent misses for one identity share one lookup and one per-target
+        charge. A 429 is a budget refusal, not an answer about the identity. An
+        identity this node does not hold is refused (404, code 404050) and is
+        remembered as unknown for five seconds, so a newly registered identity
+        can read as unknown for that long. An unknown id spends only the address
+        budget and a small node-wide unknown-id budget (300 per minute), and is
+        never tracked per target. A path that is not the canonical encoding of a
+        usable key is refused (400, code 400080) after the address budget and
+        before the cache, the held check and the target and node budgets.
         API_TRUST_PROXY defaults to false: behind a reverse proxy every client
         shares one 60 per minute bucket, so the setting is required there.
       parameters:

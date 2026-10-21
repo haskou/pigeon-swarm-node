@@ -14,6 +14,10 @@ export default class DeviceSealingViewCache {
   public static readonly MAX_ENTRIES = 1_000;
   private readonly entries = new Map<string, Entry>();
   private readonly missing = new Map<string, number>();
+  private readonly inFlight = new Map<
+    string,
+    Promise<DeviceSealingViewResource>
+  >();
 
   /** True while an unknown identity is remembered as unknown. */
   public isMissing(target: IdentityId, now = Date.now()): boolean {
@@ -77,5 +81,26 @@ export default class DeviceSealingViewCache {
       expiresAt: now + DeviceSealingViewCache.TTL_MS,
       resource,
     });
+  }
+
+  /**
+   * Single-flight: concurrent callers for one identity share one load, so a
+   * burst of misses costs one lookup and one budget charge.
+   */
+  public coalesce(
+    target: IdentityId,
+    load: () => Promise<DeviceSealingViewResource>,
+  ): Promise<DeviceSealingViewResource> {
+    const key = target.valueOf();
+    const pending = this.inFlight.get(key);
+
+    if (pending) {
+      return pending;
+    }
+
+    const promise = load().finally(() => this.inFlight.delete(key));
+    this.inFlight.set(key, promise);
+
+    return promise;
   }
 }

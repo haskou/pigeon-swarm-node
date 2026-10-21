@@ -16,6 +16,21 @@ export class CallSignalDeliveryRoute {
     return this.ownerNodeId.isEqual(nodeId);
   }
 
+  public hasSameRouteAs(route: CallSignalDeliveryRoute): boolean {
+    const own = this.toPrimitives();
+    const other = route.toPrimitives();
+
+    return (
+      own.callId === other.callId &&
+      own.ownerNodeId === other.ownerNodeId &&
+      own.networkId === other.networkId &&
+      own.participantIds.length === other.participantIds.length &&
+      own.participantIds.every(
+        (participantId, index) => participantId === other.participantIds[index],
+      )
+    );
+  }
+
   public toPrimitives() {
     return {
       callId: this.callId.valueOf(),

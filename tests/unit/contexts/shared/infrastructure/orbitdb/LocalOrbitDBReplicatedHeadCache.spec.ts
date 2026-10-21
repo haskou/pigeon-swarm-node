@@ -24,6 +24,23 @@ describe('LocalOrbitDBReplicatedHeadCache', () => {
     expect(matcher({ networkId: 'network-2' })).toBe(false);
   });
 
+  it('deletes the cached heads of every network whose key matches', async () => {
+    const matches = jest.fn((key: string) => key.startsWith('sealing:'));
+
+    await cache.deleteMatching(matches);
+
+    expect(database.deleteMany).toHaveBeenCalledWith(
+      'orbitdb_replicated_heads',
+      expect.any(Function),
+    );
+    const matcher = database.deleteMany.mock.calls[0][1];
+
+    expect(matcher({ key: 'sealing:old', networkId: 'network-1' })).toBe(true);
+    expect(matcher({ key: 'sealing:old', networkId: 'network-2' })).toBe(true);
+    expect(matcher({ key: 'other:old', networkId: 'network-1' })).toBe(false);
+    expect(matcher({ networkId: 'network-1' })).toBe(false);
+  });
+
   it('returns the signature of the OrbitDB heads used to reconcile the cache', async () => {
     database.findOne.mockResolvedValue({
       networkId: 'network-1',
@@ -31,9 +48,9 @@ describe('LocalOrbitDBReplicatedHeadCache', () => {
       warmedAt: 1,
     });
 
-    await expect(
-      cache.findReconciledHeadSignature('network-1'),
-    ).resolves.toBe('["head-1"]');
+    await expect(cache.findReconciledHeadSignature('network-1')).resolves.toBe(
+      '["head-1"]',
+    );
     expect(database.findOne).toHaveBeenCalledWith(
       'orbitdb_replicated_head_cache_warm_networks',
       'network-1',

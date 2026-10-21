@@ -45,6 +45,15 @@ export default class LocalOrbitDBReplicatedHeadCache extends OrbitDBReplicatedHe
     );
   }
 
+  public async deleteMatching(
+    matches: (key: string) => boolean,
+  ): Promise<void> {
+    await this.database.deleteMany(
+      LocalOrbitDBReplicatedHeadCache.NAMESPACE,
+      (document) => typeof document.key === 'string' && matches(document.key),
+    );
+  }
+
   public async findByNetworkId(
     networkId: string,
   ): Promise<OrbitDBReplicatedHeadCacheEntry[]> {

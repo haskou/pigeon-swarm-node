@@ -1852,6 +1852,10 @@ Implemented:
 - reject a second public network with `409`
 - persist the network in the local embedded database
 - synchronize the runtime IPFS network registry after saving
+- answer with the node's networks; private network `key` values and the
+  `privateNetwork` flag go only to the signed node owner, so an unsigned
+  addition to an unowned node receives neither, as an anonymous
+  `GET /node/networks` does
 
 ### Delete local node network
 
@@ -1872,6 +1876,8 @@ Implemented:
   conversations, communities and their channel messages/reactions/requests/moderation logs, calls, polls, missed-call notifications, peer network references and content replication records
 - preserve identity metadata that still belongs to other networks by removing only the deleted `networkId`
 - delete identity metadata only when the deleted network was its only network
+- answer with the remaining networks, private network `key` values included
+  only while the signer still owns the node
 
 ### Put local node owner
 
@@ -6839,22 +6845,28 @@ The response is `{ identityId, revision, devices: [{ deviceCredential,
 sealingKeys: [{ utcDay, sealingPublicKey }] }] }` for the devices authorized
 at the head and UTC days D and D-1 only; it carries no labels, timestamps or
 `compromisedSince`. A sender verifies it by replaying the transitions above.
-An identity the node does not know returns `404` (`404050`) and is remembered
-as unknown for five seconds; an unknown id spends only the per-address budget
-and a small node-wide unknown-id budget (300 per minute, then `429030`), is never
-tracked per target and so cannot evict the budget of a known identity; a path that is not
-the canonical encoding of a usable key returns `400` (`400080`) after the
-per-address budget but before the cache and the per-target and node budgets, and one that is not an identity id at all returns `409` with
-the error class name as `code`.
+An identity the node does not hold is answered `404` (`404050`) and remembered
+as unknown for five seconds, so an identity registered on this node can read
+as unknown for up to that long. An unknown id spends only the per-address
+budget and a small node-wide unknown-id budget (300 per minute, then `429030`),
+is never tracked per target and so cannot evict the budget of a known identity.
+A path that is not the canonical encoding of a usable key returns `400`
+(`400080`) after the per-address budget but before the cache, the held check
+and the per-target and node budgets; one that is not an identity id at all
+returns `409` with the error class name as `code`.
 
 This read is public: anyone who can reach the node learns the device
 credentials and the device count of any identity the node holds, plus the
 sealing keys of today and yesterday. It is rate limited per client address
 (60 per minute) in front of a per-target budget (300 per minute) and a node
 budget (3000 per minute), so one address can neither silence an identity nor
-the node; excess returns `429` (`429030`). A served view is cached for five
+the node); excess returns `429` (`429030`). A served view is cached for five
 seconds, a cache hit spends neither the target nor the node budget, and a view
-can therefore trail the head by that time on top of the replication delay. The
+can therefore trail the head by that time on top of the replication delay.
+Concurrent misses for one identity share one lookup and one per-target charge.
+A `429` is a budget refusal, not an answer about the identity: a held identity
+can return it while the node budget is spent, whereas a `404` only says that
+the node does not hold the identity now.
 client address is the one Express derives (`API_TRUST_PROXY`, IPv6 per /64,
 IPv4-mapped as IPv4), is kept in memory only and is never logged.
 `API_TRUST_PROXY` defaults to `false`: behind a reverse proxy every client then

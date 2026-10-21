@@ -285,6 +285,7 @@ describe('Device sealing routes', () => {
     const blockPolicy = mock<NodeBlockPolicy>();
     blockPolicy.isIdentityBlocked.mockResolvedValue(false);
     const services = new Map<unknown, unknown>([
+      [IdentityRepository, identities],
       [
         SignedHttpRequestAuthenticator,
         new SignedHttpRequestAuthenticator(
@@ -592,6 +593,68 @@ describe('Device sealing routes', () => {
 
       expect(consume).not.toHaveBeenCalled();
       consume.mockRestore();
+    });
+
+    it('never resolves an authorization for an identity this node does not hold', async () => {
+      authorizationRepository.require.mockClear();
+
+      expect(
+        (await getPublic(viewPath(wire(await KeyPair.generate())))).status,
+      ).toBe(404);
+      expect(authorizationRepository.require).not.toHaveBeenCalled();
+    });
+
+    it('charges the per-target budget before resolving the authorization on a cache miss', async () => {
+      const find = jest
+        .spyOn(DeviceSealingViewCache.prototype, 'find')
+        .mockReturnValue(undefined);
+      const consume = jest.spyOn(
+        DeviceSealingViewRateLimiter.prototype,
+        'consume',
+      );
+      authorizationRepository.require.mockClear();
+
+      expect((await getPublic(viewPath())).status).toBe(200);
+      expect(consume.mock.invocationCallOrder[0]).toBeLessThan(
+        authorizationRepository.require.mock.invocationCallOrder[0],
+      );
+
+      find.mockRestore();
+      consume.mockRestore();
+    });
+
+    it('coalesces concurrent misses for one identity into one authorization lookup', async () => {
+      const find = jest
+        .spyOn(DeviceSealingViewCache.prototype, 'find')
+        .mockReturnValue(undefined);
+      authorizationRepository.require.mockClear();
+      const originalFind = DeviceSealingViewFinder.prototype.find;
+      const slowFind = jest
+        .spyOn(DeviceSealingViewFinder.prototype, 'find')
+        .mockImplementation(async function (
+          this: DeviceSealingViewFinder,
+          message,
+        ) {
+          const { promise, resolve } = Promise.withResolvers<void>();
+          setTimeout(resolve, 50);
+          await promise;
+
+          return originalFind.call(this, message);
+        });
+
+      const responses = await Promise.all([
+        getPublic(viewPath(), nextAddress()),
+        getPublic(viewPath(), nextAddress()),
+        getPublic(viewPath(), nextAddress()),
+      ]);
+
+      expect(responses.map((response) => response.status)).toEqual([
+        200, 200, 200,
+      ]);
+      expect(authorizationRepository.require).toHaveBeenCalledTimes(1);
+
+      find.mockRestore();
+      slowFind.mockRestore();
     });
 
     it('counts every address of one IPv6 /64 as one client', async () => {

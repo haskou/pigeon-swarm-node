@@ -143,7 +143,18 @@ export default class OrbitDBDeviceSealingRecordRepository extends DeviceSealingR
       .filter(
         (record): record is DeviceSealingRecord =>
           record !== undefined &&
-          this.policy.admits(record, authorizationOf, now),
+          this.policy.serves(record, authorizationOf, now),
       );
+  }
+
+  public async pruneExpired(now: Date): Promise<void> {
+    await this.registry.forgetCachedHeads(
+      DEVICE_SEALING_RECORD_HEAD_PREFIX,
+      (key) =>
+        !this.policy.isCurrentDay(
+          DeviceSealingRecord.utcDayOfHeadKey(key),
+          now,
+        ),
+    );
   }
 }

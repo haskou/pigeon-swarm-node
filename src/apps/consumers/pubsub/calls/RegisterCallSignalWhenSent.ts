@@ -43,10 +43,10 @@ export default class RegisterCallSignalWhenSent extends Consumer {
       message = new CallSignalDeliveryRegisterMessage(
         event.attributes as CallSignalSentAttributes,
       );
-      message.assertSignalIsNotFromTheFuture(Timestamp.now());
+      message.assertSignalIsFresh(Timestamp.now());
     } catch (error) {
       if (error instanceof InvalidCallSignalError) {
-        Kernel.logger.warn?.(
+        Kernel.logger.debug?.(
           'Refused a received call signal that is not valid.',
         );
 
