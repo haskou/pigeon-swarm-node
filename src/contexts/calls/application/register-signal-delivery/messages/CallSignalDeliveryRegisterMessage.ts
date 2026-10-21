@@ -41,9 +41,13 @@ export class CallSignalDeliveryRegisterMessage {
     }
   }
 
-  /** A signal that is expired or created far ahead of the clock is refused. */
+  /**
+   * A signal that is expired or created far ahead of the clock is refused, and
+   * so is a send time outside its lifetime or far ahead of the clock.
+   */
   public assertSignalIsFresh(now: Timestamp): void {
     this.signal.assertFreshAt(now);
+    this.signal.assertSentWithinLifetimeAt(this.sentAt, now);
   }
 
   public toDelivery(): CallSignalDelivery {

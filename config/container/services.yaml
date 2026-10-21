@@ -577,6 +577,7 @@ services:
       /contexts/calls/application/register-signal-delivery/CallSignalDeliveryRegistrar
     arguments:
       - '@contexts/calls/domain/repositories/CallSignalDeliveryRepository'
+      - '@contexts/nodes/domain/repositories/NodeRepository'
   contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser:
     class: >-
       /contexts/calls/application/release-participant-lease/CallParticipantLeaseReleaser

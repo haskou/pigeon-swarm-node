@@ -148,6 +148,23 @@ export class CallSignal {
     );
   }
 
+  /**
+   * Refuses a send time outside the signal lifetime, or beyond the clock-skew
+   * bound: `createdAt - skew <= sentAt <= min(expiresAt, at + skew)`.
+   */
+  public assertSentWithinLifetimeAt(sentAt: Timestamp, at: Timestamp): void {
+    const createdAt = this.getExpiresAt().valueOf() - CallSignal.LIFETIME_MS;
+    const latest = Math.min(
+      this.getExpiresAt().valueOf(),
+      at.valueOf() + CALL_SIGNAL_MAX_CLOCK_SKEW_MS,
+    );
+    assert(
+      sentAt.valueOf() >= createdAt - CALL_SIGNAL_MAX_CLOCK_SKEW_MS &&
+        sentAt.valueOf() <= latest,
+      new InvalidCallSignalError(),
+    );
+  }
+
   public getCallId(): CallId {
     return this.callId;
   }

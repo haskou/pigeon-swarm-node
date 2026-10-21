@@ -4,6 +4,8 @@ import { CallSignalSentAttributes } from '@app/contexts/calls/domain/events/Call
 import { CallSignalSentEvent } from '@app/contexts/calls/domain/events/CallSignalSentEvent';
 import { CallSignalId } from '@app/contexts/calls/domain/value-objects/CallSignalId';
 import InMemoryCallSignalDeliveryRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallSignalDeliveryRepository';
+import NodeRepository from '@app/contexts/nodes/domain/repositories/NodeRepository';
+import { NodeId } from '@app/contexts/shared/domain/value-objects/NodeId';
 import { IPFSConnection } from '@app/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSNetwork } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetwork';
 import { IPFSNetworkConfig } from '@app/contexts/shared/infrastructure/ipfs/networks/IPFSNetworkConfig';
@@ -77,9 +79,12 @@ const startNode = async (network: IPFSNetwork): Promise<ProbeNode> => {
     new PubSubNetworkMessageCodec(),
   );
   const repository = new InMemoryCallSignalDeliveryRepository();
+  // Every probe node is a receiver: none of them owns the delivery.
+  const nodeRepository = mock<NodeRepository>();
+  nodeRepository.loadLocalNodeId.mockResolvedValue(new NodeId(randomUUID()));
   const consumer = new RegisterCallSignalWhenSent(
     adapter as unknown as DomainEventConsumer,
-    new CallSignalDeliveryRegistrar(repository),
+    new CallSignalDeliveryRegistrar(repository, nodeRepository),
   );
 
   await consumer.init();

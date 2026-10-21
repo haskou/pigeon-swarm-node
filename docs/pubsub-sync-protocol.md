@@ -291,12 +291,20 @@ same `signalId`, allowing recipients to acknowledge duplicates without
 applying SDP or ICE twice.
 
 A recipient refuses and does not register a received signal whose `expiresAt` has
-passed, or whose `createdAt` is more than 5 seconds ahead of its clock; the refusal
-is logged at debug level. A retry supersedes only the registered delivery with the
-same route (`callId`, `ownerNodeId`, `networkId` and the ordered `participantIds`),
-and only with a strictly greater `attempt` and non-decreasing `sentAt` and
-`nextRetryAt`. A delivery on another route, or one whose clock values run backwards,
-never replaces the stored one.
+passed, whose `createdAt` is more than 5 seconds ahead of its clock, or whose
+`sentAt` lies outside `createdAt - 5 s <= sentAt <= min(expiresAt, now + 5 s)`; the
+refusal is logged at debug level. A node never registers a received delivery whose
+`ownerNodeId` is its own node id: the owner keeps only the delivery its own send
+and retry path saved, so a copied signal republished by another member cannot
+replace the owner's schedule or stop its retries. A retry supersedes only the
+registered delivery with the same route (`callId`, `ownerNodeId`, `networkId` and
+the ordered `participantIds`), and only with a strictly greater `attempt` and
+non-decreasing `sentAt` and `nextRetryAt`. A delivery on another route, or one
+whose clock values run backwards, never replaces the stored one.
+
+These bounds assume node clocks agree to within the 5-second skew; a node whose
+clock drifts further refuses valid signals for most of their 20-second lifetime.
+Run NTP (or an equivalent time sync) on every node.
 
 Signal event attributes are:
 
