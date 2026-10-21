@@ -4382,5 +4382,59 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(kept.getRevision().valueOf()).toBe(1);
       expect(credentialsOf(kept)).toContain(phone.toPrimitives().publicKey);
     });
+
+    it('provisions a new identity while the network cannot list its versions', async () => {
+      const { genesis, identityId } = await fixture();
+      const { identityRepository, repository } = repositoryFixture();
+      identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await provisionAuthorization(repository, genesis);
+
+      identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
+      expect((await repository.require(identityId)).toPrimitives()).toEqual(
+        genesis.toPrimitives(),
+      );
+    });
+
+    it.each([
+      ['a private', true],
+      ['only a public', false],
+    ])(
+      'refuses a different genesis from its stored document on %s network after a restart while the network cannot list versions',
+      async (_network, onPrivateNetwork) => {
+        const {
+          database,
+          genesis,
+          identityRepository,
+          networkRegistry,
+          registry,
+        } = await enrolled(onPrivateNetwork);
+        const restarted = new OrbitDBDeviceAuthorizationRepository(
+          registry,
+          new DeviceAuthorizationPolicy(),
+          identityRepository,
+          networkRegistry,
+          database,
+        );
+        identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
+          new ReplicatedStateNotReadyError(),
+        );
+        registry.putHead.mockClear();
+        database.save.mockClear();
+
+        await expect(
+          provisionAuthorization(
+            restarted,
+            await forkOf(genesis),
+            1,
+            forkExternalIdentifier,
+          ),
+        ).rejects.toThrow(DeviceAuthorizationGenesisConflictError);
+        expect(registry.putHead).not.toHaveBeenCalled();
+        expect(database.save).not.toHaveBeenCalled();
+      },
+    );
   });
 });
