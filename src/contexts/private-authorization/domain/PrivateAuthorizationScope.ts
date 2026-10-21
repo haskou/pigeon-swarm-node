@@ -1,3 +1,4 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { AggregateRoot } from '@haskou/ddd-kernel/domain';
 import { assert } from '@haskou/value-objects';
 
@@ -615,7 +616,7 @@ export class PrivateAuthorizationScope extends AggregateRoot {
         );
       })
       .sort((left, right) =>
-        left.toPrimitives().id.localeCompare(right.toPrimitives().id),
+        compareCodeUnits(left.toPrimitives().id, right.toPrimitives().id),
       );
   }
 

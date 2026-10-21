@@ -13,6 +13,7 @@ import { PrivateControlTransitionReservation } from '@app/contexts/private-autho
 import { PrivateAuthorizationRepository } from '@app/contexts/private-authorization/domain/repositories/PrivateAuthorizationRepository';
 import { PrivateAuthorizationRevision } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationRevision';
 import { PrivateAuthorizationScopeId } from '@app/contexts/private-authorization/domain/value-objects/PrivateAuthorizationScopeId';
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import EmbeddedLocalDatabase, {
   EmbeddedLocalDatabaseOperation,
 } from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
@@ -243,7 +244,7 @@ export default class LocalPrivateAuthorizationRepository extends PrivateAuthoriz
       )
       .map((operation) => PrivateControlOperation.fromPrimitives(operation))
       .sort((left, right) =>
-        left.toPrimitives().id.localeCompare(right.toPrimitives().id),
+        compareCodeUnits(left.toPrimitives().id, right.toPrimitives().id),
       );
   }
 
