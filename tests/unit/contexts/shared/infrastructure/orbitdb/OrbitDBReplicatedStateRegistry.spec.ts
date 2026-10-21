@@ -518,6 +518,54 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it('merges a head deferred on a held key once the hold ends', async () => {
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+
+      try {
+        const gate = mock<OrbitDBMutationGate>();
+        const registry = new OrbitDBReplicatedStateRegistry();
+        const { heads, stores } = createStores();
+        const sealing = sealingOf('device');
+        const admitted = {
+          key: AUTHORIZATION.key,
+          value: { owner: 'owner', updatedAt: 12 },
+        };
+
+        gate.governs.mockImplementation(
+          (collection) => collection === 'communityOperations',
+        );
+        gate.governsHead.mockReturnValue(false);
+        gate.verdictOf.mockResolvedValue('pending');
+        registry.addMutationGate(gate);
+        registerDependentMergers(registry);
+        await registry.register('network-1', stores);
+        heads.emitUpdate({
+          payload: {
+            key: AUTHORIZATION.key,
+            value: {
+              communityOperations: [{ id: 'forged-1' }],
+              owner: 'owner',
+              updatedAt: 10,
+            },
+          },
+        });
+        await jest.advanceTimersByTimeAsync(0);
+        heads.emitUpdate({ payload: sealing });
+        await jest.advanceTimersByTimeAsync(0);
+        expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(true);
+
+        heads.log = logOf([admitted, sealing]);
+        heads.emitUpdate({ payload: admitted });
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+        expect(registry.findCachedHead(sealing.key)).toEqual(sealing.value);
+        registry.clear();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     describe('when the merger still cannot judge a head after reconciliation', () => {
       const warn = jest.fn();
       const debug = jest.fn();

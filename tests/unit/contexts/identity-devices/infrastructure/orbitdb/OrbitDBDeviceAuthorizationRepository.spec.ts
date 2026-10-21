@@ -3815,7 +3815,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     restarted.registry.rehydrateHead.mockImplementation(() => {
       rehydrated = true;
 
-      return Promise.resolve();
+      return Promise.resolve(true);
     });
     restarted.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
       [new IdentityCandidate(genesisExternalIdentifier, identityOf(genesis))],
