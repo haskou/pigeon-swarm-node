@@ -416,15 +416,19 @@ export default class PigeonApplication {
           : idempotency.handle(event, next, context),
     });
 
-    // Kernel shutdown runs hooks in reverse, after consumers and schedulers:
-    // registered last, the in-memory bus timers stop first, then the networks
-    // (OrbitDB stores, Helia) stop, then the local database closes.
-    this.kernel.registerShutdownHook(() => EmbeddedLocalDatabase.closeAll());
-    this.kernel.registerShutdownHook(() =>
-      this.kernel.di
-        .getService<IPFSNetworkRegistry>(IPFSNetworkRegistry)
-        .stopAll(),
-    );
+    // Kernel shutdown runs hooks in reverse, after consumers and schedulers,
+    // and stops at the first hook that throws. Registered last, the in-memory
+    // bus timers stop first; then the networks (OrbitDB stores, Helia) stop,
+    // and the local database closes even when a network fails to stop.
+    this.kernel.registerShutdownHook(async () => {
+      try {
+        await this.kernel.di
+          .getService<IPFSNetworkRegistry>(IPFSNetworkRegistry)
+          .stopAll();
+      } finally {
+        await EmbeddedLocalDatabase.closeAll();
+      }
+    });
     // The container shares this instance with the MessageBus every consumer uses.
     const memoryMessageBusAdapter =
       this.kernel.di.getService<MemoryMessageBusAdapter>(
@@ -476,6 +480,13 @@ export default class PigeonApplication {
       server.server,
       `${routePrefix}/realtime`,
     );
+    // Registered after the store hooks, so it runs before them: requests stop
+    // being accepted and realtime sockets close before the stores close, and
+    // a request arriving during shutdown is refused rather than failing.
+    this.kernel.registerShutdownHook(async () => {
+      await this.webSocketRealtimeServer.close();
+      await server.close();
+    });
   }
 
   public addConsumers(
