@@ -409,6 +409,10 @@ response.
   branch on `code`, never on `message`.
 - `httpStatus` repeats the HTTP status for framework errors; `details`, `errors`
   and `requiredDifficultyBits` appear only where the operation documents them.
+- An error the node did not anticipate answers `500` with the fixed body
+  `{"code": "InternalServerError", "message": "Internal server error.",
+  "httpStatus": 500}`. It never carries the cause, a path or the error class;
+  the node log keeps only the error name and errno.
 - Status codes are listed per operation: each operation documents the codes it
   can return.
 - A malformed id in a request body (for example a conversation `participantIds`

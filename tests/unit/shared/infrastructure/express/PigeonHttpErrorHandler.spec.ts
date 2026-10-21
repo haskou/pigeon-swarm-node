@@ -1,10 +1,12 @@
 import { CallSignalMismatchError } from '@app/contexts/calls/domain/errors/CallSignalMismatchError';
 import { createPigeonHttpErrorHandler } from '@app/shared/infrastructure/express/PigeonHttpErrorHandler';
 import { Log } from '@app/shared/infrastructure/logs/Log';
-import { HttpError } from 'routing-controllers';
 import { mock, MockProxy } from 'jest-mock-extended';
+import { HttpError } from 'routing-controllers';
 
 const SECRET_PATH = '/data/private_blobs/bafySecretCid/topic-xyz.part';
+
+class BrokenThing extends Error {}
 
 function respondTo(
   error: Error,
@@ -80,7 +82,6 @@ describe('createPigeonHttpErrorHandler', () => {
 
   it('logs the name alone when the error has no numeric errno', () => {
     process.env.NODE_ENV = 'production';
-    class BrokenThing extends Error {}
     const error = new BrokenThing(`failed for ${SECRET_PATH}`);
     error.name = 'BrokenThing';
 
@@ -119,9 +120,7 @@ describe('createPigeonHttpErrorHandler', () => {
   );
 
   it('does not reveal the class name of a custom unhandled error', () => {
-    class SecretSubsystemFailure extends Error {}
-
-    const response = respondTo(new SecretSubsystemFailure('boom'), logger);
+    const response = respondTo(new BrokenThing('boom'), logger);
 
     expect(response.body).toEqual({
       code: 'InternalServerError',
