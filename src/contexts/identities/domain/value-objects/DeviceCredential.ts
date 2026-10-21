@@ -1,3 +1,4 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
 import { PublicKey } from '@haskou/pigeon-swarm-crypto';
 import { StringValueObject } from '@haskou/value-objects';
@@ -34,8 +35,11 @@ export class DeviceCredential extends PublicKey {
     return this.valueOf() < other.valueOf();
   }
 
-  /** Locale order: deterministic sort and pick among credentials. */
+  /**
+   * Code-unit order: deterministic sort and pick among credentials. Locale
+   * collation would let nodes with different ICU data disagree.
+   */
   public compareTo(other: DeviceCredential): number {
-    return this.valueOf().localeCompare(other.valueOf());
+    return compareCodeUnits(this.valueOf(), other.valueOf());
   }
 }

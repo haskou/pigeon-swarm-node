@@ -99,6 +99,29 @@ describe('MLSRecordsFinder', () => {
     expect(found.map((record) => record.payload)).toEqual(['c2']);
   });
 
+  it('breaks a tie of epoch and time by record id in code-unit order, not by locale', async () => {
+    const tied = (id: string): MLSRecord =>
+      new MLSRecord(
+        new MLSRecordId(id),
+        community.getId(),
+        community.getId().valueOf(),
+        new MLSRecordKind('key_package'),
+        id,
+        owner,
+        new Timestamp(1),
+      );
+
+    records.splice(0, records.length, tied('a_AA'), tied('aAAA'), tied('BBBB'));
+
+    const found = await find(member, 'key_package');
+
+    expect(found.map((record) => record.payload)).toEqual([
+      'BBBB',
+      'aAAA',
+      'a_AA',
+    ]);
+  });
+
   it('shows a welcome only to its recipient', async () => {
     expect((await find(member, 'welcome')).length).toBe(1);
     expect(await find(other, 'welcome')).toEqual([]);

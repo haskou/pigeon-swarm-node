@@ -133,6 +133,23 @@ describe(DeviceAuthorizationPolicy.name, () => {
         ]),
       ).toBe('a');
     });
+
+    it('breaks revision ties by code unit order, not locale collation', () => {
+      expect(
+        policy.preferCheckpoint([
+          {
+            encoding: 'aAAA',
+            payload: 'lower',
+            revision: new DeviceAuthorizationRevision(2),
+          },
+          {
+            encoding: 'BBBB',
+            payload: 'upper',
+            revision: new DeviceAuthorizationRevision(2),
+          },
+        ]),
+      ).toBe('upper');
+    });
   });
 
   describe('frontier precedence', () => {
@@ -156,6 +173,23 @@ describe(DeviceAuthorizationPolicy.name, () => {
           },
         ]),
       ).toBe('a');
+    });
+
+    it('breaks revision ties by code unit order, not locale collation', () => {
+      expect(
+        policy.preferFrontier([
+          {
+            encoding: 'aAAA',
+            payload: 'lower',
+            revision: new DeviceAuthorizationRevision(3),
+          },
+          {
+            encoding: 'BBBB',
+            payload: 'upper',
+            revision: new DeviceAuthorizationRevision(3),
+          },
+        ]),
+      ).toBe('upper');
     });
 
     it('has no frontier without sources', () => {
@@ -372,6 +406,23 @@ describe(DeviceAuthorizationPolicy.name, () => {
           })),
         ),
       ).toEqual(['base', 'capped']);
+    });
+
+    it('replays recoveries sharing an operation by code unit order of their encoding', async () => {
+      const [lower, upper] = await Promise.all([
+        signedRecovery('00000000-0000-4000-8000-000000000001', 0),
+        signedRecovery('00000000-0000-4000-8000-000000000001', 0),
+      ]);
+
+      const result = policy.replay(genesis, [
+        { encoding: 'aAAA', payload: 'lower', transition: lower },
+        { encoding: 'BBBB', payload: 'upper', transition: upper },
+      ]);
+
+      expect(result.accepted.map(({ payload }) => payload)).toEqual([
+        'upper',
+        'lower',
+      ]);
     });
   });
 

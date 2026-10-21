@@ -96,6 +96,23 @@ describe('LocalPrivateAuthorizationRepository', () => {
     await expect(restarted.findPending('scope')).resolves.toHaveLength(2);
   });
 
+  it('replays pending operations in code-unit operation-id order, independent of locale', async () => {
+    const repository = new LocalPrivateAuthorizationRepository(
+      database,
+      coordinator,
+    );
+
+    for (const id of ['a_AA', 'aAAA', 'BBBB']) {
+      await repository.savePending('scope', operation(id));
+    }
+
+    expect(
+      (await repository.findPending('scope')).map(
+        (pending) => pending.toPrimitives().id,
+      ),
+    ).toEqual(['BBBB', 'aAAA', 'a_AA']);
+  });
+
   it('enumerates only persisted protected scope identifiers', async () => {
     const repository = new LocalPrivateAuthorizationRepository(
       database,

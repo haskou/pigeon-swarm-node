@@ -1,3 +1,4 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { UUID } from '@haskou/value-objects';
 
 export class DeviceAuthorizationOperationId extends UUID {
@@ -6,6 +7,6 @@ export class DeviceAuthorizationOperationId extends UUID {
   }
 
   public compareTo(other: DeviceAuthorizationOperationId): number {
-    return this.valueOf().localeCompare(other.valueOf());
+    return compareCodeUnits(this.valueOf(), other.valueOf());
   }
 }

@@ -1,13 +1,14 @@
 import { OrbitDBCallFold } from '@app/contexts/calls/infrastructure/orbitdb/OrbitDBCallFold';
+import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 
 import {
+  endPayload,
   newCallSigner,
   participantPayload,
   signCallEnd,
   signCallParticipant,
   signCallStart,
 } from '../../../../../support/signCall';
-import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 
 const NETWORK = '550e8400-e29b-41d4-a716-446655440002';
 
@@ -202,6 +203,49 @@ describe('OrbitDBCallFold', () => {
     );
     expect(folded?.primitives.participants).toEqual([]);
     expect(folded?.primitives.sessionEpoch).toBe(1);
+  });
+
+  it('breaks a tie of claimed time by record id in code-unit order, not by locale', async () => {
+    const alice = await newCallSigner();
+    const bob = await newCallSigner();
+    const start = signCallStart({
+      networkId: NETWORK,
+      nonce: 'fold-spec-nonce-00006',
+      participantIds: [alice.id, bob.id],
+      scope: { conversationId: 'one-to-one:fold', type: 'conversation' },
+      signer: alice,
+      startedAt: t0,
+    });
+    const joined = {
+      ...participantPayload({
+        at: t0 + 1_000,
+        callId: start.callId,
+        identityId: bob.id,
+        state: 'joined',
+      }),
+      id: 'aAAA',
+    };
+    const end = {
+      ...endPayload({
+        at: t0 + 1_000,
+        callId: start.callId,
+        endedByIdentityId: alice.id,
+      }),
+      id: 'BBBB',
+    };
+    const folded = OrbitDBCallFold.fold({
+      end,
+      participants: new Map([[bob.id, joined]]),
+      start: start.payload,
+    });
+
+    // Code units put 'BBBB' before 'aAAA': the end applies first, so the join
+    // that follows it is inert.
+    expect(
+      folded?.primitives.participants.find(
+        (participant) => participant.identityId === bob.id,
+      )?.joinedAt,
+    ).toBeUndefined();
   });
 
   it('marks a local timeout only while the call is still active', async () => {

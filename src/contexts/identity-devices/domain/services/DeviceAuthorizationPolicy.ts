@@ -1,3 +1,4 @@
+import { compareCodeUnits } from '@app/contexts/shared/domain/compareCodeUnits';
 import { Timestamp, assert } from '@haskou/value-objects';
 
 import { DeviceAuthorization } from '../DeviceAuthorization';
@@ -200,7 +201,7 @@ export default class DeviceAuthorizationPolicy {
       .getOperationId()
       .compareTo(right.transition.getOperationId());
 
-    return operationOrder || left.encoding.localeCompare(right.encoding);
+    return operationOrder || compareCodeUnits(left.encoding, right.encoding);
   }
 
   /**
@@ -213,7 +214,7 @@ export default class DeviceAuthorizationPolicy {
   ): number {
     return (
       right.revision.compareTo(left.revision) ||
-      left.encoding.localeCompare(right.encoding)
+      compareCodeUnits(left.encoding, right.encoding)
     );
   }
 

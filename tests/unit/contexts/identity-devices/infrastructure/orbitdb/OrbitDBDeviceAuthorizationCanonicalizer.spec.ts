@@ -12,6 +12,12 @@ describe(OrbitDBDeviceAuthorizationCanonicalizer.name, () => {
     );
   });
 
+  it('orders keys by code unit, not by locale collation', () => {
+    expect(canonicalizer.serialize({ a_AA: 2, aAAA: 1, BBBB: 3 })).toBe(
+      '{"BBBB":3,"aAAA":1,"a_AA":2}',
+    );
+  });
+
   it('keeps array order and normalizes nested objects inside arrays', () => {
     expect(canonicalizer.serialize([{ a: 2, b: 1 }, { a: 1 }])).toBe(
       '[{"a":2,"b":1},{"a":1}]',
