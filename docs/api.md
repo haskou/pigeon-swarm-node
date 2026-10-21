@@ -6847,6 +6847,11 @@ the canonical encoding of a usable key returns `400` (`400080`) after the
 per-address budget but before the cache and the per-target and node budgets, and one that is not an identity id at all returns `409` with
 the error class name as `code`.
 
+While the node is still reconciling the authorization head of the identity,
+or holds a sealing record of it that arrived before that head and waits to be
+admitted, the view returns `503` (`503020`) instead of a view that omits the
+record. The record is admitted once the reconciliation finishes.
+
 This read is public: anyone who can reach the node learns the device
 credentials and the device count of any identity the node holds, plus the
 sealing keys of today and yesterday. It is rate limited per client address

@@ -357,6 +357,8 @@ paths:
           description: The path is not an identity id (code is the error class name).
         '429':
           description: Per-address (60 per minute), per-identity (300 per minute) or per-node (3000 per minute) sealing view rate limit exceeded (code 429030).
+        '503':
+          description: The authorization head of the identity, or a sealing record still waiting for it, is not reconciled yet (code 503020); never served as a view without that record.
   /identity-devices/{identityId}/sealed-secrets:
     put:
       tags:
