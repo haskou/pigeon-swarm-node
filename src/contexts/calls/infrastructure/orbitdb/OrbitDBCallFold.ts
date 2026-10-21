@@ -75,6 +75,10 @@ export class OrbitDBCallFold {
     call.leave(identityId, at);
   }
 
+  /**
+   * Folds nothing only without a start; a start that cannot be folded throws,
+   * so the caller never reads it as an absent call.
+   */
   public static fold(
     records: CallRecords,
     timedOutAt?: number,
@@ -83,37 +87,33 @@ export class OrbitDBCallFold {
 
     if (!start) return undefined;
 
-    try {
-      const scope = CallScope.fromPrimitives(
-        start.scope as ReturnType<CallScope['toPrimitives']>,
-      );
-      const call = Call.start(
-        new IdentityId(start.creatorIdentityId as string),
-        new NetworkId(start.networkId as string),
-        scope,
-        (start.participantIds as string[]).map((id) => new IdentityId(id)),
-        new CallNonce(start.nonce as string),
-        new Timestamp(start.startedAt as number),
-        OrbitDBCallFold.epochOf(start),
-      );
+    const scope = CallScope.fromPrimitives(
+      start.scope as ReturnType<CallScope['toPrimitives']>,
+    );
+    const call = Call.start(
+      new IdentityId(start.creatorIdentityId as string),
+      new NetworkId(start.networkId as string),
+      scope,
+      (start.participantIds as string[]).map((id) => new IdentityId(id)),
+      new CallNonce(start.nonce as string),
+      new Timestamp(start.startedAt as number),
+      OrbitDBCallFold.epochOf(start),
+    );
 
-      OrbitDBCallFold.apply(call, records);
+    OrbitDBCallFold.apply(call, records);
 
-      if (timedOutAt !== undefined && call.isActive()) {
-        call.markTimedOut(new Timestamp(timedOutAt));
-      }
-
-      const primitives = call.toPrimitives();
-
-      return {
-        digest:
-          PublicMutationRecord.proofOf(start)?.getBody().payloadDigest ?? '',
-        primitives: scope.isLeaseRostered()
-          ? { ...primitives, participantIds: [], participants: [] }
-          : primitives,
-      };
-    } catch {
-      return undefined;
+    if (timedOutAt !== undefined && call.isActive()) {
+      call.markTimedOut(new Timestamp(timedOutAt));
     }
+
+    const primitives = call.toPrimitives();
+
+    return {
+      digest:
+        PublicMutationRecord.proofOf(start)?.getBody().payloadDigest ?? '',
+      primitives: scope.isLeaseRostered()
+        ? { ...primitives, participantIds: [], participants: [] }
+        : primitives,
+    };
   }
 }

@@ -841,6 +841,19 @@ readmitted in full: its queue drains and its records are projected again. A call
 not drop is read as usual, however many records a peer floods. A failed rescan is
 retried every 60 seconds, so the answer lasts as long as the rescan fails.
 
+A call is never reported missing, and a list never leaves a call out, because
+the node could not read it. A call whose participant or end records the node
+holds without its start answers `503020` for up to 60 seconds after the first
+such record arrived, then `CallNotFoundError` if the start never came. A call
+whose stored start the node cannot rebuild answers `503020` by id, and every
+list that would contain it answers `503020` too; the node never marks such a
+call missed. A list or call whose community, conversation or private-community
+check cannot be read answers `503020` rather than hiding the call or leaving a
+participant out of its realtime snapshot. Only a verified denial hides a call:
+a requester outside its conversation or community channel gets
+`CallNotFoundError`, and a call of a community the node verified to be private
+is left out of the lists.
+
 ### List active calls
 
 ```http

@@ -26,6 +26,9 @@ const SCOPE_TYPES = ['call_start', 'call_participant', 'call_end'];
 export default class OrbitDBCallProjection {
   private static readonly MAX_WAITERS = 256;
 
+  /** How long records of a call without its start answer not ready. */
+  public static readonly START_AWAIT_MS = 60_000;
+
   private readonly folded = new Map<string, FoldedCall>();
 
   private readonly records = new Map<string, CallRecords>();
@@ -45,6 +48,12 @@ export default class OrbitDBCallProjection {
   private readonly creatorScopeCallIds = new Map<string, Set<string>>();
 
   private readonly waiters = new Map<string, Set<() => void>>();
+
+  /** Calls whose start cannot be folded right now. */
+  private readonly unreadable = new Set<string>();
+
+  /** When the node first held records of a call without its start. */
+  private readonly startAwaitedSince = new Map<string, number>();
 
   private waiterCount = 0;
 
@@ -180,12 +189,30 @@ export default class OrbitDBCallProjection {
     );
   }
 
+  /**
+   * A start that cannot be folded marks the call unreadable and keeps its last
+   * fold and indexes: the call is answered as not ready, never dropped.
+   */
   private refold(callId: string): void {
+    const records = this.records.get(callId)!;
     const previous = this.folded.get(callId);
-    const next = OrbitDBCallFold.fold(
-      this.records.get(callId)!,
-      this.timedOut.get(callId),
-    );
+    let next: FoldedCall | undefined;
+
+    if (records.start) {
+      this.startAwaitedSince.delete(callId);
+    } else if (!this.startAwaitedSince.has(callId)) {
+      this.startAwaitedSince.set(callId, Date.now());
+    }
+
+    try {
+      next = OrbitDBCallFold.fold(records, this.timedOut.get(callId));
+    } catch {
+      this.unreadable.add(callId);
+
+      return;
+    }
+
+    this.unreadable.delete(callId);
 
     if (isDeepStrictEqual(previous, next)) return;
 
@@ -313,10 +340,26 @@ export default class OrbitDBCallProjection {
     return { winnerId: winner?.primitives.id };
   }
 
+  /**
+   * Throws not ready for a call it cannot fold, and for one whose other
+   * records it holds while its start is awaited for at most START_AWAIT_MS.
+   */
   private resolve(callId: string): CallPrimitives | undefined {
+    if (this.unreadable.has(callId)) throw new ReplicatedStateNotReadyError();
+
     const folded = this.folded.get(callId);
 
-    if (!folded) return undefined;
+    if (!folded) {
+      const awaitedSince = this.startAwaitedSince.get(callId);
+
+      if (
+        awaitedSince !== undefined &&
+        Date.now() - awaitedSince < OrbitDBCallProjection.START_AWAIT_MS
+      )
+        throw new ReplicatedStateNotReadyError();
+
+      return undefined;
+    }
 
     const primitives = this.withinDuration(folded);
     const supersession =
@@ -506,13 +549,16 @@ export default class OrbitDBCallProjection {
     );
   }
 
+  /** A call it cannot read is never marked missed, so it is left out here. */
   public findTimedOutRingingCalls(
     timeoutThreshold: Timestamp,
   ): Promise<CallPrimitives[]> {
     this.assertReady();
 
     return Promise.resolve(
-      this.resolveAll(this.folded.keys()).filter(
+      this.resolveAll(
+        [...this.folded.keys()].filter((id) => !this.unreadable.has(id)),
+      ).filter(
         (primitives) =>
           primitives.status === 'active' &&
           primitives.createdAt <= timeoutThreshold.valueOf() &&

@@ -6,7 +6,6 @@ import { CommunityChannelId } from '@app/contexts/communities/domain/value-objec
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
 import PrivateCommunityPublicStorageGuard from '@app/contexts/communities/infrastructure/PrivateCommunityPublicStorageGuard';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
-import { InvalidPrivateAuthorizationError } from '@app/contexts/private-authorization/domain/errors/InvalidPrivateAuthorizationError';
 import { PublicMutationProof } from '@app/contexts/public-mutations/domain/PublicMutationProof';
 import { PublicMutationRecord } from '@app/contexts/public-mutations/domain/PublicMutationRecord';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
@@ -77,26 +76,19 @@ export default class OrbitDBCallRepository extends CallRepository {
     return Promise.all(documents.map((document) => this.hydrate(document)));
   }
 
-  private async hydrateIfPublic(
-    document: CallPrimitives,
-  ): Promise<Call | undefined> {
+  /** Leaves out only a call of a community verified to be private. */
+  private hydrateIfPublic(document: CallPrimitives): Promise<Call | undefined> {
     const communityId =
       document.scope.type === 'community_channel' &&
       typeof document.scope.communityId === 'string'
         ? new CommunityId(document.scope.communityId)
         : undefined;
 
-    if (!communityId) return this.hydrate(document);
-
-    try {
-      return await this.publicStorageGuard.runWhilePublic(communityId, () =>
-        this.hydrate(document),
-      );
-    } catch (error: unknown) {
-      if (error instanceof InvalidPrivateAuthorizationError) return undefined;
-
-      throw error;
-    }
+    return communityId
+      ? this.publicStorageGuard.runIfPublic(communityId, () =>
+          this.hydrate(document),
+        )
+      : this.hydrate(document);
   }
 
   private async hydratePublicList(

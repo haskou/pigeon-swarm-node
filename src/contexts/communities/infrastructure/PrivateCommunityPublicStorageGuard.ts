@@ -56,6 +56,20 @@ export default class PrivateCommunityPublicStorageGuard {
     );
   }
 
+  /**
+   * Runs the action only for a community verified to be public: a verified
+   * private one yields undefined, and a failed check rejects.
+   */
+  public runIfPublic<T>(
+    communityId: CommunityId,
+    action: () => Promise<T>,
+  ): Promise<T | undefined> {
+    return this.storageCoordinator.exclusively(
+      communityId.valueOf(),
+      async () => ((await this.isPublic(communityId)) ? action() : undefined),
+    );
+  }
+
   public runWhilePublicScopes<T>(
     communityIds: CommunityId[],
     action: () => Promise<T>,
