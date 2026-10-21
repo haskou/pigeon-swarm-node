@@ -3,6 +3,7 @@ import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/Devic
 import { DeviceSealingRecordConflictError } from '@app/contexts/identity-devices/domain/errors/DeviceSealingRecordConflictError';
 import { DeviceSealingRecordRejectedError } from '@app/contexts/identity-devices/domain/errors/DeviceSealingRecordRejectedError';
 import OrbitDBDeviceSealingRecordRepository from '@app/contexts/identity-devices/infrastructure/orbitdb/OrbitDBDeviceSealingRecordRepository';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import OrbitDBReplicatedStateRegistry from '@app/contexts/shared/infrastructure/orbitdb/OrbitDBReplicatedStateRegistry';
 import { KeyPair } from '@haskou/pigeon-swarm-crypto';
 
@@ -87,6 +88,32 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
     return merger;
   }
 
+  it('answers 503020 instead of refusing when the authorization head is unreadable', async () => {
+    registry.cacheHeadLocally(authorizationKey, { authorization: {} });
+    const record = sealingRecordOf({
+      identityId: fixture.identityId,
+      signer: fixture.owner,
+    });
+
+    await expect(repository.publish(record)).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
+  });
+
+  it('answers 503020 instead of refusing while the authorization head is unsettled', async () => {
+    jest.spyOn(registry, 'findSettledCachedHead').mockImplementation(() => {
+      throw new ReplicatedStateNotReadyError();
+    });
+    const record = sealingRecordOf({
+      identityId: fixture.identityId,
+      signer: fixture.owner,
+    });
+
+    await expect(repository.publish(record)).rejects.toThrow(
+      ReplicatedStateNotReadyError,
+    );
+  });
+
   it('publishes an admitted record under its device sealing head key', async () => {
     const record = sealingRecordOf({
       identityId: fixture.identityId,
@@ -109,11 +136,9 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
 
     await repository.publish(record);
 
-    expect(putSpy).toHaveBeenCalledWith(
-      record.key(),
-      record.toPrimitives(),
-      [PRIVATE_NETWORK],
-    );
+    expect(putSpy).toHaveBeenCalledWith(record.key(), record.toPrimitives(), [
+      PRIVATE_NETWORK,
+    ]);
   });
 
   it('does not write again when the same record is published twice', async () => {
@@ -185,7 +210,9 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
 
   it('registers the sealing head merger for the sealing prefix only', () => {
     expect(registerSpy).toHaveBeenCalledTimes(1);
-    expect(registerSpy.mock.calls[0][0]).toBe(DEVICE_SEALING_RECORD_HEAD_PREFIX);
+    expect(registerSpy.mock.calls[0][0]).toBe(
+      DEVICE_SEALING_RECORD_HEAD_PREFIX,
+    );
   });
 
   it('scopes sealing heads to private networks', () => {
@@ -202,9 +229,9 @@ describe('OrbitDBDeviceSealingRecordRepository', () => {
       signer: fixture.owner,
     });
 
-    expect(
-      mergerOf()(undefined, record.toPrimitives(), record.key()),
-    ).toEqual(record.toPrimitives());
+    expect(mergerOf()(undefined, record.toPrimitives(), record.key())).toEqual(
+      record.toPrimitives(),
+    );
   });
 
   it('merger does not parse the device authorization for a record outside the day window', () => {
