@@ -4255,7 +4255,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
     it('does not read the store again when no network stores the head', async () => {
       const { identityId, registry, repository } = await provisioned();
-      registry.findHead.mockResolvedValue(undefined);
+      registry.findHead.mockResolvedValueOnce(undefined);
       registry.rehydrateHead.mockResolvedValue(false);
 
       await repository.has(identityId);
