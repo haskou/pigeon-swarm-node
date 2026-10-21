@@ -21,9 +21,12 @@ describe('IpfsContentStorage', () => {
   it('provides content in a network when the CID exists locally', async () => {
     ipfs.stat.mockResolvedValue(true);
 
-    await storage.provideInNetwork(new ContentId(cid), new NetworkId(networkId));
+    await storage.provideInNetwork(
+      new ContentId(cid),
+      new NetworkId(networkId),
+    );
 
-    expect(ipfs.stat).toHaveBeenCalledWith(expect.anything(), true, [networkId]);
+    expect(ipfs.stat).toHaveBeenCalledWith(expect.anything(), [networkId]);
     expect(ipfs.provideContentFromNetwork).toHaveBeenCalledTimes(1);
     expect(ipfs.provideContentFromNetwork.mock.calls[0][0].valueOf()).toBe(cid);
     expect(ipfs.provideContentFromNetwork.mock.calls[0][1]).toBe(networkId);

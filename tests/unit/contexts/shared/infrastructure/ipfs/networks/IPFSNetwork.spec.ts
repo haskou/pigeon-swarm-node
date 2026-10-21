@@ -3,7 +3,6 @@ import { generateKeyPairSync } from 'crypto';
 import { mock, MockProxy } from 'jest-mock-extended';
 
 import { IPFSBlockNotFoundOfflineError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundOfflineError';
-import { IPFSBlockNotFoundPublicError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSBlockNotFoundPublicError';
 import { IPFSContentNotFoundError } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/errors/IPFSContentNotFoundError';
 import { IPFSConnection } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSConnection';
 import { IPFSId } from '../../../../../../../src/contexts/shared/infrastructure/ipfs/helia/IPFSId';
@@ -104,25 +103,18 @@ describe('IPFSNetwork', () => {
   });
 
   describe('stat', () => {
-    it('should delegate to connection.stat with signal', async () => {
+    it('should delegate to connection.stat', async () => {
       const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
       const cid = new IPFSId('bafytest');
-      const controller = new AbortController();
 
       connection.stat.mockResolvedValue(undefined);
 
-      await expect(
-        network.stat(cid, true, controller.signal),
-      ).resolves.toBeUndefined();
-      expect(connection.stat).toHaveBeenCalledWith(
-        cid,
-        true,
-        controller.signal,
-      );
+      await expect(network.stat(cid)).resolves.toBeUndefined();
+      expect(connection.stat).toHaveBeenCalledWith(cid);
     });
 
-    it('should map offline block not found errors to IPFSContentNotFoundError', async () => {
+    it('should map a block missing locally to IPFSContentNotFoundError', async () => {
       const config = new IPFSNetworkConfig(networkId, 'net');
       const network = new IPFSNetwork(config, connection);
       const cid = new IPFSId('bafytest');
@@ -131,23 +123,7 @@ describe('IPFSNetwork', () => {
         new IPFSBlockNotFoundOfflineError('bafytest'),
       );
 
-      await expect(network.stat(cid, true)).rejects.toThrow(
-        IPFSContentNotFoundError,
-      );
-    });
-
-    it('should map online block not found errors to IPFSContentNotFoundError', async () => {
-      const config = new IPFSNetworkConfig(networkId, 'net');
-      const network = new IPFSNetwork(config, connection);
-      const cid = new IPFSId('bafytest');
-
-      connection.stat.mockRejectedValue(
-        new IPFSBlockNotFoundPublicError('bafytest'),
-      );
-
-      await expect(network.stat(cid, false)).rejects.toThrow(
-        IPFSContentNotFoundError,
-      );
+      await expect(network.stat(cid)).rejects.toThrow(IPFSContentNotFoundError);
     });
 
     it('should rethrow non not-found errors', async () => {
@@ -158,7 +134,7 @@ describe('IPFSNetwork', () => {
 
       connection.stat.mockRejectedValue(error);
 
-      await expect(network.stat(cid, false)).rejects.toBe(error);
+      await expect(network.stat(cid)).rejects.toBe(error);
     });
   });
 
