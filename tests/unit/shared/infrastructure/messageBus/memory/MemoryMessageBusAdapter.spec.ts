@@ -1,4 +1,5 @@
 import { IdentityNotFoundError } from '@app/contexts/identities/domain/errors/IdentityNotFoundError';
+import MemoryMessageBusAdapterClosedError from '@app/shared/infrastructure/errors/MemoryMessageBusAdapterClosedError';
 import MemoryMessageBusAdapter from '@app/shared/infrastructure/messageBus/memory/MemoryMessageBusAdapter';
 import Kernel from '@haskou/ddd-kernel';
 import { DomainEvent } from '@haskou/ddd-kernel/domain';
@@ -71,5 +72,69 @@ describe('MemoryMessageBusAdapter', () => {
         'Dropped in-memory event: event=test.event consumer=test.queue error=IdentityNotFoundError',
       ],
     ]);
+  });
+
+  describe('close', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
+    it('should stop every consumer timer so no handler runs after close', async () => {
+      const adapter = new MemoryMessageBusAdapter();
+      const handler = jest.fn().mockResolvedValue(undefined);
+
+      await adapter.consume(
+        'test.queue',
+        TestDomainEvent.EVENT_NAME,
+        TestDomainEvent,
+        'pigeon-swarm',
+        handler,
+      );
+      await adapter.consume(
+        'test.queue',
+        TestDomainEvent.EVENT_NAME,
+        TestDomainEvent,
+        'pigeon-swarm',
+        handler,
+      );
+      expect(jest.getTimerCount()).toBe(2);
+
+      adapter.close();
+      await adapter.publish([new TestDomainEvent('aggregate-id')]);
+      await jest.advanceTimersByTimeAsync(500);
+
+      expect(jest.getTimerCount()).toBe(0);
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should refuse a consumer after close without starting a timer', async () => {
+      const adapter = new MemoryMessageBusAdapter();
+
+      adapter.close();
+
+      await expect(
+        adapter.consume(
+          'test.queue',
+          TestDomainEvent.EVENT_NAME,
+          TestDomainEvent,
+          'pigeon-swarm',
+          jest.fn(),
+        ),
+      ).rejects.toThrow(MemoryMessageBusAdapterClosedError);
+      expect(jest.getTimerCount()).toBe(0);
+    });
+
+    it('should be idempotent', () => {
+      const adapter = new MemoryMessageBusAdapter();
+
+      adapter.close();
+
+      expect(() => adapter.close()).not.toThrow();
+    });
   });
 });
