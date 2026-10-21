@@ -6,7 +6,6 @@ import { IdempotencyConsumerMiddleware } from '@haskou/ddd-kernel/adapters/pubsu
 import Consumer from '@haskou/ddd-kernel/adapters/pubsub';
 import {
   ExpressKernelServer,
-  HttpErrorHandler,
   RoutePrefix,
 } from '@haskou/ddd-kernel/adapters/ui';
 import Scheduler from '@haskou/ddd-kernel/scheduler';
@@ -88,10 +87,7 @@ import {
 } from '../shared/infrastructure/environment/PigeonEnvironment';
 import InitializerTimedOutError from '../shared/infrastructure/errors/InitializerTimedOutError';
 import HttpRequestContext from '../shared/infrastructure/express/HttpRequestContext';
-import {
-  handleCustomHttpError,
-  handleDomainError,
-} from '../shared/infrastructure/express/PigeonHttpErrorResponseHandlers';
+import { createPigeonHttpErrorHandler } from '../shared/infrastructure/express/PigeonHttpErrorHandler';
 import { PublicStaticContent } from '../shared/infrastructure/express/PublicStaticContent';
 import { parseTrustProxySetting } from '../shared/infrastructure/express/TrustProxySetting';
 import { Initializer } from '../shared/infrastructure/lifecycle/Initializer';
@@ -178,10 +174,7 @@ export default class PigeonApplication {
 
       const routePrefix = this.getRoutePrefix();
       const routePrefixValue = routePrefix.toString();
-      const errorHandler = new HttpErrorHandler({
-        handlers: [handleDomainError, handleCustomHttpError],
-        logger: this.logger,
-      });
+      const errorHandler = createPigeonHttpErrorHandler(this.logger);
 
       this.server = new ExpressKernelServer({
         controllers: applicationRoutes,
