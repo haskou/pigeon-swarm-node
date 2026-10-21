@@ -12,7 +12,8 @@ describe('Call signal consumers', () => {
     'MCowBQYDK2VwAyEAFuQGsm0WcnE4FhQecwAFGeTfQCZzEMuhE73CyTUxOio=';
   const recipientIdentityId =
     'MCowBQYDK2VwAyEAKV3uU7LZg0grhngWKkoR9jqZo5M3yQ2GHliIFMgdJZw=';
-  const createdAt = 1_770_000_000_000;
+  /** Signals are refused once expired, so the fixture is created now. */
+  const createdAt = Date.now();
   const signalAttributes = {
     attempt: 1,
     callId: '550e8400-e29b-41d4-a716-446655440000',

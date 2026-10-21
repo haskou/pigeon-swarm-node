@@ -87,7 +87,8 @@ const startNode = async (network: IPFSNetwork): Promise<ProbeNode> => {
   return { adapter, repository };
 };
 
-const CREATED_AT = 1_770_000_000_000;
+/** Signals are refused once expired, so the fixture is created now. */
+const CREATED_AT = Date.now();
 const ENVELOPE = 'opaque-sealed-envelope-for-the-recipient-device';
 
 /** A signal as the origin publishes it: sealed entries and a signature only. */

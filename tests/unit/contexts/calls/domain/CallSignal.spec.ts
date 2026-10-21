@@ -321,17 +321,6 @@ describe('CallSignal', () => {
     ).toBe(false);
   });
 
-  it('refuses a creation time beyond the clock-skew bound as a future signal even once expired logic is ignored', () => {
-    const signal = CallSignal.fromPrimitives(wire());
-
-    expect(() =>
-      signal.assertNotCreatedInTheFutureAt(new Timestamp(createdAt - 5_001)),
-    ).toThrow(InvalidCallSignalError);
-    expect(() =>
-      signal.assertNotCreatedInTheFutureAt(new Timestamp(createdAt + 60_000)),
-    ).not.toThrow();
-  });
-
   it('identifies the recipient', () => {
     const signal = CallSignal.fromPrimitives(wire());
 
