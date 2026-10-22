@@ -3098,7 +3098,9 @@ before anything is stored, so the identity's enrolled and revoked devices stay
 as they are. Updates keep the genesis and may change the networks. The check
 reads only what this node holds (its stored document and the genesis it
 verified or provisioned), never the network, so a new identity publishes on a
-node with no peers.
+node with no peers. A stored authorization document this node cannot read
+answers `503` code `503020` and is kept as it is, never replaced by its genesis,
+for this request and for every read or change of the identity's devices.
 
 The signature covers this canonical property order:
 

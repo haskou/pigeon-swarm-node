@@ -217,10 +217,9 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return undefined;
     }
 
-    const candidate = await this.readHead(identityId);
+    const candidate = await this.readDocument(identityId);
     const document =
       candidate &&
-      this.validator.isDocument(candidate) &&
       this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
         ? candidate
         : this.factory.toDocument(trustedGenesis, []);
@@ -229,23 +228,25 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   }
 
   /**
-   * The genesis this node already holds for the identity: verified earlier,
-   * provisioned here, or in its stored document. It never asks the network: a
-   * new identity has no version list there yet and could never publish.
+   * The stored document of the identity; undefined only when none is stored.
+   * One that is stored but fails validation answers 503020 and stays as it
+   * is: replacing it with its genesis would erase every recorded revocation.
    */
-  private heldGenesis(
+  private async readDocument(
     identityId: IdentityId,
-    stored: Record<string, unknown> | undefined,
-  ): OrbitDBDeviceAuthorizationDocument['genesis'] | undefined {
-    const known = this.routing.trustedGenesis(identityId.valueOf());
+  ): Promise<OrbitDBDeviceAuthorizationDocument | undefined> {
+    const stored = await this.readHead(identityId);
 
-    if (known) {
-      return known.toPrimitives();
+    if (stored === undefined) {
+      return undefined;
     }
 
-    return stored && this.validator.isDocument(stored)
-      ? stored.genesis
-      : undefined;
+    assert(
+      this.validator.isDocument(stored),
+      new ReplicatedStateNotReadyError(),
+    );
+
+    return stored;
   }
 
   public compareAndApply(
@@ -255,7 +256,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       const trustedGenesis = await this.routing.resolveTrustedGenesis(
         transition.getIdentityId(),
       );
-      const candidate = await this.readHead(transition.getIdentityId());
+      const candidate = await this.readDocument(transition.getIdentityId());
 
       assert(
         trustedGenesis !== undefined,
@@ -263,7 +264,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       );
       const stored =
         candidate &&
-        this.validator.isDocument(candidate) &&
         this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
           ? candidate
           : await this.save(this.factory.toDocument(trustedGenesis, []));
@@ -367,12 +367,12 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
   ): Promise<void> {
     return this.lock.run(authorization.getIdentityId(), async () => {
       const identityId = authorization.getIdentityId();
-      const trustedGenesis = this.heldGenesis(
-        identityId,
-        this.routing.trustedGenesis(identityId.valueOf())
-          ? undefined
-          : await this.readHead(identityId),
-      );
+      // The genesis this node already holds: verified or provisioned here, or
+      // in its stored document. Never the network: a new identity has no
+      // version list there yet and could never publish.
+      const trustedGenesis =
+        this.routing.trustedGenesis(identityId.valueOf())?.toPrimitives() ??
+        (await this.readDocument(identityId))?.genesis;
 
       assert(
         !trustedGenesis ||
@@ -389,11 +389,10 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       );
       // Read again: the registry admits a replicated head only once its
       // genesis is trusted, so the read above may miss the stored history.
-      const existing = await this.readHead(identityId);
+      const existing = await this.readDocument(identityId);
 
       if (
         existing &&
-        this.validator.isDocument(existing) &&
         this.genesisMatcher.sameAuthorizationGenesis(
           existing.genesis,
           authorization.toPrimitives(),
