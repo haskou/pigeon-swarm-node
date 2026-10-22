@@ -311,6 +311,19 @@ export default class OrbitDBReplicatedStateRegistry {
    */
   private readonly settledHeadKeys = new Set<string>();
 
+  /** The keys whose mergers run, innermost last: a merger can read another. */
+  private readonly mergingHeadKeys: string[] = [];
+
+  /**
+   * Heads a merger judged while a settled head it depends on was absent, by
+   * that head's key. A head can be absent only because its own merger could
+   * not judge it yet (a cold replay refuses an authorization whose trust is
+   * not known), so once it is cached they are deferred and offered again.
+   */
+  private readonly headsAwaitingAbsentHead = new Map<string, Set<string>>();
+
+  private headsAwaitingAbsentHeadCount = 0;
+
   private readonly reconciledStoreHeadSignatures = new WeakMap<
     OrbitDBDatabase,
     string
@@ -2049,6 +2062,7 @@ export default class OrbitDBReplicatedStateRegistry {
       return current
         ? this.mergeHeadRecordCollection(current, candidate)
         : candidate;
+    this.mergingHeadKeys.push(key);
     try {
       const merged = merger(current, candidate, key);
 
@@ -2064,7 +2078,48 @@ export default class OrbitDBReplicatedStateRegistry {
       Kernel.logger.warn?.('Rejected incompatible replicated state');
 
       return current;
+    } finally {
+      this.mergingHeadKeys.pop();
     }
+  }
+
+  /**
+   * Remembers that the head being merged was judged without the absent head
+   * of `key`. Bounded: the heads remembered longest are forgotten first.
+   */
+  private awaitAbsentHead(key: string): void {
+    const dependent = this.mergingHeadKeys.at(-1);
+
+    if (dependent === undefined || dependent === key) return;
+    const dependents = this.headsAwaitingAbsentHead.get(key) ?? new Set();
+
+    if (dependents.has(dependent)) return;
+    dependents.add(dependent);
+    this.headsAwaitingAbsentHead.set(key, dependents);
+    this.headsAwaitingAbsentHeadCount += 1;
+
+    while (
+      this.headsAwaitingAbsentHeadCount >
+      OrbitDBReplicatedStateRegistry.MAX_DEFERRED_HEAD_KEYS
+    ) {
+      const [oldest, forgotten] = this.headsAwaitingAbsentHead
+        .entries()
+        .next().value!;
+
+      this.headsAwaitingAbsentHead.delete(oldest);
+      this.headsAwaitingAbsentHeadCount -= forgotten.size;
+    }
+  }
+
+  /** Defers and settles again the heads judged while `key` was absent. */
+  private offerHeadsAwaiting(key: string): void {
+    const dependents = this.headsAwaitingAbsentHead.get(key);
+
+    if (!dependents) return;
+    this.headsAwaitingAbsentHead.delete(key);
+    this.headsAwaitingAbsentHeadCount -= dependents.size;
+    dependents.forEach((dependent) => this.deferHead(dependent));
+    this.scheduleDeferredHeadSettle();
   }
 
   private deferHead(key: string): void {
@@ -2229,6 +2284,7 @@ export default class OrbitDBReplicatedStateRegistry {
     if (accepted) {
       cache.set(key, candidate);
       this.wakeReadmissions();
+      if (!current) this.offerHeadsAwaiting(key);
 
       return candidate;
     }
@@ -2323,6 +2379,7 @@ export default class OrbitDBReplicatedStateRegistry {
   ): Record<string, unknown> {
     this.projectedHeads.set(key, value);
     this.exactProjectedHeadKeys.add(key);
+    this.offerHeadsAwaiting(key);
 
     return value;
   }
@@ -3435,6 +3492,8 @@ export default class OrbitDBReplicatedStateRegistry {
     this.headSettlement = Promise.resolve(true);
     this.deferredHeadSettleScheduled = false;
     this.settledHeadKeys.clear();
+    this.headsAwaitingAbsentHead.clear();
+    this.headsAwaitingAbsentHeadCount = 0;
     this.stopHeadRetries();
   }
 
@@ -3799,7 +3858,8 @@ export default class OrbitDBReplicatedStateRegistry {
    * The cached head of a key once the key is settled: no copy of it is held or
    * dropped unverified, and no network is still rebuilding the cache it may
    * be in. Unlike `findCachedHead`, a key that waits is never read as absent:
-   * the read rejects as not ready.
+   * the read rejects as not ready. Read by a merger, an absent head is
+   * remembered: once it is cached, the head being merged is offered again.
    */
   public findSettledCachedHead(
     key: string,
@@ -3814,6 +3874,7 @@ export default class OrbitDBReplicatedStateRegistry {
     if (!head && this.networksAwaitingHeadReconciliation.size > 0) {
       throw new ReplicatedStateNotReadyError();
     }
+    if (!head) this.awaitAbsentHead(key);
 
     return head;
   }
