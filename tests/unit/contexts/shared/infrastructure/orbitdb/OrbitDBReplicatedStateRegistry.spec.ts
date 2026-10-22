@@ -682,6 +682,95 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it('offers a head refused while the head it depends on was absent again once that head is merged', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+      const sealing = sealingOf('device');
+      let authorityKnown = false;
+
+      // Newest first, like a cold restart replays a heads log without its cache.
+      heads.all.mockResolvedValue([sealing, AUTHORIZATION]);
+      heads.log = logOf([sealing, AUTHORIZATION]);
+      heads.get.mockImplementation((key: string) =>
+        Promise.resolve(
+          key === AUTHORIZATION.key ? AUTHORIZATION.value : undefined,
+        ),
+      );
+      registry.registerHeadRecordMerger(
+        'authorization:',
+        (current, candidate) => (authorityKnown ? candidate : current),
+      );
+      registry.registerHeadRecordMerger('sealing:', (current, candidate) =>
+        registry.findSettledCachedHead(AUTHORIZATION.key)
+          ? (current ?? candidate)
+          : undefined,
+      );
+      await registry.register('network-1', stores);
+
+      authorityKnown = true;
+      await expect(registry.rehydrateHead(AUTHORIZATION.key)).resolves.toBe(
+        true,
+      );
+
+      // Never answered as merged without the dependent head: pending or merged.
+      expect(
+        registry.hasDeferredHeadsUnder('sealing:') ||
+          registry.findCachedHead(sealing.key) !== undefined,
+      ).toBe(true);
+      await flushPromises();
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+      expect(registry.findCachedHead(sealing.key)).toEqual(sealing.value);
+      registry.clear();
+    });
+
+    it('forgets first the heads judged longest ago without an absent head past the bound', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+      const sealings = Array.from({ length: 4_097 }, (_, index) =>
+        sealingOf(`device-${index}`),
+      );
+      const authorizationOf = (device: string): HeadRecord => ({
+        key: `authorization:${device}`,
+        value: { device },
+      });
+
+      registry.registerHeadRecordMerger(
+        'authorization:',
+        (_current, candidate) => candidate,
+      );
+      registry.registerHeadRecordMerger('sealing:', (current, candidate) =>
+        registry.findSettledCachedHead(
+          authorizationOf(String(candidate.device)).key,
+        )
+          ? (current ?? candidate)
+          : undefined,
+      );
+      await registry.register('network-1', stores);
+      // Delivered in this order: device-0 is judged first, so forgotten first.
+      heads.log = logOf(sealings);
+      sealings.forEach((sealing) => heads.emitUpdate({ payload: sealing }));
+      await flushPromises();
+
+      heads.emitUpdate({ payload: authorizationOf('device-0') });
+      heads.emitUpdate({ payload: authorizationOf('device-4096') });
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(true);
+      // Settling replays the whole log of the store: wait for the pass to end.
+      for (
+        let pass = 0;
+        pass < 20 && registry.hasDeferredHeadsUnder('sealing:');
+        pass++
+      ) {
+        await flushPromises();
+      }
+
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+      expect(registry.findCachedHead(sealings[0].key)).toBeUndefined();
+      expect(registry.findCachedHead(sealings[4_096].key)).toEqual(
+        sealings[4_096].value,
+      );
+      registry.clear();
+    }, 30_000);
+
     describe('when the merger still cannot judge a head after reconciliation', () => {
       const warn = jest.fn();
       const debug = jest.fn();

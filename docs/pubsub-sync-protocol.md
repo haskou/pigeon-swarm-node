@@ -1213,6 +1213,16 @@ not refused. A settle repeats its log pass, at most four times, while each pass
 merges a head no earlier pass merged, so a record replayed before its
 authorization in the same pass is merged once that authorization is.
 
+A cold replay can also find the authorization head itself unjudgeable: its
+merger refuses it while the identity's signed genesis is not trusted yet, and
+that trust is restored only by the first read of the identity. A sealing record
+settled after the replay then finds no authorization and is refused. The
+registry remembers every head a merger judged while a settled head it read was
+absent (at most 4096, the oldest forgotten first); once that head is cached,
+for example when the sealing view's authorization read restores it, those heads
+are deferred and offered to their mergers again. The sealing view therefore
+answers `503020` until the record is merged, never a device list without it.
+
 ## Live call projection boundary
 
 Conversation lifecycle documents retain merge tombstones; runtime leases stay
