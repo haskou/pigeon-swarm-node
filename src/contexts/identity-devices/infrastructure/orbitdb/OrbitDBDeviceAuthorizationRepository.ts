@@ -366,10 +366,12 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     return this.lock.run(authorization.getIdentityId(), async () => {
-      const existing = await this.readHead(authorization.getIdentityId());
+      const identityId = authorization.getIdentityId();
       const trustedGenesis = this.heldGenesis(
-        authorization.getIdentityId(),
-        existing,
+        identityId,
+        this.routing.trustedGenesis(identityId.valueOf())
+          ? undefined
+          : await this.readHead(identityId),
       );
 
       assert(
@@ -385,6 +387,9 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
         identityVersion,
         identityExternalIdentifier,
       );
+      // Read again: the registry admits a replicated head only once its
+      // genesis is trusted, so the read above may miss the stored history.
+      const existing = await this.readHead(identityId);
 
       if (
         existing &&
