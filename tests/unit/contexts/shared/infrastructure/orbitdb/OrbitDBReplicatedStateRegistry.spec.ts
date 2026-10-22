@@ -682,6 +682,45 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       registry.clear();
     });
 
+    it('offers a head refused while the head it depends on was absent again once that head is merged', async () => {
+      const registry = new OrbitDBReplicatedStateRegistry();
+      const { heads, stores } = createStores();
+      const sealing = sealingOf('device');
+      let authorityKnown = false;
+
+      // Newest first, like a cold restart replays a heads log without its cache.
+      heads.all.mockResolvedValue([sealing, AUTHORIZATION]);
+      heads.log = logOf([sealing, AUTHORIZATION]);
+      heads.get.mockImplementation(async (key: string) =>
+        key === AUTHORIZATION.key ? AUTHORIZATION.value : undefined,
+      );
+      registry.registerHeadRecordMerger(
+        'authorization:',
+        (current, candidate) => (authorityKnown ? candidate : current),
+      );
+      registry.registerHeadRecordMerger('sealing:', (current, candidate) =>
+        registry.findSettledCachedHead(AUTHORIZATION.key)
+          ? (current ?? candidate)
+          : undefined,
+      );
+      await registry.register('network-1', stores);
+
+      authorityKnown = true;
+      await expect(registry.rehydrateHead(AUTHORIZATION.key)).resolves.toBe(
+        true,
+      );
+
+      // Never answered as merged without the dependent head: pending or merged.
+      expect(
+        registry.hasDeferredHeadsUnder('sealing:') ||
+          registry.findCachedHead(sealing.key) !== undefined,
+      ).toBe(true);
+      await flushPromises();
+      expect(registry.hasDeferredHeadsUnder('sealing:')).toBe(false);
+      expect(registry.findCachedHead(sealing.key)).toEqual(sealing.value);
+      registry.clear();
+    });
+
     describe('when the merger still cannot judge a head after reconciliation', () => {
       const warn = jest.fn();
       const debug = jest.fn();
