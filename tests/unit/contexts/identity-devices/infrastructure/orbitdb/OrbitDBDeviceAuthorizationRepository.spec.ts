@@ -4436,5 +4436,49 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
         expect(database.save).not.toHaveBeenCalled();
       },
     );
+
+    it('keeps the stored history when a restarted node provisions the genesis before admitting its head', async () => {
+      const {
+        database,
+        genesis,
+        getHead,
+        identityId,
+        identityRepository,
+        networkRegistry,
+        registry,
+      } = await enrolled(true);
+      const restarted = new OrbitDBDeviceAuthorizationRepository(
+        registry,
+        new DeviceAuthorizationPolicy(),
+        identityRepository,
+        networkRegistry,
+        database,
+      );
+      // The real registry admits a head only once the repository's private
+      // routing trusts its genesis; the spec reads that routing to model it.
+      const internals = restarted as unknown as {
+        routing: { trustedGenesis(identityId: string): unknown };
+      };
+      const routing = internals.routing;
+      const stored = getHead();
+      // Like the replicated registry: a head whose genesis the node does not
+      // trust yet is not admitted.
+      registry.findHead.mockImplementation(() =>
+        Promise.resolve(
+          routing.trustedGenesis(identityId.valueOf()) ? getHead() : undefined,
+        ),
+      );
+      registry.findPersistedHead.mockResolvedValue(undefined);
+      registry.putHead.mockClear();
+
+      await provisionAuthorization(restarted, genesis);
+
+      expect(registry.putHead).toHaveBeenCalledTimes(1);
+      expect(registry.putHead).toHaveBeenCalledWith(
+        expect.any(String),
+        stored,
+        expect.any(Array),
+      );
+    });
   });
 });
