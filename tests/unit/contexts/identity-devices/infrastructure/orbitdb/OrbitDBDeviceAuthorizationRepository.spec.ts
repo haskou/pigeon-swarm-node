@@ -4196,6 +4196,37 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(database.save).not.toHaveBeenCalled();
     });
 
+    it('answers 503020 and keeps a stored document it cannot validate', async () => {
+      const {
+        database,
+        genesis,
+        getHead,
+        identityId,
+        registry,
+        repository,
+        transition,
+      } = await provisioned();
+      const unreadable = { ...getHead(), authorization: 'unreadable' };
+      const stored = JSON.stringify(unreadable);
+      registry.findHead.mockResolvedValue(unreadable);
+
+      await expect(provisionAuthorization(repository, genesis)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.has(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.require(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.compareAndApply(transition)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(registry.putHead).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+      expect(JSON.stringify(unreadable)).toBe(stored);
+    });
+
     it('refuses to write over a head the store cannot settle', async () => {
       const { database, registry, repository, transition } =
         await provisioned();
