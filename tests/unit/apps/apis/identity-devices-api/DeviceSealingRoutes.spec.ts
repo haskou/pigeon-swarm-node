@@ -589,10 +589,13 @@ describe('Device sealing routes', () => {
         'consume',
       );
 
-      await getPublic(viewPath(wire(await KeyPair.generate())));
+      try {
+        await getPublic(viewPath(wire(await KeyPair.generate())));
 
-      expect(consume).not.toHaveBeenCalled();
-      consume.mockRestore();
+        expect(consume).not.toHaveBeenCalled();
+      } finally {
+        consume.mockRestore();
+      }
     });
 
     it('never resolves an authorization for an identity this node does not hold', async () => {
