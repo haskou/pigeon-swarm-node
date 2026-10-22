@@ -2098,14 +2098,13 @@ export default class OrbitDBReplicatedStateRegistry {
     this.headsAwaitingAbsentHead.set(key, dependents);
     this.headsAwaitingAbsentHeadCount += 1;
 
-    while (
-      this.headsAwaitingAbsentHeadCount >
-      OrbitDBReplicatedStateRegistry.MAX_DEFERRED_HEAD_KEYS
-    ) {
-      const [oldest, forgotten] = this.headsAwaitingAbsentHead
-        .entries()
-        .next().value!;
-
+    for (const [oldest, forgotten] of this.headsAwaitingAbsentHead) {
+      if (
+        this.headsAwaitingAbsentHeadCount <=
+        OrbitDBReplicatedStateRegistry.MAX_DEFERRED_HEAD_KEYS
+      ) {
+        return;
+      }
       this.headsAwaitingAbsentHead.delete(oldest);
       this.headsAwaitingAbsentHeadCount -= forgotten.size;
     }
@@ -2284,6 +2283,7 @@ export default class OrbitDBReplicatedStateRegistry {
     if (accepted) {
       cache.set(key, candidate);
       this.wakeReadmissions();
+
       if (!current) this.offerHeadsAwaiting(key);
 
       return candidate;
@@ -3874,6 +3874,7 @@ export default class OrbitDBReplicatedStateRegistry {
     if (!head && this.networksAwaitingHeadReconciliation.size > 0) {
       throw new ReplicatedStateNotReadyError();
     }
+
     if (!head) this.awaitAbsentHead(key);
 
     return head;

@@ -691,8 +691,10 @@ describe('OrbitDBReplicatedStateRegistry', () => {
       // Newest first, like a cold restart replays a heads log without its cache.
       heads.all.mockResolvedValue([sealing, AUTHORIZATION]);
       heads.log = logOf([sealing, AUTHORIZATION]);
-      heads.get.mockImplementation(async (key: string) =>
-        key === AUTHORIZATION.key ? AUTHORIZATION.value : undefined,
+      heads.get.mockImplementation((key: string) =>
+        Promise.resolve(
+          key === AUTHORIZATION.key ? AUTHORIZATION.value : undefined,
+        ),
       );
       registry.registerHeadRecordMerger(
         'authorization:',
