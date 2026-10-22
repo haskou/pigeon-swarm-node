@@ -3853,10 +3853,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     expect(found.getNetworkIds()).toEqual(genesis.getNetworkIds());
   });
 
-  it('returns a concurrently merged checkpoint when repairing an untrusted head', async () => {
+  it('returns a concurrently merged checkpoint when repairing a head of an untrusted genesis', async () => {
     const { genesis, identityId, owner } = await fixture();
     const target = await KeyPair.generate();
     const { getHead, registry, repository, setHead } = repositoryFixture();
+    const untrusted = repositoryFixture();
     const transition = await enrollment(
       identityId,
       owner,
@@ -3864,10 +3865,14 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
+    await provisionAuthorization(
+      untrusted.repository,
+      (await fixture()).genesis,
+    );
     await provisionAuthorization(repository, genesis);
     await repository.compareAndApply(transition);
     const concurrentHead = getHead();
-    setHead({ kind: 'untrusted' });
+    setHead(untrusted.getHead() ?? {});
     registry.putHead.mockImplementationOnce(() => {
       setHead(concurrentHead ?? {});
 
