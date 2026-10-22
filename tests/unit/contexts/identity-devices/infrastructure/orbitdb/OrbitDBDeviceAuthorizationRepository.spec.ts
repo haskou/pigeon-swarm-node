@@ -7,6 +7,7 @@ import { IdentityVersion } from '@app/contexts/identities/domain/value-objects/I
 import { RecoveryAuthority } from '@app/contexts/identities/domain/value-objects/RecoveryAuthority';
 import { DeviceAuthorization } from '@app/contexts/identity-devices/domain/DeviceAuthorization';
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
+import { DeviceAuthorizationGenesisConflictError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationGenesisConflictError';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import DeviceAuthorizationPolicy from '@app/contexts/identity-devices/domain/services/DeviceAuthorizationPolicy';
 import { DeviceAuthorizationEpoch } from '@app/contexts/identity-devices/domain/value-objects/DeviceAuthorizationEpoch';
@@ -51,7 +52,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     return { genesis, identityId, owner, recovery };
   }
 
-  function repositoryFixture() {
+  function repositoryFixture(onPrivateNetwork = true) {
     const registry = mock<OrbitDBReplicatedStateRegistry>();
     const identityRepository = mock<IdentityRepository>();
     identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
@@ -63,7 +64,7 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     privateNetwork.getId.mockReturnValue(
       '550e8400-e29b-41d4-a716-446655440000',
     );
-    privateNetwork.isPrivate.mockReturnValue(true);
+    privateNetwork.isPrivate.mockReturnValue(onPrivateNetwork);
     networkRegistry.getAll.mockReturnValue([privateNetwork]);
 
     registry.registerHeadRecordMerger.mockImplementation(
@@ -3852,10 +3853,11 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
     expect(found.getNetworkIds()).toEqual(genesis.getNetworkIds());
   });
 
-  it('returns a concurrently merged checkpoint when repairing an untrusted head', async () => {
+  it('returns a concurrently merged checkpoint when repairing a head of an untrusted genesis', async () => {
     const { genesis, identityId, owner } = await fixture();
     const target = await KeyPair.generate();
     const { getHead, registry, repository, setHead } = repositoryFixture();
+    const untrusted = repositoryFixture();
     const transition = await enrollment(
       identityId,
       owner,
@@ -3863,10 +3865,14 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       '00000000-0000-4000-8000-000000000001',
       '10000000-0000-4000-8000-000000000001',
     );
+    await provisionAuthorization(
+      untrusted.repository,
+      (await fixture()).genesis,
+    );
     await provisionAuthorization(repository, genesis);
     await repository.compareAndApply(transition);
     const concurrentHead = getHead();
-    setHead({ kind: 'untrusted' });
+    setHead(untrusted.getHead() ?? {});
     registry.putHead.mockImplementationOnce(() => {
       setHead(concurrentHead ?? {});
 
@@ -4195,6 +4201,37 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
       expect(database.save).not.toHaveBeenCalled();
     });
 
+    it('answers 503020 and keeps a stored document it cannot validate', async () => {
+      const {
+        database,
+        genesis,
+        getHead,
+        identityId,
+        registry,
+        repository,
+        transition,
+      } = await provisioned();
+      const unreadable = { ...getHead(), authorization: 'unreadable' };
+      const stored = JSON.stringify(unreadable);
+      registry.findHead.mockResolvedValue(unreadable);
+
+      await expect(provisionAuthorization(repository, genesis)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.has(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.require(identityId)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      await expect(repository.compareAndApply(transition)).rejects.toThrow(
+        ReplicatedStateNotReadyError,
+      );
+      expect(registry.putHead).not.toHaveBeenCalled();
+      expect(database.save).not.toHaveBeenCalled();
+      expect(JSON.stringify(unreadable)).toBe(stored);
+    });
+
     it('refuses to write over a head the store cannot settle', async () => {
       const { database, registry, repository, transition } =
         await provisioned();
@@ -4262,6 +4299,222 @@ describe(OrbitDBDeviceAuthorizationRepository.name, () => {
 
       expect(registry.rehydrateHead).toHaveBeenCalled();
       expect(registry.findPersistedHead).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('never replacing the genesis of an identity it already has', () => {
+    const forkExternalIdentifier = new IdentityExternalIdentifier('bafy-fork');
+
+    async function enrolled(onPrivateNetwork: boolean) {
+      const setup = await fixture();
+      const phone = await KeyPair.generate();
+      const repositorySetup = repositoryFixture(onPrivateNetwork);
+      repositorySetup.identityRepository.findFreshCandidateReferencesById.mockResolvedValue(
+        [
+          new IdentityCandidate(
+            genesisExternalIdentifier,
+            identityOf(setup.genesis),
+          ),
+        ],
+      );
+      await provisionAuthorization(repositorySetup.repository, setup.genesis);
+      await repositorySetup.repository.compareAndApply(
+        enrollment(
+          setup.identityId,
+          setup.owner,
+          phone,
+          '00000000-0000-4000-8000-000000000071',
+          '10000000-0000-4000-8000-000000000071',
+        ),
+      );
+
+      return { ...setup, ...repositorySetup, phone };
+    }
+
+    async function forkOf(genesis: DeviceAuthorization) {
+      const device = await KeyPair.generate();
+      const recovery = await KeyPair.generate();
+
+      return DeviceAuthorization.genesis(
+        genesis.getIdentityId(),
+        genesis.getNetworkIds(),
+        DeviceCredential.fromString(device.toPrimitives().publicKey),
+        RecoveryAuthority.fromString(recovery.toPrimitives().publicKey),
+      );
+    }
+
+    function credentialsOf(authorization: DeviceAuthorization): string[] {
+      return authorization
+        .getCredentials()
+        .map((credential) => credential.valueOf());
+    }
+
+    it.each([
+      ['a private', true],
+      ['only a public', false],
+    ])(
+      'refuses a second, different version-1 genesis on %s network and keeps the enrolled devices',
+      async (_network, onPrivateNetwork) => {
+        const { database, genesis, identityId, phone, registry, repository } =
+          await enrolled(onPrivateNetwork);
+        registry.putHead.mockClear();
+        database.save.mockClear();
+
+        await expect(
+          provisionAuthorization(
+            repository,
+            await forkOf(genesis),
+            1,
+            forkExternalIdentifier,
+          ),
+        ).rejects.toThrow(DeviceAuthorizationGenesisConflictError);
+
+        const kept = await repository.require(identityId);
+        expect(kept.getRevision().valueOf()).toBe(1);
+        expect(credentialsOf(kept)).toContain(phone.toPrimitives().publicKey);
+        expect(registry.putHead).not.toHaveBeenCalled();
+        expect(database.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('refuses a different genesis known only from its own earlier provision', async () => {
+      const { genesis, identityId } = await fixture();
+      const { repository } = repositoryFixture();
+      await provisionAuthorization(repository, genesis);
+
+      await expect(
+        provisionAuthorization(
+          repository,
+          await forkOf(genesis),
+          1,
+          forkExternalIdentifier,
+        ),
+      ).rejects.toThrow(DeviceAuthorizationGenesisConflictError);
+      expect((await repository.require(identityId)).toPrimitives()).toEqual(
+        genesis.toPrimitives(),
+      );
+    });
+
+    it('keeps the enrolled devices when an update provisions the same genesis with more networks', async () => {
+      const { genesis, identityId, phone, repository } = await enrolled(true);
+      const update = DeviceAuthorization.genesis(
+        identityId,
+        [
+          ...genesis.getNetworkIds(),
+          new NetworkId('550e8400-e29b-41d4-a716-446655440001'),
+        ],
+        genesis.getCredentials()[0],
+        genesis.getRecoveryAuthority(),
+      );
+
+      await provisionAuthorization(
+        repository,
+        update,
+        2,
+        new IdentityExternalIdentifier('bafy-second'),
+      );
+
+      const kept = await repository.require(identityId);
+      expect(kept.getRevision().valueOf()).toBe(1);
+      expect(credentialsOf(kept)).toContain(phone.toPrimitives().publicKey);
+    });
+
+    it('provisions a new identity while the network cannot list its versions', async () => {
+      const { genesis, identityId } = await fixture();
+      const { identityRepository, repository } = repositoryFixture();
+      identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
+        new ReplicatedStateNotReadyError(),
+      );
+
+      await provisionAuthorization(repository, genesis);
+
+      identityRepository.findFreshCandidateReferencesById.mockResolvedValue([]);
+      expect((await repository.require(identityId)).toPrimitives()).toEqual(
+        genesis.toPrimitives(),
+      );
+    });
+
+    it.each([
+      ['a private', true],
+      ['only a public', false],
+    ])(
+      'refuses a different genesis from its stored document on %s network after a restart while the network cannot list versions',
+      async (_network, onPrivateNetwork) => {
+        const {
+          database,
+          genesis,
+          identityRepository,
+          networkRegistry,
+          registry,
+        } = await enrolled(onPrivateNetwork);
+        const restarted = new OrbitDBDeviceAuthorizationRepository(
+          registry,
+          new DeviceAuthorizationPolicy(),
+          identityRepository,
+          networkRegistry,
+          database,
+        );
+        identityRepository.findFreshCandidateReferencesById.mockRejectedValue(
+          new ReplicatedStateNotReadyError(),
+        );
+        registry.putHead.mockClear();
+        database.save.mockClear();
+
+        await expect(
+          provisionAuthorization(
+            restarted,
+            await forkOf(genesis),
+            1,
+            forkExternalIdentifier,
+          ),
+        ).rejects.toThrow(DeviceAuthorizationGenesisConflictError);
+        expect(registry.putHead).not.toHaveBeenCalled();
+        expect(database.save).not.toHaveBeenCalled();
+      },
+    );
+
+    it('keeps the stored history when a restarted node provisions the genesis before admitting its head', async () => {
+      const {
+        database,
+        genesis,
+        getHead,
+        identityId,
+        identityRepository,
+        networkRegistry,
+        registry,
+      } = await enrolled(true);
+      const restarted = new OrbitDBDeviceAuthorizationRepository(
+        registry,
+        new DeviceAuthorizationPolicy(),
+        identityRepository,
+        networkRegistry,
+        database,
+      );
+      // The real registry admits a head only once the repository's private
+      // routing trusts its genesis; the spec reads that routing to model it.
+      const internals = restarted as unknown as {
+        routing: { trustedGenesis(identityId: string): unknown };
+      };
+      const routing = internals.routing;
+      const stored = getHead();
+      // Like the replicated registry: a head whose genesis the node does not
+      // trust yet is not admitted.
+      registry.findHead.mockImplementation(() =>
+        Promise.resolve(
+          routing.trustedGenesis(identityId.valueOf()) ? getHead() : undefined,
+        ),
+      );
+      registry.findPersistedHead.mockResolvedValue(undefined);
+      registry.putHead.mockClear();
+
+      await provisionAuthorization(restarted, genesis);
+
+      expect(registry.putHead).toHaveBeenCalledTimes(1);
+      expect(registry.putHead).toHaveBeenCalledWith(
+        expect.any(String),
+        stored,
+        expect.any(Array),
+      );
     });
   });
 });

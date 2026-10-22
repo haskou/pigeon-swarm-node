@@ -846,6 +846,19 @@ readmitted in full: its queue drains and its records are projected again. A call
 not drop is read as usual, however many records a peer floods. A failed rescan is
 retried every 60 seconds, so the answer lasts as long as the rescan fails.
 
+A call is never reported missing, and a list never leaves a call out, because
+the node could not read it. A call whose participant or end records the node
+holds without its start answers `503020` until the start is projected: those
+records are admitted only after their start, so the start exists. A call
+whose stored start the node cannot rebuild answers `503020` by id, and every
+list that would contain it answers `503020` too; the node never marks such a
+call missed. A list or call whose community, conversation or private-community
+check cannot be read answers `503020` rather than hiding the call or leaving a
+participant out of its realtime snapshot. Only a verified denial hides a call:
+a requester outside its conversation or community channel gets
+`CallNotFoundError`, and a call of a community the node verified to be private
+is left out of the lists.
+
 ### List active calls
 
 ```http
@@ -2584,16 +2597,43 @@ times out, the answer is the same `503`, even when another network reported the
 CID absent: one network's absence does not prove the content is absent
 everywhere. Retry.
 
-Identity and keychain record lookups follow the same rule. The Helia adapter
-reports a record as absent only when the local datastore or every DHT router
-answered not-found. The filesystem datastore answers not-found only when the
-record file does not exist; any other local read failure (I/O error,
-permission, abort) is a datastore error. A datastore error, a DHT timeout or
-abort, a router that failed while another answered not-found, or having no connected peers while the
-DHT is enabled is a retrieval failure: the lookup answers `503` with code
-`503020`, never "no record", so an unreachable DHT cannot make an existing
-identity or keychain read as missing. Block `stat` over the public network
-likewise reports a missing block only on a definitive not-found answer.
+Identity and keychain record lookups follow the same rule. The node asks every
+network it has configured, all at once, and reports a record as absent only
+when each network answered within the lookup timeout that it holds none:
+
+- A not-found answer from the node's local datastore is definitive. The
+  filesystem datastore answers not-found only when the record file does not
+  exist; any other local read failure (I/O error, permission, abort) is a
+  datastore error.
+- On a network whose DHT is disabled (a private network), that local answer is
+  the whole answer.
+- On a network whose DHT is enabled (the public network), the node asks its
+  peers. A DHT not-found only means that the query of every router finished
+  without finding a value, not that the network verified the record is absent.
+  A connected node treats that answer as absence, so peers able to eclipse the
+  node's DHT view can make an existing record read as missing.
+- A datastore error, a DHT timeout or abort, a router that failed while another
+  answered not-found, and having no connected peers while the DHT is enabled are
+  retrieval failures. The lookup answers `503` with code `503020`, never "no
+  record", so an unreachable DHT cannot make an existing identity or keychain
+  read as missing.
+
+The lookup times out after 2500 ms (`IPFS_CONTENT_TIMEOUT_MS`, capped at 5000
+ms) and then answers `503` with code `503020`. A DHT query that has to walk the
+public network to prove a record absent often outlasts that timeout, so a
+genuinely absent record on the public network often answers `503020` rather
+than `404` or `409`. A node that has a public network with no connected peers
+answers `503020` for every record it does not hold locally, whatever its other
+networks answer. An unknown id with no peers and no local record therefore
+answers `503`, not `404` or `409`.
+
+The `message` of such a `503020` says why. `IPFS records are not reachable on
+every network yet. Retry shortly.` means the node is ready but the record lookup
+could not be verified. `Replicated state is not ready yet. Retry after the node
+finishes opening and synchronizing replicated state.` means the node has not
+finished startup or opened its replicated state; keychain lookups also use it
+when they cannot verify a keychain's ownership. The message is a diagnostic:
+both answers mean "retry", and a client must branch only on the code.
 
 ### Register content replication
 
@@ -3005,7 +3045,10 @@ read, the lookup answers HTTP 503 with code `503020`
 identity is not reported missing, so retry. A 409 means the node is ready (see
 Node readiness) and every network it asked answered that it does not know the
 identity. If any network fails to answer, the lookup answers 503 with code
-`503020` instead, even when another network reported the identity absent.
+`503020` instead, even when another network reported the identity absent. What
+counts as a network's answer, the lookup timeout, why a public network without
+peers answers 503, and how the `message` tells an unverified lookup from a node
+that is not ready are described under `### Get public IPFS content`.
 
 ### Publish identity
 
@@ -3046,6 +3089,18 @@ Response: `200` with the published identity. It is not `201 Created`: publishing
 is idempotent, so the same signed body can be sent again and names the same
 identity without creating anything new. The admission path (proof of work and
 registration control above) is unchanged by this rule.
+
+An identity's genesis is never replaced. A body whose genesis (initial device
+credential, its commitment and the recovery authority) differs from the one
+this node already holds for the `id`, including a second validly signed
+version 1, is refused with `409` code `DeviceAuthorizationGenesisConflictError`
+before anything is stored, so the identity's enrolled and revoked devices stay
+as they are. Updates keep the genesis and may change the networks. The check
+reads only what this node holds (its stored document and the genesis it
+verified or provisioned), never the network, so a new identity publishes on a
+node with no peers. A stored authorization document this node cannot read
+answers `503` code `503020` and is kept as it is, never replaced by its genesis,
+for this request and for every read or change of the identity's devices.
 
 The signature covers this canonical property order:
 
@@ -3315,7 +3370,9 @@ Errors:
   its routing record, replicated keychain document or local index entry cannot be
   read or mapped. The keychain is not reported missing, so retry. A record or
   document that stays unreadable keeps this answer at 503 rather than 409 until it
-  is repaired or removed.
+  is repaired or removed. What counts as a verified absence, the lookup timeout
+  and which `message` each of these `503020` answers carries are described under
+  `### Get public IPFS content`.
 
 ## Conversation HTTP API
 
@@ -5972,6 +6029,14 @@ projection confirms that the authenticated identity is a member and can view
 the requested channel. Protected settings stay in the node-local database and
 are limited to 256 scopes per identity and 4,096 scopes per node.
 
+A protected setting stored on the node that the node cannot read (it no longer
+parses, or the domain rejects it) is kept unchanged and never read as "no
+setting": `GET /notification-settings`, this upsert and the push delivery
+check for that scope answer `503` with code `503020`
+(`ReplicatedStateNotReadyError`) instead of listing fewer settings, falling
+back to defaults or replacing it. Resetting the scope with `DELETE
+/notification-settings/scopes` removes it explicitly.
+
 ### Reset scope notification settings
 
 ```http
@@ -6161,6 +6226,14 @@ Response:
 
 Backend also removes stale subscriptions automatically when the push provider
 returns `404` or `410`.
+
+A stored subscription the node cannot read (it no longer parses, or the
+domain rejects it, for example an endpoint host outside the supported list) is
+kept unchanged and never skipped or removed: `POST /push/test` answers `503`
+with code `503020` (`ReplicatedStateNotReadyError`) instead of testing fewer
+subscriptions, and push delivery to that identity fails rather than reaching
+only some of its subscriptions. Registering the same endpoint again with
+`PUT /push/subscriptions` replaces it.
 
 Push delivery failures are logged as one JSON line with `message`, `endpointHost`,
 `statusCode`, `error` and `shouldDeleteSubscription`. The full endpoint URL,

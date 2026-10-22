@@ -109,6 +109,8 @@ paths:
           description: Invalid signed request.
         '415':
           description: Request body is not application/json.
+        '503':
+          description: Node not ready (code 503020). A push subscription stored for the authenticated identity cannot be read; it is kept unchanged and no subscription was tested. Retry.
         default:
           $ref: '../open-api.yaml#/components/responses/Error'
         '200':

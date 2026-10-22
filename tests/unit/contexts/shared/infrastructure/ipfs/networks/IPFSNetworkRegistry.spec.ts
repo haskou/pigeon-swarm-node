@@ -790,6 +790,51 @@ describe('IPFSNetworkRegistry', () => {
       expect(registry.getAll()).toEqual([]);
       expect(removeStorage).not.toHaveBeenCalled();
     });
+
+    it('should stop the remaining networks when one fails to stop, then report the failure', async () => {
+      const registry = createRegistry();
+      const failingNetwork = mock<IPFSNetwork>();
+      const secondNetwork = mock<IPFSNetwork>();
+      const stopFailure = new Error('helia stop failed');
+
+      failingNetwork.getId.mockReturnValue('network-1');
+      failingNetwork.stop.mockRejectedValue(stopFailure);
+      secondNetwork.getId.mockReturnValue('network-2');
+      secondNetwork.stop.mockResolvedValue(undefined);
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            loadOrCreateSharedPeerPrivateKey: () => Promise<unknown>;
+          },
+          'loadOrCreateSharedPeerPrivateKey',
+        )
+        .mockResolvedValue({});
+
+      jest
+        .spyOn(
+          registry as unknown as {
+            createNetworkFromConfig: () => Promise<IPFSNetwork>;
+          },
+          'createNetworkFromConfig',
+        )
+        .mockResolvedValueOnce(failingNetwork)
+        .mockResolvedValueOnce(secondNetwork);
+
+      await registry.register(
+        new IPFSNetworkConfig('network-1', 'private_1', new PrivateKey(validPem)),
+      );
+      await registry.register(
+        new IPFSNetworkConfig('network-2', 'private_2', new PrivateKey(validPem)),
+      );
+
+      await expect(registry.stopAll()).rejects.toMatchObject({
+        errors: [stopFailure],
+        message: 'Some IPFS networks failed to stop',
+      });
+      expect(secondNetwork.stop).toHaveBeenCalledTimes(1);
+      expect(registry.getAll()).toEqual([]);
+    });
   });
 });
 

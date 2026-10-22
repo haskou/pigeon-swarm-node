@@ -3,11 +3,15 @@ import { NotificationScopeSettings } from '@app/contexts/notification-settings/d
 import { NotificationSettingsStorageQuota } from '@app/contexts/notification-settings/domain/NotificationSettingsStorageQuota';
 import { NotificationSettingScope } from '@app/contexts/notification-settings/domain/value-objects/NotificationSettingScope';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import ReplicatedStateNotReadyError from '@app/contexts/shared/infrastructure/orbitdb/ReplicatedStateNotReadyError';
 import EmbeddedLocalDatabase from '@app/shared/infrastructure/local-db/EmbeddedLocalDatabase';
 import { Integer } from '@haskou/value-objects';
 
 export default class LocalNotificationScopeSettingsRepository {
   private static readonly NAMESPACE = 'private_notification_scope_settings';
+  private static readonly UNREADABLE_MESSAGE =
+    'Stored notification settings cannot be read. They were kept unchanged, so they are not reported missing. Retry later.';
+
   private static readonly queues = new WeakMap<
     EmbeddedLocalDatabase,
     Promise<void>
@@ -79,13 +83,13 @@ export default class LocalNotificationScopeSettingsRepository {
     );
   }
 
-  private async toDomain(
+  private toDomain(
     document: Record<string, unknown>,
-  ): Promise<NotificationScopeSettings | undefined> {
+  ): NotificationScopeSettings {
     if (!this.isDocument(document)) {
-      await this.remove(document);
-
-      return undefined;
+      throw new ReplicatedStateNotReadyError(
+        LocalNotificationScopeSettingsRepository.UNREADABLE_MESSAGE,
+      );
     }
 
     try {
@@ -93,17 +97,8 @@ export default class LocalNotificationScopeSettingsRepository {
         document as ReturnType<NotificationScopeSettings['toPrimitives']>,
       );
     } catch {
-      await this.remove(document);
-
-      return undefined;
-    }
-  }
-
-  private async remove(document: Record<string, unknown>): Promise<void> {
-    if (typeof document._id === 'string') {
-      await this.database.delete(
-        LocalNotificationScopeSettingsRepository.NAMESPACE,
-        document._id,
+      throw new ReplicatedStateNotReadyError(
+        LocalNotificationScopeSettingsRepository.UNREADABLE_MESSAGE,
       );
     }
   }
@@ -137,12 +132,9 @@ export default class LocalNotificationScopeSettingsRepository {
       LocalNotificationScopeSettingsRepository.NAMESPACE,
       (document) => document.identityId === identityId.valueOf(),
     );
-    const settings = await Promise.all(
-      documents.map((document) => this.toDomain(document)),
-    );
 
-    return settings
-      .filter((value): value is NotificationScopeSettings => Boolean(value))
+    return documents
+      .map((document) => this.toDomain(document))
       .sort(
         (left, right) =>
           right.toPrimitives().updatedAt - left.toPrimitives().updatedAt,

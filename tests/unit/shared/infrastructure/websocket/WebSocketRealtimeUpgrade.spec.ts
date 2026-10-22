@@ -26,6 +26,7 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
   const legacyPath = '/ws';
   let server: Server;
   let port: number;
+  let realtimeServer: WebSocketRealtimeServer;
 
   beforeEach(async () => {
     server = createServer((_request, response) => {
@@ -33,7 +34,8 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
       response.setHeader('Location', 'http://127.0.0.1:1/elsewhere');
       response.end();
     });
-    new WebSocketRealtimeServer().attach(server, ticketPath);
+    realtimeServer = new WebSocketRealtimeServer();
+    realtimeServer.attach(server, ticketPath);
     await new Promise<void>((resolve) =>
       server.listen(0, '127.0.0.1', resolve),
     );
@@ -330,6 +332,34 @@ describe('realtime upgrade (real HTTP server and ws client)', () => {
           protocols: ticketProtocols(await issueTicket()),
         }),
       ).toMatchObject({ opened: true });
+    });
+  });
+
+  describe('shutdown', () => {
+    it('closes open realtime sockets as going away', async () => {
+      const socket = new WebSocket(
+        `ws://127.0.0.1:${port}${ticketPath}`,
+        ticketProtocols(await issueTicket()),
+      );
+      const opened = Promise.withResolvers<void>();
+      const closed = Promise.withResolvers<number>();
+
+      socket.on('open', () => opened.resolve());
+      socket.on('close', (code) => closed.resolve(code));
+      await opened.promise;
+      await realtimeServer.close();
+
+      expect(await closed.promise).toBe(1001);
+    });
+
+    it('refuses new upgrades once closing', async () => {
+      await realtimeServer.close();
+
+      expect(
+        await connect(ticketPath, {
+          protocols: ticketProtocols(await issueTicket()),
+        }),
+      ).toEqual({ status: 503 });
     });
   });
 });

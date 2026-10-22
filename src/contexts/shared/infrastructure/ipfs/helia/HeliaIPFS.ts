@@ -11,7 +11,6 @@ import { PrivateKey as NetworkPrivateKey } from '@haskou/pigeon-swarm-crypto';
 
 import ReplicatedStateNotReadyError from '../../orbitdb/ReplicatedStateNotReadyError';
 import { IPFSBlockNotFoundOfflineError } from '../errors/IPFSBlockNotFoundOfflineError';
-import { IPFSBlockNotFoundPublicError } from '../errors/IPFSBlockNotFoundPublicError';
 import { IPFSContentTooLargeError } from '../errors/IPFSContentTooLargeError';
 import { Libp2pPrivateKeyLike } from '../networks/adapters/types/Libp2pPrivateKeyLike';
 import {
@@ -52,9 +51,6 @@ function peerIdFromConnectionEvent(event: Event): string {
 export abstract class HeliaIPFS implements IPFSConnection {
   private static readonly RECORD_UNVERIFIED_MESSAGE =
     'The IPFS record could not be verified as present or absent. Retry shortly.';
-
-  private static readonly CONTENT_UNVERIFIED_MESSAGE =
-    'The IPFS content could not be verified as present or absent. Retry shortly.';
 
   private static readonly automaticProviderPublicationWindowMs = 5 * 60_000;
   private static readonly maxAutomaticProviderPublicationAttempts = 10_000;
@@ -1077,42 +1073,13 @@ export abstract class HeliaIPFS implements IPFSConnection {
     await this.deleteLocalBlock(parsedCid, signal);
   }
 
-  public async stat(
-    cid: IPFSId,
-    offlineOnly: boolean,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  public async stat(cid: IPFSId): Promise<void> {
     const parsedCid: ParsedCidLike = await heliaRuntimeAdapter.parseCid(
       cid.valueOf(),
     );
 
-    if (offlineOnly) {
-      const exists = await this.heliaCore.blockstore.has(parsedCid, {
-        signal,
-      });
-
-      if (!exists) {
-        throw new IPFSBlockNotFoundOfflineError(cid.valueOf());
-      }
-
-      return;
-    }
-
-    try {
-      await this.heliaCore.blockstore.get(
-        parsedCid,
-        (await this.createContentRetrievalOptions(cid, signal)) as NonNullable<
-          Parameters<HeliaInstance['blockstore']['get']>[1]
-        >,
-      );
-    } catch (error: unknown) {
-      if (IPFSVerifiedAbsence.isVerified(error)) {
-        throw new IPFSBlockNotFoundPublicError(cid.valueOf());
-      }
-
-      throw new ReplicatedStateNotReadyError(
-        HeliaIPFS.CONTENT_UNVERIFIED_MESSAGE,
-      );
+    if (!(await this.heliaCore.blockstore.has(parsedCid))) {
+      throw new IPFSBlockNotFoundOfflineError(cid.valueOf());
     }
   }
 
@@ -1285,7 +1252,8 @@ export abstract class HeliaIPFS implements IPFSConnection {
 
       return new TextDecoder().decode(value);
     } catch (error: unknown) {
-      if (IPFSVerifiedAbsence.isVerified(error)) {
+      // An aborted query can end without a value; that is not absence.
+      if (!signal?.aborted && IPFSVerifiedAbsence.isVerified(error)) {
         return undefined;
       }
 

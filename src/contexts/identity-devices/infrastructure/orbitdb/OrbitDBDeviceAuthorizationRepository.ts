@@ -6,6 +6,7 @@ import { DeviceAuthorizationTimeline } from '@app/contexts/identity-devices/doma
 import { DeviceAuthorizationTransition } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransition';
 import { DeviceAuthorizationTransitionLog } from '@app/contexts/identity-devices/domain/DeviceAuthorizationTransitionLog';
 import { DeviceCompromiseCaps } from '@app/contexts/identity-devices/domain/DeviceCompromiseCaps';
+import { DeviceAuthorizationGenesisConflictError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationGenesisConflictError';
 import { DeviceAuthorizationNotFoundError } from '@app/contexts/identity-devices/domain/errors/DeviceAuthorizationNotFoundError';
 import { InvalidDeviceAuthorizationTransitionError } from '@app/contexts/identity-devices/domain/errors/InvalidDeviceAuthorizationTransitionError';
 import { DeviceAuthorizationRepository } from '@app/contexts/identity-devices/domain/repositories/DeviceAuthorizationRepository';
@@ -216,15 +217,36 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       return undefined;
     }
 
-    const candidate = await this.readHead(identityId);
+    const candidate = await this.readDocument(identityId);
     const document =
       candidate &&
-      this.validator.isDocument(candidate) &&
       this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
         ? candidate
         : this.factory.toDocument(trustedGenesis, []);
 
     return document !== candidate ? this.save(document) : document;
+  }
+
+  /**
+   * The stored document of the identity; undefined only when none is stored.
+   * One that is stored but fails validation answers 503020 and stays as it
+   * is: replacing it with its genesis would erase every recorded revocation.
+   */
+  private async readDocument(
+    identityId: IdentityId,
+  ): Promise<OrbitDBDeviceAuthorizationDocument | undefined> {
+    const stored = await this.readHead(identityId);
+
+    if (stored === undefined) {
+      return undefined;
+    }
+
+    assert(
+      this.validator.isDocument(stored),
+      new ReplicatedStateNotReadyError(),
+    );
+
+    return stored;
   }
 
   public compareAndApply(
@@ -234,7 +256,7 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       const trustedGenesis = await this.routing.resolveTrustedGenesis(
         transition.getIdentityId(),
       );
-      const candidate = await this.readHead(transition.getIdentityId());
+      const candidate = await this.readDocument(transition.getIdentityId());
 
       assert(
         trustedGenesis !== undefined,
@@ -242,7 +264,6 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
       );
       const stored =
         candidate &&
-        this.validator.isDocument(candidate) &&
         this.genesisMatcher.hasTrustedGenesis(candidate, trustedGenesis)
           ? candidate
           : await this.save(this.factory.toDocument(trustedGenesis, []));
@@ -345,25 +366,39 @@ export default class OrbitDBDeviceAuthorizationRepository extends DeviceAuthoriz
     identityExternalIdentifier: IdentityExternalIdentifier,
   ): Promise<void> {
     return this.lock.run(authorization.getIdentityId(), async () => {
+      const identityId = authorization.getIdentityId();
+      // The genesis this node already holds: verified or provisioned here, or
+      // in its stored document. Never the network: a new identity has no
+      // version list there yet and could never publish.
+      const trustedGenesis =
+        this.routing.trustedGenesis(identityId.valueOf())?.toPrimitives() ??
+        (await this.readDocument(identityId))?.genesis;
+
+      assert(
+        !trustedGenesis ||
+          this.genesisMatcher.sameAuthorizationGenesis(
+            trustedGenesis,
+            authorization.toPrimitives(),
+          ),
+        new DeviceAuthorizationGenesisConflictError(),
+      );
       this.routing.remember(
         authorization,
         identityVersion,
         identityExternalIdentifier,
       );
-      const existing = await this.readHead(authorization.getIdentityId());
+      // Read again: the registry admits a replicated head only once its
+      // genesis is trusted, so the read above may miss the stored history.
+      const existing = await this.readDocument(identityId);
 
-      if (existing) {
-        if (
-          !this.validator.isDocument(existing) ||
-          !this.genesisMatcher.sameAuthorizationGenesis(
-            existing.genesis,
-            authorization.toPrimitives(),
-          )
-        ) {
-          await this.save(this.factory.toDocument(authorization, []));
-        } else {
-          await this.save(existing);
-        }
+      if (
+        existing &&
+        this.genesisMatcher.sameAuthorizationGenesis(
+          existing.genesis,
+          authorization.toPrimitives(),
+        )
+      ) {
+        await this.save(existing);
 
         return;
       }

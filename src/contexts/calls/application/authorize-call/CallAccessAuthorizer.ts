@@ -4,6 +4,7 @@ import { CommunityId } from '@app/contexts/communities/domain/value-objects/Comm
 import ConversationRepository from '@app/contexts/conversations/domain/repositories/ConversationRepository';
 import { ConversationId } from '@app/contexts/conversations/domain/value-objects/ConversationId';
 import { IdentityId } from '@app/contexts/shared/domain/value-objects/IdentityId';
+import { DomainError } from '@haskou/value-objects';
 
 import { Call } from '../../domain/Call';
 import { CallNotFoundError } from '../../domain/errors/CallNotFoundError';
@@ -67,8 +68,10 @@ export default class CallAccessAuthorizer {
 
     try {
       community.authorizeVoiceChannelCall(identityId, channelId);
-    } catch {
-      throw new CallNotFoundError();
+    } catch (error: unknown) {
+      if (error instanceof DomainError) throw new CallNotFoundError();
+
+      throw error;
     }
   }
 
@@ -112,13 +115,19 @@ export default class CallAccessAuthorizer {
     return participants.filter((_identityId, index) => visibility[index]);
   }
 
+  /**
+   * False only for a verified denial; a scope it cannot read rejects, so an
+   * unreadable repository never reads as no access.
+   */
   public async canAccess(call: Call, identityId: IdentityId): Promise<boolean> {
     try {
       await this.assertAccess(call, identityId);
 
       return true;
-    } catch {
-      return false;
+    } catch (error: unknown) {
+      if (error instanceof CallNotFoundError) return false;
+
+      throw error;
     }
   }
 }

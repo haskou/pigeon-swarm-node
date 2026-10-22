@@ -471,11 +471,25 @@ export default class IPFSNetworkRegistry {
     await this.enqueueMutation(() => this.removeNetworkNow(id));
   }
 
-  /** Stops every network through the removal path, so OrbitDB stores close before the local database. */
+  /**
+   * Stops every network through the removal path, so OrbitDB stores close
+   * before the local database. A network that fails to stop does not keep
+   * the others running: every failure is reported together at the end.
+   */
   public async stopAll(): Promise<void> {
     await this.enqueueMutation(async () => {
+      const failures: unknown[] = [];
+
       for (const id of this.getAll().map((network) => network.getId())) {
-        await this.removeNetworkNow(id);
+        try {
+          await this.removeNetworkNow(id);
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+
+      if (failures.length > 0) {
+        throw new AggregateError(failures, 'Some IPFS networks failed to stop');
       }
     });
   }

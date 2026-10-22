@@ -40,6 +40,15 @@ export abstract class DeviceAuthorizationRepository {
     identityId: IdentityId,
   ): Promise<DeviceCompromiseCaps>;
 
+  /**
+   * Stores the genesis authorization of a published identity version. An
+   * identity whose genesis this node already holds (stored, verified or
+   * provisioned) keeps it: a different genesis, even a second validly signed
+   * version 1, rejects with DeviceAuthorizationGenesisConflictError before
+   * anything is remembered or written, so its enrolled and revoked devices are
+   * never reset. The check never waits on the network. A stored document that
+   * cannot be read rejects with ReplicatedStateNotReadyError and is kept.
+   */
   public abstract provision(
     authorization: DeviceAuthorization,
     identityVersion: IdentityVersion,

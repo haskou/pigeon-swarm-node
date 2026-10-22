@@ -8,6 +8,7 @@ import CallRepository from '@app/contexts/calls/domain/repositories/CallReposito
 import CallParticipantLeaseWarmUp from '@app/contexts/calls/infrastructure/memory/CallParticipantLeaseWarmUp';
 import InMemoryCallParticipantLeaseRepository from '@app/contexts/calls/infrastructure/memory/InMemoryCallParticipantLeaseRepository';
 import { Community } from '@app/contexts/communities/domain/Community';
+import { CommunityMemberNotFoundError } from '@app/contexts/communities/domain/errors/CommunityMemberNotFoundError';
 import CommunityRepository from '@app/contexts/communities/domain/repositories/CommunityRepository';
 import { CommunityChannelId } from '@app/contexts/communities/domain/value-objects/CommunityChannelId';
 import { CommunityId } from '@app/contexts/communities/domain/value-objects/CommunityId';
@@ -223,7 +224,7 @@ describe('live call privacy', () => {
     expect(JSON.stringify(leaseMessage)).not.toContain(node.valueOf());
     (client.send as jest.Mock).mockClear();
     community.authorizeVoiceChannelCall.mockImplementation(() => {
-      throw new Error('Access revoked');
+      throw new CommunityMemberNotFoundError();
     });
     hub.publish([started]);
     await flush();
@@ -287,7 +288,8 @@ describe('live call privacy', () => {
     jest
       .mocked(community.authorizeVoiceChannelCall)
       .mockImplementation((identityId) => {
-        if (identityId.isEqual(outsider)) throw new Error('Not a member');
+        if (identityId.isEqual(outsider))
+          throw new CommunityMemberNotFoundError();
       });
     hub.register(outsider, outsiderClient);
     (client.send as jest.Mock).mockClear();
